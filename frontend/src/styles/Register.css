@@ -1,0 +1,332 @@
+.auth-page-bg {
+  background-color: var(--bg-secondary);
+}
+
+body.dark-mode .auth-page-bg {
+  background-color: #09090b;
+}
+
+.register-card {
+  background-color: var(--bg-primary);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-xl);
+  transition: all var(--transition-normal);
+  padding: var(--space-8);
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.register-card:hover {
+  box-shadow: var(--shadow-2xl);
+  transform: translateY(-2px);
+}
+
+body.dark-mode .register-card {
+  background-color: #27272a !important;
+}
+
+.register-title {
+  color: var(--text-primary);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  margin-bottom: var(--space-2);
+}
+
+.register-subtitle {
+  color: var(--text-secondary);
+  font-size: var(--font-size-base);
+  margin-bottom: var(--space-8);
+}
+
+body.dark-mode .register-title {
+  color: #fafafa !important;
+}
+
+body.dark-mode .register-subtitle {
+  color: #d4d4d8 !important;
+}
+
+.register-label {
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  margin-bottom: var(--space-2);
+  display: block;
+}
+
+body.dark-mode .register-label {
+  color: #fafafa !important;
+}
+
+.register-input {
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  padding: var(--space-3) var(--space-4);
+  transition: all var(--transition-fast);
+  width: 100%;
+  margin-bottom: var(--space-4);
+}
+
+[data-theme="dark"] .register-input {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border-color: var(--border-medium);
+}
+
+.register-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] .register-input:focus {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+}
+
+.register-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+[data-theme="dark"] .register-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.register-button {
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--primary);
+  color: var(--text-inverse);
+  border: none;
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-md);
+  margin-top: var(--space-4);
+}
+
+[data-theme="dark"] .register-button {
+  background-color: var(--primary);
+  color: var(--text-inverse);
+}
+
+.register-button:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-1px);
+}
+
+[data-theme="dark"] .register-button:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+}
+
+.register-button:active {
+  transform: translateY(0);
+}
+
+.register-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.register-error {
+  color: #dc2626;
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  background-color: rgba(220, 38, 38, 0.1);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: var(--radius-md);
+}
+
+[data-theme="dark"] .register-error {
+  color: #f87171;
+  background-color: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.2);
+}
+
+.register-link {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: var(--font-weight-medium);
+  transition: color var(--transition-fast);
+}
+
+.register-link:hover {
+  color: var(--primary-hover);
+  text-decoration: underline;
+}
+
+[data-theme="dark"] .register-link {
+  color: var(--gray-300);
+}
+
+[data-theme="dark"] .register-link:hover {
+  color: var(--gray-100);
+}
+
+.register-link-container {
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  margin-top: var(--space-6);
+}
+
+body.dark-mode .register-link-container {
+  color: #d4d4d8 !important; /* Light gray text */
+}
+
+/* Logo container */
+.register-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--space-6);
+}
+
+/* Form container */
+.register-form {
+  width: 100%;
+}
+
+/* Input group spacing */
+.register-form .form-group {
+  margin-bottom: var(--space-5);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .register-card {
+    padding: var(--space-6);
+    margin: var(--space-4);
+    border-radius: var(--radius-xl);
+  }
+  
+  .register-title {
+    font-size: var(--font-size-xl);
+  }
+  
+  .register-input {
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+}
+
+@media (max-width: 480px) {
+  .register-card {
+    padding: var(--space-4);
+    margin: var(--space-2);
+  }
+  
+  .register-title {
+    font-size: var(--font-size-lg);
+  }
+  
+  .register-subtitle {
+    font-size: var(--font-size-sm);
+  }
+}
+
+/* Animation for form appearance */
+@keyframes registerAppear {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.register-card {
+  animation: registerAppear var(--transition-slow) ease-out;
+}
+
+/* Focus management */
+.register-input:focus,
+.register-button:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Loading state */
+.register-button.loading {
+  position: relative;
+  color: transparent;
+}
+
+.register-button.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 2px solid var(--text-inverse);
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 1s linear infinite;
+}
+
+[data-theme="dark"] .register-button.loading::after {
+  border-color: var(--text-inverse);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Password strength indicator */
+.password-strength {
+  margin-top: var(--space-2);
+  font-size: var(--font-size-xs);
+}
+
+.password-strength.weak {
+  color: #dc2626;
+}
+
+.password-strength.medium {
+  color: #f59e0b;
+}
+
+.password-strength.strong {
+  color: #10b981;
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  .register-card {
+    animation: none;
+  }
+  
+  .register-button {
+    transition: none;
+  }
+  
+  .register-button.loading::after {
+    animation: none;
+  }
+}
+
+@media (prefers-contrast: high) {
+  .register-card {
+    border-width: 2px;
+  }
+  
+  .register-input {
+    border-width: 2px;
+  }
+  
+  .register-button {
+    border: 2px solid currentColor;
+  }
+}

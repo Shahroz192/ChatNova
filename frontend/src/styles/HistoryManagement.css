@@ -1,0 +1,25 @@
+/* History Management Component Styles */
+
+/* Search Input Dark Mode Support */
+[data-theme="dark"] .form-control::placeholder {
+  color: var(--text-tertiary) !important;
+  opacity: 1;
+}
+
+[data-theme="dark"] .form-control {
+  background-color: var(--bg-primary);
+  border-color: var(--border-light);
+  color: var(--text-primary);
+}
+
+/* Session List Items Dark Mode Support */
+[data-theme="dark"] .list-group-item {
+  background-color: transparent !important;
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .list-group-item:hover {
+  background-color: var(--bg-tertiary);
+}
+
+/* Additional HistoryManagement specific styles can go here */

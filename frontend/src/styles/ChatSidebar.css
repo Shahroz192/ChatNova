@@ -1,0 +1,177 @@
+/* Enhanced Sidebar Styling */
+.sidebar {
+    background: var(--bg-sidebar) !important;
+    border-right: 1px solid var(--border-light) !important;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    position: relative;
+}
+
+.dark-mode .sidebar {
+    border-right: 1px solid var(--border-light) !important;
+}
+
+.sidebar::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.02) 0%,
+        rgba(0, 0, 0, 0.02) 100%
+    );
+    pointer-events: none;
+}
+
+.dark-mode .sidebar::before {
+    background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.01) 0%,
+        rgba(0, 0, 0, 0.1) 100%
+    );
+}
+
+/* Additional aggressive styling for select in sidebar */
+.sidebar select {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-medium) !important;
+}
+
+.dark-mode .sidebar select {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-medium) !important;
+}
+
+.dark-mode .sidebar select option {
+    background-color: var(--gray-900) !important;
+    color: var(--text-primary) !important;
+    padding: 8px 12px !important;
+    border: none !important;
+}
+
+/* Custom select wrapper */
+.custom-select-wrapper {
+    position: relative;
+}
+
+.custom-select-wrapper::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 12px;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 4px solid var(--text-secondary);
+    pointer-events: none;
+}
+
+.dark-mode .custom-select-wrapper::after {
+    border-top-color: var(--text-secondary);
+}
+
+/* Form Group and Label */
+.form-group {
+    margin-bottom: var(--space-4);
+}
+
+.form-label {
+    color: var(--text-primary);
+    font-weight: var(--font-weight-medium);
+    margin-bottom: var(--space-2);
+}
+
+.dark-mode .form-label {
+    color: var(--text-primary);
+}
+
+/* Custom Dropdown Styles */
+.custom-dropdown {
+    position: relative;
+    width: 100%;
+}
+
+.dropdown-button {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: var(--transition-fast);
+}
+
+.dropdown-button:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border-dark);
+}
+
+.dropdown-button:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.dropdown-arrow {
+    font-size: 12px;
+    font-weight: bold;
+    color: var(--text-secondary);
+    transition: var(--transition-fast);
+}
+
+.dropdown-options {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    z-index: var(--z-dropdown);
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 4px;
+}
+
+.dropdown-option {
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    color: var(--text-primary);
+}
+
+.dropdown-option:hover {
+    background: var(--bg-secondary);
+}
+
+.dropdown-option:first-child {
+    border-top-left-radius: var(--radius-md);
+    border-top-right-radius: var(--radius-md);
+}
+
+.dropdown-option:last-child {
+    border-bottom-left-radius: var(--radius-md);
+    border-bottom-right-radius: var(--radius-md);
+}
+
+.dark-mode .dropdown-options {
+    background: var(--bg-secondary);
+    border-color: var(--border-medium);
+}
+
+.dark-mode .dropdown-option:hover {
+    background: var(--gray-800);
+}

@@ -1,0 +1,232 @@
+/* BYOK Form Component Styles (API Keys section) */
+
+/* BYOK Form Container */
+.byok-form {
+  color: var(--text-primary);
+}
+
+.dark-mode .byok-form,
+[data-theme="dark"] .byok-form {
+  color: #e0e0e0;
+}
+
+.byok-text-color {
+  color: var(--text-primary);
+}
+
+.dark-mode .byok-text-color,
+[data-theme="dark"] .byok-text-color {
+  color: #e0e0e0;
+}
+
+/* Table Border and Layout */
+.byok-table-border {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  width: calc(100% + 2.5rem);
+  margin: 0 -1.25rem;
+  overflow: hidden;
+}
+
+.dark-mode .byok-table-border,
+[data-theme="dark"] .byok-table-border {
+  border: 1px solid #30363d;
+}
+
+/* Table Background */
+.byok-table-bg {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.dark-mode .byok-table-bg,
+[data-theme="dark"] .byok-table-bg {
+  background-color: #161b22;
+  color: #e0e0e0;
+}
+
+/* Table Header */
+.byok-table-header {
+  background-color: var(--bg-secondary);
+}
+
+.dark-mode .byok-table-header,
+[data-theme="dark"] .byok-table-header {
+  background-color: #0d1117;
+}
+
+.byok-table-header-cell {
+  border-bottom: 1px solid var(--border-light);
+  padding: var(--space-3) var(--space-4);
+}
+
+.dark-mode .byok-table-header-cell,
+[data-theme="dark"] .byok-table-header-cell {
+  border-bottom: 1px solid #30363d;
+}
+
+.byok-table-header-text {
+  color: var(--text-primary);
+  text-align: left;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.dark-mode .byok-table-header-text,
+[data-theme="dark"] .byok-table-header-text {
+  color: #e0e0e0;
+}
+
+/* Table Body */
+.byok-table-body {
+  border-bottom: 1px solid var(--border-light);
+}
+
+.dark-mode .byok-table-body,
+[data-theme="dark"] .byok-table-body {
+  border-bottom: 1px solid #30363d;
+}
+
+.byok-table-row {
+  border-bottom: 1px solid var(--border-light);
+  transition: background-color var(--transition-fast);
+}
+
+.dark-mode .byok-table-row,
+[data-theme="dark"] .byok-table-row {
+  border-bottom: 1px solid #30363d;
+}
+
+.byok-table-row:nth-child(even) {
+  background-color: var(--bg-primary);
+}
+
+.byok-table-row:nth-child(odd) {
+  background-color: var(--bg-secondary);
+}
+
+.dark-mode .byok-table-row:nth-child(even),
+[data-theme="dark"] .byok-table-row:nth-child(even) {
+  background-color: #161b22;
+}
+
+.dark-mode .byok-table-row:nth-child(odd),
+[data-theme="dark"] .byok-table-row:nth-child(odd) {
+  background-color: #0d1117;
+}
+
+.byok-table-row:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.dark-mode .byok-table-row:hover,
+[data-theme="dark"] .byok-table-row:hover {
+  background-color: #21262d;
+}
+
+/* Model Status Styling */
+.byok-model-available {
+  color: #2ea043;
+  font-weight: var(--font-weight-medium);
+}
+
+.dark-mode .byok-model-available,
+[data-theme="dark"] .byok-model-available {
+  color: #56d364;
+}
+
+.byok-model-unavailable {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.dark-mode .byok-model-unavailable,
+[data-theme="dark"] .byok-model-unavailable {
+  color: #8b949e;
+}
+
+.byok-model-required {
+  color: #cf222e !important;
+  font-size: var(--font-size-xs);
+}
+
+.dark-mode .byok-model-required,
+[data-theme="dark"] .byok-model-required {
+  color: #f85149 !important;
+}
+
+/* Badge Styling */
+.byok-badge-active {
+  background-color: #dcffe4;
+  color: #2ea043;
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-0.5) var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.dark-mode .byok-badge-active,
+[data-theme="dark"] .byok-badge-active {
+  background-color: #1a361a;
+  color: #66e066;
+}
+
+/* Input Field Styling */
+.byok-input-field {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  color: var(--text-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2);
+  width: 100%;
+  transition: all var(--transition-fast);
+}
+
+.byok-input-field:focus {
+  background-color: var(--bg-primary);
+  border-color: var(--primary);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 0.2rem rgba(0, 0, 0, 0.25);
+  outline: none;
+}
+
+.dark-mode .byok-input-field,
+[data-theme="dark"] .byok-input-field {
+  background-color: #0d1117;
+  border: 1px solid #30363d;
+  color: #e0e0e0;
+}
+
+.dark-mode .byok-input-field:focus,
+[data-theme="dark"] .byok-input-field:focus {
+  background-color: var(--bg-secondary);
+  border-color: var(--primary);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 0.2rem rgba(0, 0, 0, 0.25);
+}
+
+/* Table Cell Padding */
+.byok-table-row td {
+  padding: var(--space-3) var(--space-4);
+  vertical-align: middle;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .byok-table-border {
+    width: calc(100% + var(--space-2));
+    margin: 0 -var(--space-1);
+    border-radius: var(--radius-md);
+  }
+  
+  .byok-table-header-cell,
+  .byok-table-row td {
+    padding: var(--space-2) var(--space-3);
+  }
+  
+  .byok-table-header-text {
+    font-size: var(--font-size-xs);
+  }
+}

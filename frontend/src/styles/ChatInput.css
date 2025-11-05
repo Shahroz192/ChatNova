@@ -1,0 +1,128 @@
+/* Modern Input Area */
+.input-area {
+  background-color: var(--bg-primary) !important;
+  border-top: none !important;
+  padding: var(--space-6);
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-sticky);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.input-container {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-end;
+  max-width: 100%;
+}
+
+.input-field {
+  flex: 1;
+  min-height: 48px;
+  max-height: 120px;
+  resize: none;
+  border: 1px solid var(--border-medium) !important;
+  border-radius: var(--radius-xl);
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  font-size: var(--font-size-base);
+  font-family: inherit;
+  padding: var(--space-3) var(--space-4);
+  line-height: var(--line-height-normal);
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-xs);
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--primary);
+  background-color: var(--bg-primary);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+}
+
+.dark-mode .input-field:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Placeholder text styling */
+.input-field::placeholder {
+  color: var(--text-tertiary) !important;
+  opacity: 1 !important;
+}
+
+.dark-mode .input-field::placeholder {
+  color: var(--text-tertiary) !important;
+  opacity: 1 !important;
+}
+
+/* Ensure input field is visible in dark mode */
+.dark-mode .input-field {
+  background-color: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-medium) !important;
+  border-radius: var(--radius-xl) !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+
+.send-button {
+  width: 48px;
+  height: 48px;
+  border: none !important;
+  border-radius: var(--radius-full);
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-md);
+  flex-shrink: 0;
+}
+
+.send-button:hover:not(:disabled) {
+  background-color: var(--primary-hover);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.send-button:active {
+  transform: translateY(0);
+}
+
+.send-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Input Area Fixed */
+.input-area-fixed {
+  background-color: var(--bg-primary);
+  border-top: none;
+  padding: var(--space-6);
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-sticky);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.dark-mode .send-button {
+  background-color: var(--primary);
+  color: var(--text-inverse);
+}
+
+/* Chat Messages Area */
+.chat-messages-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+  background: var(--bg-chat);
+}
+
+.dark-mode .send-button {
+  background: linear-gradient(135deg, var(--gray-600) 0%, var(--gray-700) 100%);
+}
