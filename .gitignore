@@ -1,0 +1,26 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.ruff_cache
+node_modules/
+
+# Virtual environments
+.venv
+.env
+
+# Generated reports and data files
+**/performance_report.*
+**/generate_flame_graph.py
+cookies.txt
+**/*report.*
+**/performance_*.*
+
+#Ignore vscode AI rules
+.codacy
+.pytest_cache
+.vscode/
+.coverage
