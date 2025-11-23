@@ -1,7 +1,7 @@
 """Add token blacklist table for session invalidation
 
-Revision ID: 5d8e4f2c9a1b
-Revises:
+Revision ID: token_blacklist_table
+Revises: 3bff5f5bc4c8
 Create Date: 2025-10-31 12:00:00.000000
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "token_blacklist_table"
-down_revision = None
+down_revision = "3bff5f5bc4c8"
 branch_labels = None
 depends_on = None
 

@@ -25,10 +25,10 @@ const BYOKForm: React.FC = () => {
 
   const fetchAvailableModels = async () => {
     try {
-      const response = await api.get("/chat/models");
-      setAvailableModels(response.data.models);
+      const response = await api.get("/users/me/api-keys");
+      setAvailableModels(response.data.api_keys.map((key: { model_name: string }) => key.model_name));
     } catch (error) {
-      console.error("Failed to fetch models", error);
+      console.error("Failed to fetch saved API keys", error);
     }
   };
 
@@ -150,10 +150,7 @@ const BYOKForm: React.FC = () => {
                     placeholder={
                       availableModels.includes(model) ? "" : "Enter API key..."
                     }
-                    disabled={
-                      availableModels.includes(model) ||
-                      (!availableModels.includes(model) && !apiKeys[model])
-                    }
+                    disabled={availableModels.includes(model)}
                   />
                 </td>
                 <td className="py-3 px-4">

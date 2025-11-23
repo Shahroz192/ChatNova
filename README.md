@@ -74,68 +74,88 @@ pnpm install
 
 ### Configure Environment
 
-1. Create a `.env` file in the backend directory based on the example:
+1. Create a `.env` file based on the example:
 
    ```bash
-   cp backend/.env.example backend/.env
+   cp .env.example .env
    ```
 
 2. Update the `.env` file with your actual API keys and configuration values:
 
    ```
-   DATABASE_URL=postgresql://user:password@localhost/ai_chat_pro
-   SECRET_KEY=your-super-secret-key
-   ALGORITHM=HS256
-   ACCESS_TOKEN_EXPIRE_MINUTES=30
+   POSTGRES_DB=ChatNova
+   POSTGRES_USER=chatnova_user
+   POSTGRES_PASSWORD=your_strong_password
+
    GOOGLE_API_KEY=your-google-api-key
    CEREBRAS_API_KEY=your-cerebras-api-key
    GROQ_API_KEY=your-groq-api-key
+
+   FERNET_KEY=generate_using_provided_command
+   SECRET_KEY=generate_using_provided_command
    ```
+
+   See [DOCKER_SETUP.md](./DOCKER_SETUP.md) for detailed instructions.
 
 ## Usage
 
-### Docker Compose (Recommended)
+### Docker Compose (Recommended for Production)
 
-The project can be run with Docker Compose for easy setup:
+For the easiest setup with all services containerized:
 
 ```bash
+# 1. Create and configure .env file
+cp .env.example .env
+# Edit .env with your values
+
+# 2. Build and start all services
 docker-compose up --build
 ```
 
-The backend API will be available at `http://localhost:8000` and the frontend will be accessible at `http://localhost:3000`.
+The backend API will be available at `http://localhost:8000`.
 
-### Development Mode
+For detailed Docker setup and commands, see [DOCKER_SETUP.md](./DOCKER_SETUP.md).
 
-For development, you can run the backend and frontend separately:
+### Local Development Mode
 
-1. Start the database:
+For development with live reload:
+
+1. **Start PostgreSQL** (using Docker):
 
    ```bash
    docker-compose up db -d
    ```
 
-2. Run database migrations:
+2. **Configure local environment**:
+
+   ```bash
+   # Update DATABASE_URL to use localhost instead of db container
+   # DATABASE_URL=postgresql://chatnova_user:your_password@localhost:5432/ChatNova
+   ```
+
+3. **Run database migrations**:
 
    ```bash
    cd backend
-   alembic upgrade head
+   uv run alembic upgrade head
    ```
 
-3. Start the backend server:
+4. **Start the backend server** (with auto-reload):
 
    ```bash
    cd backend
-   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+   uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
    ```
 
-4. Start the frontend development server:
+5. **Start the frontend** (in a new terminal):
 
    ```bash
    cd frontend
+   pnpm install  # if not already installed
    pnpm dev
    ```
 
-The backend API will be available at `http://localhost:8000` and the frontend will be accessible at `http://localhost:5173`.
+The backend API will be available at `http://localhost:8000` and the frontend at `http://localhost:5173`.
 
 ### Available Endpoints
 

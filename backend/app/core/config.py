@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 
-mcp_path = "/home/shahroz/ai-chat-pro/backend/app/mcp.json"
+mcp_path = "/home/shahroz/ChatNova/backend/app/mcp.json"
 
 
 class Settings(BaseSettings):

@@ -190,15 +190,13 @@ const Chat: React.FC<ChatProps> = () => {
     useEffect(() => {
         const init = async () => {
             await loadModels();
-            await loadApiKeys();
         };
         init();
     }, []);
 
     useEffect(() => {
         const handleSessionFromUrl = async () => {
-            if (sessionIdFromUrl && !loading) {
-                // Don't load if already loading
+            if (sessionIdFromUrl) {
                 const sessionId = parseInt(sessionIdFromUrl);
                 if (!isNaN(sessionId) && sessionId !== currentSessionId) {
                     const success = await loadSessionById(sessionId);
@@ -216,7 +214,7 @@ const Chat: React.FC<ChatProps> = () => {
         // Small delay to prevent immediate errors on navigation
         const timer = setTimeout(handleSessionFromUrl, 100);
         return () => clearTimeout(timer);
-    }, [sessionIdFromUrl, loading]); // Include loading to prevent conflicts
+    }, [sessionIdFromUrl, currentSessionId, navigate, showError]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -297,21 +295,17 @@ const Chat: React.FC<ChatProps> = () => {
 
     const loadModels = async () => {
         try {
-            const response = await api.get("/chat/models");
-            setModels(response.data.models);
-            if (response.data.models.length > 0) {
-                setSelectedModel(response.data.models[0]);
+            const response = await api.get("/users/me/api-keys");
+            const userModels = response.data.api_keys.map(
+                (key: { model_name: string }) => key.model_name
+            );
+            setModels(userModels);
+            if (userModels.length > 0) {
+                setSelectedModel(userModels[0]);
             }
         } catch (error) {
             showError("Loading Error", "Failed to load AI models.");
             console.error("Failed to load models", error);
-        }
-    };
-
-    const loadApiKeys = async () => {
-        try {
-        } catch (error) {
-            console.error("Failed to load API keys", error);
         }
     };
 

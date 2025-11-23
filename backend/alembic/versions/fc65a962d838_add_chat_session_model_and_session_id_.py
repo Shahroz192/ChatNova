@@ -51,25 +51,24 @@ def upgrade():
         ["created_at"],
         unique=False,
     )
-
-    # Add session_id column to messages table
-    op.add_column(
-        "messages",
-        sa.Column(
-            "session_id", sa.Integer(), sa.ForeignKey("chat_sessions.id"), nullable=True
-        ),
-    )
     op.create_index(
-        op.f("ix_messages_session_id"), "messages", ["session_id"], unique=False
+        op.f("ix_chat_sessions_updated_at"),
+        "chat_sessions",
+        ["updated_at"],
+        unique=False,
+    )
+    op.alter_column(
+        "chat_sessions",
+        "updated_at",
+        existing_type=sa.DateTime(timezone=True),
+        nullable=False,
+        server_default=sa.text("now()"),
     )
 
 
 def downgrade():
-    # Drop session_id column from messages table
-    op.drop_index(op.f("ix_messages_session_id"), table_name="messages")
-    op.drop_column("messages", "session_id")
-
     # Drop chat_sessions table
+    op.drop_index(op.f("ix_chat_sessions_updated_at"), table_name="chat_sessions")
     op.drop_index(op.f("ix_chat_sessions_created_at"), table_name="chat_sessions")
     op.drop_index(op.f("ix_chat_sessions_user_id"), table_name="chat_sessions")
     op.drop_index(op.f("ix_chat_sessions_title"), table_name="chat_sessions")
