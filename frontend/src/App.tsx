@@ -1,9 +1,9 @@
  import React from "react";
  import {
- BrowserRouter as Router,
- Routes,
- Route,
- Navigate,
+   BrowserRouter as Router,
+   Routes,
+   Route,
+   Navigate,
  } from "react-router-dom";
  import Login from "./components/auth/Login";
  import Register from "./components/auth/Register";
@@ -14,65 +14,61 @@
  import Settings from "./components/settings/Settings";
  import ToastContainer from "./components/common/ToastContainer";
  import RequireAuth from "./components/common/RequireAuth";
-   import { ToastProvider } from "./contexts/ToastContext";
- import { ThemeProvider } from "./contexts/ThemeContext";
-
-  const App: React.FC = () => {
-
-     return (
+ import { ToastProvider } from "./contexts/ToastContext";
+ 
+ const App: React.FC = () => {
+   return (
      <ToastProvider>
-     <ThemeProvider>
-     <Router>
-     <Routes>
-         <Route path="/login" element={<Login />} />
-         <Route path="/register" element={<Register />} />
-     <Route
-     path="/chat"
-     element={
-     <RequireAuth>
-     <Chat />
-     </RequireAuth>
-     }
-     />
-     <Route
-         path="/history"
-     element={
-     <RequireAuth>
-             <HistoryManagement />
-             </RequireAuth>
+       <Router>
+         <Routes>
+           <Route path="/login" element={<Login />} />
+           <Route path="/register" element={<Register />} />
+           <Route
+             path="/chat"
+             element={
+               <RequireAuth>
+                 <Chat />
+               </RequireAuth>
              }
-         />
-     <Route
-         path="/model-test"
-     element={
-     <RequireAuth>
-             <ModelTest />
-             </RequireAuth>
+           />
+           <Route
+             path="/history"
+             element={
+               <RequireAuth>
+                 <HistoryManagement />
+               </RequireAuth>
              }
-         />
-     <Route
-         path="/profile"
-     element={
-     <RequireAuth>
-             <ProfileEdit />
-             </RequireAuth>
+           />
+           <Route
+             path="/model-test"
+             element={
+               <RequireAuth>
+                 <ModelTest />
+               </RequireAuth>
              }
-         />
-     <Route
-     path="/settings"
-     element={
-     <RequireAuth>
-     <Settings />
-     </RequireAuth>
-     }
-     />
-             <Route path="/" element={<Navigate to="/chat" />} />
-             </Routes>
-             <ToastContainer />
-             </Router>
-                 </ThemeProvider>
-          </ToastProvider>
-      );
+           />
+           <Route
+             path="/profile"
+             element={
+               <RequireAuth>
+                 <ProfileEdit />
+               </RequireAuth>
+             }
+           />
+           <Route
+             path="/settings"
+             element={
+               <RequireAuth>
+                 <Settings />
+               </RequireAuth>
+             }
+           />
+           <Route path="/" element={<Navigate to="/chat" />} />
+         </Routes>
+         <ToastContainer />
+       </Router>
+     </ToastProvider>
+   );
  };
-
-export default App;
+ 
+ export default App;

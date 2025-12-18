@@ -11,10 +11,8 @@ from app.core.memory_profiler import memory_profiler
 from app.core.compression import CompressionMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
 
-# Enable memory profiling
 memory_profiler.start_tracemalloc()
 
-# Create database tables if the database is available
 try:
     Base.metadata.create_all(bind=engine)
     setup_db_profiling(engine)
@@ -23,22 +21,16 @@ except Exception as e:
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION)
 
-# Add rate limiting
-# Use environment-aware rate limiting (higher limits for testing)
 if settings.ENVIRONMENT == "testing":
-    # More generous limits for testing to avoid interfering with test runs
     limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 else:
-    # Stricter limits for production
     limiter = Limiter(key_func=get_remote_address, default_limits=["10/minute"])
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Add compression middleware for large responses
 app.add_middleware(CompressionMiddleware)
 
-# Add security headers middleware
 app.add_middleware(SecurityHeadersMiddleware)
 
 app.add_middleware(
@@ -46,16 +38,16 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://localhost:3000",
-        "http://localhost:8000",  # Allow backend origin for direct access
-    ],  # Allow specific origins only
+        "http://localhost:8000",
+    ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Specific methods only
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=[
         "Authorization",
         "Content-Type",
         "X-Requested-With",
         "Set-Cookie",
-    ],  # Specific headers only
+    ],
 )
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])

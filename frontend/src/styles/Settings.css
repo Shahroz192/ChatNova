@@ -115,93 +115,12 @@
   --z-tooltip: 1070;
 }
 
-/* Dark Mode Monochrome Palette */
-.dark-mode {
-  /* Inverted Monochrome for Dark Mode */
-  --gray-50: var(--gray-950);
-  --gray-100: var(--gray-900);
-  --gray-150: var(--gray-850);
-  --gray-200: var(--gray-800);
-  --gray-300: var(--gray-700);
-  --gray-400: var(--gray-600);
-  --gray-500: var(--gray-500);
-  --gray-600: var(--gray-400);
-  --gray-700: var(--gray-300);
-  --gray-800: var(--gray-200);
-  --gray-850: var(--gray-150);
-  --gray-900: var(--gray-100);
-  --gray-950: var(--gray-50);
-
-  /* Dark Mode Semantic Colors */
-  --primary: var(--gray-200);
-  --primary-hover: var(--gray-100);
-  --primary-light: var(--gray-300);
-  --secondary: var(--gray-400);
-  --accent: var(--gray-300);
-
-  /* Dark Mode Backgrounds */
-  --bg-primary: var(--gray-700);
-  --bg-secondary: var(--gray-850);
-  --bg-tertiary: var(--gray-800);
-  --bg-chat: #000000;
-  --bg-sidebar: var(--gray-900);
-
-  /* Dark Mode Text */
-  --text-primary: var(--gray-100);
-  --text-secondary: var(--gray-300);
-  --text-tertiary: var(--gray-400);
-  --text-inverse: var(--gray-900);
-
-  /* Dark Mode Borders */
-  --border-light: var(--gray-800);
-  --border-medium: var(--gray-700);
-  --border-dark: var(--gray-600);
-
-  /* Enhanced Shadows for Dark Mode */
-  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.3), 0 1px 2px -1px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.2);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
-  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-}
-
-.settings-page .dark-mode .bg-light,
-.dark-mode .settings-page .bg-light {
-  background-color: var(--bg-secondary) !important;
-  color: var(--text-primary);
-}
-
+/* Settings Page Light Mode Styles */
 .settings-page .text-primary,
 .text-primary {
   color: var(--text-primary) !important;
 }
 
-.settings-page .dark-mode .text-primary,
-.dark-mode .settings-page .text-primary {
-  color: var(--primary) !important;
-}
-
-.settings-page .dark-mode .text-muted,
-.dark-mode .settings-page .text-muted {
-  color: #8b949e !important;
-}
-
-.settings-page .dark-mode .border-end,
-.dark-mode .settings-page .border-end {
-  border-right: 1px solid #30363d !important;
-}
-
-/* Navigation sidebar styles in dark mode */
-.settings-page .dark-mode .col-md-3.bg-light.border-end.d-flex.flex-column.p-4,
-.dark-mode .settings-page .col-md-3.bg-light.border-end.d-flex.flex-column.p-4 {
-  background: linear-gradient(to bottom, #161b22, #0d1117) !important;
-  background-attachment: fixed !important;
-  color: #e0e0e0;
-}
-
-/* Navigation link styles in light mode */
-.settings-page .nav-link,
 .settings-page .nav-link {
   color: var(--text-primary) !important;
   background-color: var(--bg-secondary) !important;
@@ -222,90 +141,7 @@
   border-color: var(--primary) !important;
 }
 
-/* Navigation link styles in dark mode */
-.settings-page .dark-mode .nav-link,
-.dark-mode .settings-page .nav-link {
-  color: #c9d1d9 !important;
-  background-color: #21262d !important;
-  border: 1px solid #30363d !important;
-}
-
-.settings-page .dark-mode .nav-link.active,
-.dark-mode .settings-page .nav-link.active {
-  background-color: var(--primary) !important;
-  border-color: var(--primary) !important;
-  color: var(--text-inverse) !important;
-}
-
-.settings-page .dark-mode .nav-link:hover:not(.active),
-.dark-mode .settings-page .nav-link:hover:not(.active) {
-  background-color: var(--bg-tertiary) !important;
-  color: var(--primary) !important;
-  border-color: var(--primary) !important;
-}
-
-/* Navigation item styles */
-.settings-page .dark-mode .nav-item,
-.dark-mode .settings-page .nav-item {
-  border-radius: 8px;
-}
-
-/* Card styles in dark mode */
-.settings-page .dark-mode .card,
-.dark-mode .settings-page .card {
-  background-color: #161b22 !important;
-  background-attachment: fixed !important;
-  border-color: #30363d !important;
-  color: #e0e0e0 !important;
-  border-radius: 16px !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-}
-
-.settings-page .dark-mode .card-header,
-.dark-mode .settings-page .card-header {
-  background-color: #0d1117 !important;
-  border-color: #30363d !important;
-  color: #e0e0e0 !important;
-  border-radius: 16px 16px 0 0 !important;
-}
-
-.settings-page .dark-mode .card-body,
-.dark-mode .settings-page .card-body {
-  background-color: #161b22 !important;
-  background-attachment: fixed !important;
-  color: #e0e0e0 !important;
-}
-
-/* Form control styles in dark mode */
-.settings-page .dark-mode .form-control,
-.dark-mode .settings-page .form-control {
-  background-color: #0d1117 !important;
-  border-color: #30363d !important;
-  color: #e0e0e0 !important;
-  border-radius: 12px !important;
-  padding: 12px !important;
-}
-
-.settings-page .dark-mode .form-control:focus,
-.dark-mode .settings-page .form-control:focus {
-  background-color: var(--bg-secondary) !important;
-  border-color: var(--primary) !important;
-  color: var(--text-primary) !important;
-  box-shadow: 0 0 0 0.2rem rgba(0, 0, 0, 0.25) !important;
-}
-
-.settings-page .dark-mode .form-label,
-.dark-mode .settings-page .form-label {
-  color: #e0e0e0 !important;
-}
-
-/* Form text styles */
-.settings-page .dark-mode .form-text,
-.dark-mode .settings-page .form-text {
-  color: #8b949e !important;
-}
-
-/* Button styles in light mode */
+/* Button styles */
 .settings-page .btn-primary,
 .btn-primary {
   background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%) !important;
@@ -315,20 +151,6 @@
 
 .settings-page .btn-primary:hover,
 .btn-primary:hover {
-  background: linear-gradient(135deg, var(--primary-hover) 0%, var(--primary) 100%) !important;
-  border-color: var(--primary-hover) !important;
-}
-
-/* Button styles in dark mode */
-.settings-page .dark-mode .btn-primary,
-.dark-mode .settings-page .btn-primary {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%) !important;
-  border-color: var(--primary) !important;
-  color: var(--text-inverse) !important;
-}
-
-.settings-page .dark-mode .btn-primary:hover,
-.dark-mode .settings-page .btn-primary:hover {
   background: linear-gradient(135deg, var(--primary-hover) 0%, var(--primary) 100%) !important;
   border-color: var(--primary-hover) !important;
 }
@@ -347,137 +169,13 @@
   color: var(--primary) !important;
 }
 
-.settings-page .dark-mode .btn-outline,
-.dark-mode .settings-page .btn-outline {
-  color: var(--primary) !important;
-  border-color: var(--primary) !important;
-  background-color: transparent !important;
-}
-
-.settings-page .dark-mode .btn-outline:hover,
-.dark-mode .settings-page .btn-outline:hover {
-  background-color: var(--bg-tertiary) !important;
-  border-color: var(--primary) !important;
-  color: var(--primary) !important;
-}
-
-/* Alert styles in dark mode */
-.settings-page .dark-mode .alert,
-.dark-mode .settings-page .alert {
-  border: 1px solid !important;
-  border-radius: 8px !important;
-}
-
-.settings-page .dark-mode .alert-success,
-.dark-mode .settings-page .alert-success {
-  background-color: #1a361a !important;
-  border-color: #336633 !important;
-  color: #66e066 !important;
-}
-
-.settings-page .dark-mode .alert-danger,
-.dark-mode .settings-page .alert-danger {
-  background-color: #471717 !important;
-  border-color: #7a2828 !important;
-  color: #f87171 !important;
-}
-
-.settings-page .dark-mode .alert-info,
-.dark-mode .settings-page .alert-info {
-  background-color: #1a364c !important;
-  border-color: #336699 !important;
-  color: #a3c6f0 !important;
-}
-
-/* Input group styles in dark mode */
-.settings-page .dark-mode .input-group,
-.dark-mode .settings-page .input-group {
-  border-radius: 16px !important;
-  overflow: hidden !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
-}
-
-.settings-page .dark-mode .input-group .form-control,
-.dark-mode .settings-page .input-group .form-control {
-  background-color: #0d1117 !important;
-  border: none !important;
-  border-radius: 0 !important;
-  color: #e0e0e0 !important;
-}
-
-.settings-page .dark-mode .input-group .btn,
-.dark-mode .settings-page .input-group .btn {
-  border: none !important;
-  border-radius: 0 !important;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%) !important;
-  color: var(--text-inverse) !important;
-}
-
-.settings-page .dark-mode .input-group .btn:hover,
-.dark-mode .settings-page .input-group .btn:hover {
-  background: linear-gradient(135deg, var(--primary-hover) 0%, var(--primary) 100%) !important;
-}
-
-/* For the main content area */
-.settings-page .dark-mode .col-md-9.d-flex.flex-column.p-4,
-.dark-mode .settings-page .col-md-9.d-flex.flex-column.p-4 {
-  background-color: #0d1117 !important;
-  background-attachment: fixed !important;
-}
-
-/* Scrollbar styles for dark mode */
-.settings-page .dark-mode ::-webkit-scrollbar,
-.dark-mode .settings-page ::-webkit-scrollbar {
-  width: 8px !important;
-}
-
-.settings-page .dark-mode ::-webkit-scrollbar-track,
-.dark-mode .settings-page ::-webkit-scrollbar-track {
-  background: #0d1117 !important;
-}
-
-.settings-page .dark-mode ::-webkit-scrollbar-thumb,
-.dark-mode .settings-page ::-webkit-scrollbar-thumb {
-  background: #30363d !important;
-  border-radius: 4px !important;
-}
-
-.settings-page .dark-mode ::-webkit-scrollbar-thumb:hover,
-.dark-mode .settings-page ::-webkit-scrollbar-thumb:hover {
-  background: #444c56 !important;
-}
-
-
-
-
-/* Fixed sidebar styling */
+/* Sidebar styling */
 .sidebar-fixed {
     overflow-y: auto;
     scrollbar-width: thin;
 }
 
-.dark-mode .sidebar-fixed {
-    scrollbar-color: #30363d #0d1117;
-}
-
-/* Light mode sidebar styling */
 .col-md-3.bg-light.border-end.d-flex.flex-column.p-4.sidebar-fixed {
     background: linear-gradient(to bottom, #ffffff, #f8f9fa) !important;
     padding: 1.5rem !important;
-}
-
-/* Dark mode sidebar styling */
-.dark-mode .col-md-3.bg-light.border-end.d-flex.flex-column.p-4.sidebar-fixed {
-    background: linear-gradient(to bottom, #161b22, #0d1117) !important;
-}
-
-/* Ensure list group items are transparent for sticky background */
-.settings-page .dark-mode .list-group-item,
-.dark-mode .settings-page .list-group-item {
-    background-color: transparent !important;
-}
-
-.settings-page .dark-mode .list-group,
-.dark-mode .settings-page .list-group {
-    background-color: transparent !important;
 }

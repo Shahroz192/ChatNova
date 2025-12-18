@@ -266,11 +266,12 @@ def profile_ai_service(ai_service_class):
         user_id: Optional[int] = None,
         db: Optional[object] = None,
         session_id: Optional[int] = None,
+        search_web: bool = False,
     ) -> str:
         # Profile the simple chat method
         with ai_profiler.profile_context(model_name, message):
             return original_simple_chat(
-                self, message, model_name, user_id, db, session_id
+                self, message, model_name, user_id, db, session_id, search_web
             )
 
     async def new_agent_chat(

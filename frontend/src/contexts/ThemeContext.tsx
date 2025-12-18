@@ -1,9 +1,9 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { ReactNode } from 'react';
+import React, { createContext, useContext, useEffect } from 'react';
+import { ThemeProvider as NextThemesProvider } from 'next-themes';
 
 interface ThemeContextType {
-  darkMode: boolean;
-  setDarkMode: (darkMode: boolean) => void;
+  theme: string | undefined;
+  setTheme: (theme: string) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -17,31 +17,74 @@ export const useTheme = () => {
 };
 
 interface ThemeProviderProps {
-  children: ReactNode;
+  children: React.ReactNode;
+  defaultTheme?: string;
 }
 
-export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
-  // Apply theme immediately from localStorage for all pages
-  const savedTheme = localStorage.getItem('darkMode');
-  const initialDarkMode = savedTheme ? JSON.parse(savedTheme) : false;
-
-  const [darkMode, setDarkMode] = useState(initialDarkMode);
-
+export const ThemeProvider: React.FC<ThemeProviderProps> = ({
+  children,
+  defaultTheme = 'system'
+}) => {
   useEffect(() => {
-    // Apply theme to document root for CSS custom properties
-    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
-    document.body.classList.toggle('dark-mode', darkMode);
-    localStorage.setItem('darkMode', JSON.stringify(darkMode));
-  }, [darkMode]);
+    // Add dynamic CSS variables based on theme
+    const updateCSSVariables = (theme: string) => {
+      const root = document.documentElement;
+      
+      if (theme === 'dark') {
+        // Apply dark theme classes
+        root.classList.add('dark');
+        root.classList.remove('light');
+        
+        // Set CSS custom properties for dark mode using existing variables
+        root.style.setProperty('--background-primary', 'var(--dark-bg-50)');
+        root.style.setProperty('--background-secondary', 'var(--dark-bg-100)');
+        root.style.setProperty('--text-primary', 'var(--dark-bg-900)');
+        root.style.setProperty('--text-secondary', 'var(--dark-bg-700)');
+        root.style.setProperty('--border-color', 'var(--dark-bg-300)');
+        root.style.setProperty('--card-background', 'var(--dark-bg-100)');
+      } else {
+        // Apply light theme classes
+        root.classList.remove('dark');
+        root.classList.add('light');
+        
+        // Set CSS custom properties for light mode using existing variables
+        root.style.setProperty('--background-primary', 'var(--light-bg-50)');
+        root.style.setProperty('--background-secondary', 'var(--light-bg-100)');
+        root.style.setProperty('--text-primary', 'var(--light-bg-900)');
+        root.style.setProperty('--text-secondary', 'var(--light-bg-700)');
+        root.style.setProperty('--border-color', 'var(--light-bg-300)');
+        root.style.setProperty('--card-background', 'var(--light-bg-50)');
+      }
+    };
 
-  const value: ThemeContextType = {
-    darkMode,
-    setDarkMode,
-  };
+    // Get initial theme
+    const currentTheme = localStorage.getItem('theme') || defaultTheme;
+    updateCSSVariables(currentTheme);
+
+    // Listen for system theme changes
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleSystemThemeChange = (e: MediaQueryListEvent) => {
+      if (localStorage.getItem('theme') === 'system' || !localStorage.getItem('theme')) {
+        updateCSSVariables(e.matches ? 'dark' : 'light');
+      }
+    };
+
+    mediaQuery.addEventListener('change', handleSystemThemeChange);
+
+    return () => {
+      mediaQuery.removeEventListener('change', handleSystemThemeChange);
+    };
+  }, [defaultTheme]);
 
   return (
-    <ThemeContext.Provider value={value}>
+    <NextThemesProvider
+      attribute="class"
+      defaultTheme={defaultTheme}
+      enableSystem={true}
+      disableTransitionOnChange={false}
+      storageKey="theme"
+    >
       {children}
-    </ThemeContext.Provider>
+    </NextThemesProvider>
   );
 };

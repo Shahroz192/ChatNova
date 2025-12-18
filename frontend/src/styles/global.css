@@ -430,16 +430,6 @@ body {
   }
 }
 
-/* Dark mode improvements */
-[data-theme="dark"] {
-  color-scheme: dark;
-}
-
-[data-theme="dark"] img,
-[data-theme="dark"] video {
-  opacity: 0.9;
-}
-
 /* High contrast mode support */
 @media (prefers-contrast: high) {
   :root {

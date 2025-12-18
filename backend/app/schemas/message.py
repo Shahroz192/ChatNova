@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict, field_validator
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 from app.core.input_validation import InputSanitizer
 
@@ -7,6 +7,7 @@ from app.core.input_validation import InputSanitizer
 class MessageBase(BaseModel):
     content: str
     model: str
+    search_web: Optional[bool] = False
 
 
 class MessageCreate(MessageBase):
@@ -33,10 +34,18 @@ class MessageCreate(MessageBase):
         # Basic model name validation - alphanumeric, hyphens, underscores only
         import re
 
-        if not re.match(r"^[a-zA-Z0-9._-]+$", v):
+        if not re.match(r"^[a-zA-Z0-9._\-:/]+$", v):
             raise ValueError("Invalid model name format")
 
         return v.strip()
+
+    @field_validator("search_web")
+    @classmethod
+    def validate_search_web(cls, v):
+        """Validate search_web flag."""
+        if v is None:
+            return False
+        return bool(v)
 
 
 class MessageUpdate(BaseModel):

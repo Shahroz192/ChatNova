@@ -6,9 +6,8 @@ import MCPServerForm from './MCPServerForm';
 import MCPServerList from './MCPServerList';
 import HistoryManagement from '../chat/HistoryManagement';
 import api from '../../utils/api';
-import { useTheme } from '../../contexts/ThemeContext';
- import '../../styles/Settings.css';
- import '../../styles/MCPServer.css';
+import '../../styles/Settings.css';
+import '../../styles/MCPServer.css';
 
 interface User {
   id: number;
@@ -21,11 +20,9 @@ interface SettingsProps {}
 
 const Settings: React.FC<SettingsProps> = () => {
   const [activeTab, setActiveTab] = useState<'keys' | 'servers' | 'account' | 'privacy' | 'appearance' | 'history'>('keys');
-  const { darkMode } = useTheme();
-
 
   return (
-    <div className={darkMode ? "settings-page dark-mode" : "settings-page"}>
+    <div className="settings-page">
       <Container fluid className="vh-100 d-flex flex-column">
         <Row className="flex-grow-1">
           <Col md={3} className="bg-light border-end d-flex flex-column p-4 sidebar-fixed" style={{ height: '100vh', position: 'sticky', top: 0, overflowY: 'auto' }}>

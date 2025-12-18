@@ -1,6 +1,6 @@
- import React, { useState } from "react";
- import { Form, Button, Container, Row, Col } from "react-bootstrap";
- import { Link, useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { Form, Button, Container, Row, Col } from "react-bootstrap";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../../utils/api";
 import qs from "qs";
 import '../../styles/Register.css';
@@ -12,23 +12,23 @@ const Login: React.FC = () => {
     const [error, setError] = useState("");
     const navigate = useNavigate();
 
-     const handleSubmit = async (e: React.FormEvent) => {
-         e.preventDefault();
-         setError("");
-         try {
-             await api.post("/auth/login", qs.stringify({
-                 username: email,
-                 password: password,
-             }), {
-                 headers: {
-                     'Content-Type': 'application/x-www-form-urlencoded',
-                 },
-             });
-             navigate("/chat");
-         } catch (err) {
-             setError("Invalid email or password");
-         }
-     };
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError("");
+        try {
+            await api.post("/auth/login", qs.stringify({
+                username: email,
+                password: password,
+            }), {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+            });
+            navigate("/chat");
+        } catch (err) {
+            setError("Invalid email or password");
+        }
+    };
 
     return (
         <Container fluid

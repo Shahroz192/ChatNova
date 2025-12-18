@@ -1,7 +1,10 @@
 import os
 import asyncio
 import logging
+import re
 from dotenv import load_dotenv
+from app.core.config import settings
+from app.core.generative_ui import GENERATIVE_UI_INSTRUCTION
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
 from langchain.memory import ConversationBufferMemory
@@ -16,8 +19,11 @@ from app.core.cache import cache_manager
 from app.core.security import decrypt_api_key
 from app.crud.user import user_api_key, user_mcp_server
 from app.crud.message import message as message_crud
+from app.services.web_search import web_search_service, SearchType
 from sqlalchemy.orm import Session
 import json
+from langchain.agents import initialize_agent, AgentType
+from langchain_community.tools import DuckDuckGoSearchRun
 
 load_dotenv()
 
@@ -30,7 +36,6 @@ class AIChatService:
         except Exception as e:
             logging.error(f"Error initializing MCP client: {e}")
 
-        # Default LLMs without keys (keys will be provided per user)
         self.llm_configs = {
             "gemini-2.5-flash": {
                 "class": ChatGoogleGenerativeAI,
@@ -54,7 +59,6 @@ class AIChatService:
             },
         }
 
-        # Memory storage per session
         self.session_memories = {}
 
         self.prompt = ChatPromptTemplate.from_messages(
@@ -74,7 +78,6 @@ class AIChatService:
             return {"mcpServers": {}}
 
         try:
-            # Parse the stored JSON configuration
             config = json.loads(user_servers[0].mcp_servers_config)
             return config
         except (json.JSONDecodeError, IndexError):
@@ -94,7 +97,6 @@ class AIChatService:
         llm_class = config["class"]
         model = config["model"]
 
-        # Try to get user key first
         api_key = None
         if user_id and db:
             user_key_obj = user_api_key.get_by_user_and_model(
@@ -109,14 +111,12 @@ class AIChatService:
                     )
                     return None
 
-        # If no user key, try env var (for backward compatibility)
         if not api_key:
             api_key = os.getenv(config["key_env"])
 
         if not api_key:
             return None
 
-        # Handle special cases for API key parameter names
         if llm_class == ChatGoogleGenerativeAI:
             api_key_param = "google_api_key"
         else:
@@ -155,16 +155,12 @@ class AIChatService:
         """Load conversation history into memory for a session"""
         memory = self.get_session_memory(session_id)
 
-        # Get all messages for this session
         messages = message_crud.get_by_session(db, session_id=session_id)
 
-        # Clear existing memory and reload with session history
         memory.clear()
 
         for msg in messages:
-            # Add human message
             memory.chat_memory.add_user_message(msg.content)
-            # Add AI response
             memory.chat_memory.add_ai_message(msg.response)
 
         return memory
@@ -176,6 +172,7 @@ class AIChatService:
         user_id: Optional[int] = None,
         db: Optional[Session] = None,
         session_id: Optional[int] = None,
+        search_web: bool = False,
     ) -> AsyncGenerator[str, None]:
         llm = self.get_llm(model_name, user_id, db)
         if not llm:
@@ -184,49 +181,81 @@ class AIChatService:
                 f"Invalid model '{model_name}' or API key not available. Available models: {available_models}"
             )
 
-        # Try to get response from cache first
         cached_response = None
         if user_id:
-            cached_response = cache_manager.get_llm_response(
-                user_id, message, model_name
-            )
+            cached_response = cache_manager.get_llm_response(user_id, f"{message}:search:{search_web}", model_name)
 
         if cached_response:
             print(f"Cache hit for user {user_id} with message: {message[:50]}...")
-            # Stream cached response in chunks
             for chunk in cached_response:
                 yield chunk
-                await asyncio.sleep(0.01)  # Small delay for smooth streaming
+                await asyncio.sleep(0.01)
             return
 
-        # If not in cache, call the LLM with streaming
         full_response = ""
-        if session_id:
-            # Use session-based memory
-            memory = self.load_session_history(session_id, db)
-            chain = self.prompt | llm | self.parser
-            async for chunk in chain.astream(
-                {"input": message, "chat_history": memory.chat_memory.messages}
-            ):
-                full_response += chunk
-                yield chunk
+
+        if search_web:
+            try:
+                logging.info("using web search")
+                search_tool = web_search_service.get_tool()
+                agent = initialize_agent(
+                    tools=[search_tool],
+                    llm=llm,
+                    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+                    verbose=True,
+                    handle_parsing_errors=True
+                )
+                
+                response = await agent.arun(message)
+                full_response = response
+                yield response
+
+            except Exception as e:
+                logging.error(f"Agent search failed: {e}. Falling back to standard chat.")
+                yield f"Error performing search: {str(e)}"
+                return
+
         else:
-            # Use simple prompt without memory (provide empty chat_history)
-            logging.info("session_id not provided, using simple prompt without memory")
-            chain = self.prompt | llm | self.parser
-            async for chunk in chain.astream({"input": message, "chat_history": []}):
-                full_response += chunk
-                yield chunk
+            system_prompt = f"You are a helpful AI assistant.\n\n{GENERATIVE_UI_INSTRUCTION}"
+            
+            if session_id:
+                memory = self.load_session_history(session_id, db)
+                prompt = ChatPromptTemplate.from_messages(
+                    [
+                        ("system", system_prompt),
+                        MessagesPlaceholder(variable_name="chat_history"),
+                        ("human", "{input}"),
+                    ]
+                )
+                chain = prompt | llm | StrOutputParser()
+                async for chunk in chain.astream(
+                    {
+                        "input": message,
+                        "chat_history": memory.chat_memory.messages
+                    }
+                ):
+                    full_response += chunk
+                    yield chunk
+            else:
+                prompt = ChatPromptTemplate.from_messages(
+                    [
+                        ("system", system_prompt),
+                        ("human", "{input}"),
+                    ]
+                )
+                chain = prompt | llm | StrOutputParser()
+                async for chunk in chain.astream({"input": message}):
+                    full_response += chunk
+                    yield chunk
 
-        # Save to conversation memory if session_id is provided
-        if session_id:
-            memory = self.get_session_memory(session_id)
-            memory.chat_memory.add_user_message(message)
-            memory.chat_memory.add_ai_message(full_response)
+        if full_response:
+            if session_id:
+                memory = self.get_session_memory(session_id)
+                memory.chat_memory.add_user_message(message)
+                memory.chat_memory.add_ai_message(full_response)
 
-        # Cache the full response if user_id is provided
-        if user_id:
-            cache_manager.set_llm_response(user_id, message, model_name, full_response)
+            if user_id:
+                cache_manager.set_llm_response(user_id, f"{message}:search:{search_web}", model_name, full_response)
 
     async def agent_chat(
         self,
@@ -237,7 +266,6 @@ class AIChatService:
         session_id: Optional[int] = None,
     ) -> str:
         try:
-            # Get user MCP config
             mcp_config = (
                 self.get_user_mcp_config(user_id, db)
                 if user_id and db
@@ -246,7 +274,6 @@ class AIChatService:
             if not mcp_config["mcpServers"]:
                 raise ValueError("No MCP servers configured for user.")
 
-            # Create MCP client for user
             user_mcp_client = MCPClient.from_dict(mcp_config)
 
             llm = self.get_llm(model_name, user_id, db)
@@ -256,7 +283,6 @@ class AIChatService:
                     f"Invalid model '{model_name}' or API key not available. Available models: {available_models}"
                 )
 
-            # Try to get response from cache first for agent chat too
             cached_response = None
             if user_id:
                 cached_response = cache_manager.get_llm_response(
@@ -269,11 +295,9 @@ class AIChatService:
                 )
                 return cached_response
 
-            # For agent chat, we need to modify the prompt to include memory if session_id is provided
             if session_id:
                 memory = self.load_session_history(session_id, db)
                 agent = MCPAgent(llm=llm, client=user_mcp_client, max_steps=50)
-                # Prepend the conversation history to the input message
                 history_str = "\n".join(
                     [str(m.content) for m in memory.chat_memory.messages]
                 )
@@ -281,14 +305,12 @@ class AIChatService:
                 response = await agent.run(full_input)
 
             else:
-                # Use default agent prompt without memory (provide empty chat_history)
                 logging.info(
                     "session_id not provided, using default agent prompt without memory"
                 )
                 agent = MCPAgent(llm=llm, client=user_mcp_client, max_steps=50)
-                response = await agent.run(message)  # , chat_history=[]
+                response = await agent.run(message)
 
-            # Cache the response if user_id is provided
             if user_id:
                 cache_manager.set_llm_response(user_id, message, model_name, response)
 
@@ -298,25 +320,20 @@ class AIChatService:
             return "Error in agent chat: " + str(e)
 
     async def compare_models(
-        self, message: str, user_id: Optional[int] = None, db: Optional[Session] = None
+        self, message: str, user_id: Optional[int] = None, db: Optional[Session] = None, search_web: bool = False
     ) -> Dict[str, str]:
-        """
-        Compare responses from all available models for the same input
-        """
+        """Compare responses from all available models for the same input"""
         results = {}
 
-        # Get available models
         available_models = self.get_available_models(user_id, db)
 
-        # Create tasks for all models
         tasks = []
         for model_name in available_models:
             task = asyncio.create_task(
-                self._collect_model_response(message, model_name, user_id, db)
+                self._collect_model_response(message, model_name, user_id, db, search_web)
             )
             tasks.append((model_name, task))
 
-        # Wait for all tasks to complete
         for model_name, task in tasks:
             try:
                 response = await task
@@ -332,15 +349,13 @@ class AIChatService:
         model_name: str,
         user_id: Optional[int] = None,
         db: Optional[Session] = None,
+        search_web: bool = False,
     ) -> str:
-        """
-        Helper method to collect the full response from an async generator
-        """
+        """Helper method to collect the full response from an async generator"""
         full_response = ""
-        async for chunk in self.simple_chat(message, model_name, user_id, db):
+        async for chunk in self.simple_chat(message, model_name, user_id, db, search_web=search_web):
             full_response += chunk
         return full_response
 
 
-# Apply profiling to the AI service
 ai_service = profile_ai_service(AIChatService)()

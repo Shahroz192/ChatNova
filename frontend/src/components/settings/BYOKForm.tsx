@@ -26,7 +26,7 @@ const BYOKForm: React.FC = () => {
   const fetchAvailableModels = async () => {
     try {
       const response = await api.get("/users/me/api-keys");
-      setAvailableModels(response.data.api_keys.map((key: { model_name: string }) => key.model_name));
+      setAvailableModels(response.data.map((key: { model_name: string }) => key.model_name));
     } catch (error) {
       console.error("Failed to fetch saved API keys", error);
     }
@@ -117,11 +117,10 @@ const BYOKForm: React.FC = () => {
                 <td className="py-3 px-4">
                   <div className="flex items-center space-x-2">
                     <span
-                      className={`font-medium ${
-                        availableModels.includes(model)
+                      className={`font-medium ${availableModels.includes(model)
                           ? "byok-model-available"
                           : "byok-model-unavailable"
-                      }`}
+                        }`}
                     >
                       {model}
                     </span>

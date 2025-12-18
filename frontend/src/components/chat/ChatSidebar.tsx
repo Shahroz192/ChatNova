@@ -1,6 +1,6 @@
 import React from 'react';
 import { Col, Form, Button } from 'react-bootstrap';
-import { Sun, Moon, Settings, Plus, Search } from 'lucide-react';
+import { Settings, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface ChatSidebarProps {
@@ -9,10 +9,6 @@ interface ChatSidebarProps {
   models: string[];
   useTools: boolean;
   setUseTools: (use: boolean) => void;
-  showSearch: boolean;
-  setShowSearch: (show: boolean) => void;
-  darkMode: boolean;
-  setDarkMode: (dark: boolean) => void;
   isDropdownOpen: boolean;
   setIsDropdownOpen: (open: boolean) => void;
   setCurrentSessionId: (id: number | null) => void;
@@ -25,10 +21,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   models,
   useTools,
   setUseTools,
-  showSearch,
-  setShowSearch,
-  darkMode,
-  setDarkMode,
   isDropdownOpen,
   setIsDropdownOpen,
   setCurrentSessionId,
@@ -43,7 +35,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
       style={{ height: '100vh', position: 'sticky', top: 0 }}
     >
       <div className="d-flex align-items-center mb-4">
-        <h2 className="h4 font-weight-bold mb-0">
+        <h2 className="h4 font-weight-bold mb-0 chatnova-title">
           ChatNova
         </h2>
       </div>
@@ -99,26 +91,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
           className="p-2 rounded-circle"
         >
           <Plus size={20} />
-        </Button>
-        <Button
-          variant="link"
-          onClick={() => setShowSearch(!showSearch)}
-          title="Search in Conversation"
-          className="p-2 rounded-circle"
-        >
-          <Search size={20} />
-        </Button>
-        <Button
-          variant="link"
-          onClick={() => setDarkMode(!darkMode)}
-          title="Toggle Theme"
-          className="p-2 rounded-circle"
-        >
-          {darkMode ? (
-            <Sun size={20} />
-          ) : (
-            <Moon size={20} />
-          )}
         </Button>
         <Button
           variant="link"

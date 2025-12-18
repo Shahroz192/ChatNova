@@ -17,13 +17,14 @@
   max-width: 100%;
 }
 
-.input-field {
+.input-field,
+.form-control.input-field {
   flex: 1;
   min-height: 48px;
   max-height: 120px;
   resize: none;
-  border: 1px solid var(--border-medium);
-  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-medium) !important;
+  border-radius: var(--radius-xl) !important;
   background-color: var(--bg-secondary) !important;
   color: var(--text-primary) !important;
   font-size: var(--font-size-base);
@@ -31,39 +32,20 @@
   padding: var(--space-3) var(--space-4);
   line-height: var(--line-height-normal);
   transition: all var(--transition-fast);
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-xs) !important;
 }
 
 .input-field:focus {
   outline: none;
   border-color: var(--primary);
-  background-color: var(--bg-primary);
+  background-color: var(--bg-secondary) !important;
   box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
-}
-
-.dark-mode .input-field:focus {
-  border-color: var(--primary);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1) !important;
 }
 
 /* Placeholder text styling */
 .input-field::placeholder {
   color: var(--text-tertiary) !important;
   opacity: 1 !important;
-}
-
-.dark-mode .input-field::placeholder {
-  color: var(--text-tertiary) !important;
-  opacity: 1 !important;
-}
-
-/* Ensure input field is visible in dark mode */
-.dark-mode .input-field {
-  background-color: var(--bg-secondary) !important;
-  color: var(--text-primary) !important;
-  border: 1px solid var(--border-medium);
-  border-radius: var(--radius-xl) !important;
-  box-shadow: var(--shadow-sm) !important;
 }
 
 .send-button {
@@ -108,13 +90,4 @@
   z-index: var(--z-sticky);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-}
-
-.dark-mode .send-button {
-  background-color: var(--primary);
-  color: var(--text-inverse);
-}
-
-.dark-mode .send-button:hover:not(:disabled) {
-  background-color: var(--primary-hover);
 }

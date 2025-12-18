@@ -1,6 +1,3 @@
-/**
- * Format a timestamp as relative time (e.g., "2 minutes ago")
- */
 export const formatRelativeTime = (dateString: string): string => {
   const date = new Date(dateString);
   const now = new Date();
@@ -39,26 +36,17 @@ export const formatRelativeTime = (dateString: string): string => {
   return diffInYears === 1 ? '1 year ago' : `${diffInYears} years ago`;
 };
 
-/**
- * Format a timestamp as a full datetime string
- */
 export const formatFullDateTime = (dateString: string): string => {
   const date = new Date(dateString);
   return date.toLocaleString();
 };
 
-/**
- * Check if a timestamp is from today
- */
 export const isToday = (dateString: string): boolean => {
   const date = new Date(dateString);
   const today = new Date();
   return date.toDateString() === today.toDateString();
 };
 
-/**
- * Check if a timestamp is from yesterday
- */
 export const isYesterday = (dateString: string): boolean => {
   const date = new Date(dateString);
   const yesterday = new Date();

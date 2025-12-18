@@ -4,7 +4,6 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import QueuePool
 from app.core.config import settings
 
-# Optimized database engine configuration for high-concurrency AI chat application
 engine = create_engine(
     settings.DATABASE_URL,
     poolclass=QueuePool,
@@ -20,7 +19,6 @@ engine = create_engine(
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
-
 
 def get_db():
     db = SessionLocal()

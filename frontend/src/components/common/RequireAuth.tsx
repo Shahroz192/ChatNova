@@ -14,7 +14,6 @@ const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     }, []);
 
     if (isAuth === null) {
-        // Loading state while checking authentication
         return <div>Loading...</div>;
     }
 

@@ -1,14 +1,13 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface MarkdownRendererProps {
   content: string;
-  darkMode: boolean;
 }
 
-const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, darkMode }) => {
+const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
     return (
         <div className="markdown-content">
             <ReactMarkdown
@@ -23,7 +22,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, darkMode }
                         ) : (
                             <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
                                 <SyntaxHighlighter
-                                    style={darkMode ? oneDark : oneLight}
+                                    style={oneLight}
                                     language={match[1]}
                                     PreTag="div"
                                 >

@@ -1,16 +1,13 @@
 import React from 'react';
-import { Copy, RotateCcw, Bookmark, BookmarkCheck, Edit, Trash2 } from 'lucide-react';
+import { Copy, RotateCcw, Edit, Trash2 } from 'lucide-react';
 import type { Message } from '../../types/chat';
 
 interface MessageContextMenuProps {
   message: Message;
   isActive: boolean;
   onClose: () => void;
-  bookmarkedMessages: number[];
   handleCopyMessage: (message: Message) => void;
-  handleCopyAsCode: (message: Message) => void;
   handleRegenerateResponse: (message: Message) => void;
-  handleBookmarkMessage: (messageId: number) => void;
   handleEditMessage: (message: Message) => void;
   handleDeleteMessage: (messageId: number) => void;
 }
@@ -19,11 +16,8 @@ const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
   message,
   isActive,
   onClose,
-  bookmarkedMessages,
   handleCopyMessage,
-  handleCopyAsCode,
   handleRegenerateResponse,
-  handleBookmarkMessage,
   handleEditMessage,
   handleDeleteMessage,
 }) => {
@@ -34,8 +28,7 @@ const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
     onClose();
   };
 
-  const isUserMessage = message.content && !message.response;
-  const isBookmarked = bookmarkedMessages.includes(message.id);
+  const isUserMessage = !!message.content;
 
   return (
     <div className="message-context-menu" onClick={(e) => e.stopPropagation()}>
@@ -50,29 +43,11 @@ const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
       {message.response && (
         <>
           <button
-            className="context-menu-item copy-code"
-            onClick={() => handleAction(() => handleCopyAsCode(message))}
-          >
-            <Copy size={16} />
-            Copy as Code
-          </button>
-
-          <button
             className="context-menu-item regenerate"
             onClick={() => handleAction(() => handleRegenerateResponse(message))}
           >
             <RotateCcw size={16} />
             Regenerate Response
-          </button>
-
-          <div className="context-menu-separator"></div>
-
-          <button
-            className="context-menu-item bookmark"
-            onClick={() => handleAction(() => handleBookmarkMessage(message.id))}
-          >
-            {isBookmarked ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
-            {isBookmarked ? 'Remove Bookmark' : 'Bookmark'}
           </button>
         </>
       )}

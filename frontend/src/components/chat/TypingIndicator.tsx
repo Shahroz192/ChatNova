@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Bot, Brain, Sparkles, Zap } from 'lucide-react';
 
 interface TypingIndicatorProps {
-  darkMode: boolean;
   modelName?: string;
   animationStyle?: 'dots' | 'pulse' | 'wave' | 'bounce' | 'cognitive';
   showModel?: boolean;
@@ -10,9 +9,8 @@ interface TypingIndicatorProps {
   status?: 'thinking' | 'processing' | 'generating';
 }
 
-const TypingIndicator: React.FC<TypingIndicatorProps> = ({ 
-  darkMode, 
-  modelName = "AI", 
+const TypingIndicator: React.FC<TypingIndicatorProps> = ({
+  modelName = "AI",
   animationStyle = 'dots',
   showModel = true,
   reducedMotion = false,
@@ -187,18 +185,18 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   };
 
   return (
-    <div className={`enhanced-typing-indicator ${darkMode ? 'dark' : ''}`}>
+    <div className="enhanced-typing-indicator">
       <div className="d-flex justify-content-start mb-3">
         <div className="d-flex align-items-start">
           {/* Enhanced AI Avatar */}
-          <div className={`enhanced-ai-avatar ${darkMode ? 'dark' : ''}`}>
-            <div 
+          <div className="enhanced-ai-avatar">
+            <div
               className="avatar-icon-container"
               style={{ background: modelStyle.gradient }}
             >
-              <ModelIcon 
-                size={24} 
-                className="enhanced-bot-icon" 
+              <ModelIcon
+                size={24}
+                className="enhanced-bot-icon"
                 style={{ color: 'white' }}
               />
             </div>
@@ -208,7 +206,7 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
           </div>
           
           {/* Enhanced Typing Bubble */}
-          <div className={`enhanced-typing-bubble ${darkMode ? 'dark' : ''}`}>
+          <div className="enhanced-typing-bubble">
             <div className="typing-content-wrapper">
               {/* Status indicator */}
               <div className="typing-status">
@@ -236,7 +234,7 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
       </div>
 
       {/* Accessibility announcement */}
-      <div 
+      <div
         className="sr-only"
         aria-live="polite"
         aria-label={`${modelName} is ${status === 'thinking' ? 'thinking' : status}`}
