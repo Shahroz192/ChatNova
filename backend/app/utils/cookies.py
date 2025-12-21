@@ -9,10 +9,10 @@ def set_auth_cookie(response: Response, token: str) -> None:
         value=token,
         httponly=True,
         secure=settings.ENVIRONMENT
-        != "development",  # Use secure cookies in production
-        samesite="lax",  # Lax prevents CSRF while allowing safe cross-site usage
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Convert minutes to seconds
-        path="/api/v1",  # Restrict cookie to API endpoints
+        != "development", 
+        samesite="lax",  
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  
+        path="/api/v1", 
     )
 
 

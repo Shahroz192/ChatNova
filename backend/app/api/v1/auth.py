@@ -11,29 +11,24 @@ from app.core.profiler import request_profiler
 from app.utils.cookies import set_auth_cookie
 from app.core.config import settings
 
-if settings.ENVIRONMENT == "testing":
-    limiter = Limiter(key_func=get_remote_address)
-else:
-    limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter()
 
+
 @router.post("/register", response_model=User)
 @request_profiler.profile_endpoint("/register", "POST")
-@limiter.limit(
-    "50/minute" if settings.ENVIRONMENT == "testing" else "5/minute"
-)
+@limiter.limit("50/minute" if settings.ENVIRONMENT == "testing" else "5/minute")
 def register(request: Request, user_in: UserCreate, db: Session = Depends(get_db)):
     db_user = crud.user.get_by_email(db, email=user_in.email)
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     return crud.user.create(db, obj_in=user_in)
 
+
 @router.post("/login")
 @request_profiler.profile_endpoint("/login", "POST")
-@limiter.limit(
-    "50/minute" if settings.ENVIRONMENT == "testing" else "5/minute"
-)
+@limiter.limit("50/minute" if settings.ENVIRONMENT == "testing" else "5/minute")
 def login(
     request: Request,
     response: Response,
@@ -56,6 +51,7 @@ def login(
         "email": user.email,
         "token_jti": token_jti,
     }
+
 
 @router.post("/logout")
 @request_profiler.profile_endpoint("/logout", "POST")
@@ -85,6 +81,7 @@ def logout(response: Response, request: Request, db: Session = Depends(get_db)):
 
     clear_auth_cookie(response)
     return {"success": True, "message": "Successfully logged out"}
+
 
 @router.post("/logout-all")
 @request_profiler.profile_endpoint("/logout-all", "POST")

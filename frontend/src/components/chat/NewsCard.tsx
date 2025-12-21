@@ -45,8 +45,11 @@ const NewsCard: React.FC<NewsCardProps> = ({
                 });
                 onShare(article);
             } catch (error) {
-                // Fallback to copying URL
-                navigator.clipboard.writeText(article.source_url);
+                try {
+                    await navigator.clipboard.writeText(article.source_url);
+                } catch (clipboardError) {
+                    console.error('Failed to copy article URL to clipboard:', clipboardError);
+                }
             }
         } else if (onShare) {
             onShare(article);

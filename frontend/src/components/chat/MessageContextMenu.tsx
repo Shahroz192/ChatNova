@@ -10,6 +10,7 @@ interface MessageContextMenuProps {
   handleRegenerateResponse: (message: Message) => void;
   handleEditMessage: (message: Message) => void;
   handleDeleteMessage: (messageId: number) => void;
+  messageType?: 'user' | 'assistant';
 }
 
 const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
@@ -20,6 +21,7 @@ const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
   handleRegenerateResponse,
   handleEditMessage,
   handleDeleteMessage,
+  messageType = 'user',
 }) => {
   if (!isActive) return null;
 
@@ -28,19 +30,25 @@ const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
     onClose();
   };
 
-  const isUserMessage = !!message.content;
+  const isUserMessage = messageType === 'user';
+  const isAssistantMessage = messageType === 'assistant';
 
   return (
     <div className="message-context-menu" onClick={(e) => e.stopPropagation()}>
-      <button
-        className="context-menu-item"
-        onClick={() => handleAction(() => handleCopyMessage(message))}
-      >
-        <Copy size={16} />
-        Copy Message
-      </button>
+      {isUserMessage && (
+        <>
+          <button
+            className="context-menu-item edit"
+            onClick={() => handleAction(() => handleEditMessage(message))}
+          >
+            <Edit size={16} />
+            Edit Message
+          </button>
+          <div className="context-menu-separator"></div>
+        </>
+      )}
 
-      {message.response && (
+      {isAssistantMessage && message.response && (
         <>
           <button
             className="context-menu-item regenerate"
@@ -49,21 +57,17 @@ const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
             <RotateCcw size={16} />
             Regenerate Response
           </button>
+          <div className="context-menu-separator"></div>
         </>
       )}
 
-      {isUserMessage && (
-        <>
-          <div className="context-menu-separator"></div>
-          <button
-            className="context-menu-item edit"
-            onClick={() => handleAction(() => handleEditMessage(message))}
-          >
-            <Edit size={16} />
-            Edit Message
-          </button>
-        </>
-      )}
+      <button
+        className="context-menu-item"
+        onClick={() => handleAction(() => handleCopyMessage(message))}
+      >
+        <Copy size={16} />
+        Copy Message
+      </button>
 
       <div className="context-menu-separator"></div>
 

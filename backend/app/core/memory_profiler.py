@@ -3,6 +3,7 @@ Memory Profiler for AI Chat Pro
 This module provides memory usage monitoring and profiling for the application
 """
 
+import logging
 import tracemalloc
 import psutil
 import os
@@ -12,6 +13,9 @@ from typing import List, Optional
 from dataclasses import dataclass
 from datetime import datetime
 import gc
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -169,7 +173,7 @@ def profile_memory_usage(func):
         after_snapshot = memory_profiler.take_snapshot()
 
         memory_diff = after_snapshot.rss_memory_mb - before_snapshot.rss_memory_mb
-        print(f"Memory usage change for {func.__name__}: {memory_diff:+.2f} MB")
+        logger.info(f"Memory usage change for {func.__name__}: {memory_diff:+.2f} MB")
 
         return result
 

@@ -32,8 +32,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Content Security Policy
         csp = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-            "style-src 'self' 'unsafe-inline'; "
+            "script-src 'self'; "
+            "style-src 'self' https:; "
             "img-src 'self' data: https:; "
             "font-src 'self' https:; "
             "connect-src 'self' wss: https:; "

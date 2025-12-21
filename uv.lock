@@ -35,6 +35,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pytest" },
+    { name = "pytest-asyncio" },
     { name = "pytest-cov" },
     { name = "python-dotenv" },
     { name = "python-jose", extra = ["cryptography"] },
@@ -49,6 +50,11 @@ dev = [
     { name = "black" },
     { name = "flake8" },
     { name = "pytest" },
+    { name = "pytest-asyncio" },
+]
+
+[package.dev-dependencies]
+dev = [
     { name = "pytest-asyncio" },
 ]
 
@@ -80,6 +86,7 @@ requires-dist = [
     { name = "pydantic-settings", specifier = ">=2.11.0" },
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.6" },
+    { name = "pytest-asyncio", specifier = ">=1.2.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.25.3" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
@@ -90,6 +97,9 @@ requires-dist = [
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.37.0" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest-asyncio", specifier = ">=1.2.0" }]
 
 [[package]]
 name = "aiohappyeyeballs"

@@ -40,7 +40,7 @@ def downgrade():
     except Exception:
         # Index might not exist from previous migration runs
         pass
-    
+
     # Drop session_id column from messages table if it exists
     try:
         op.drop_column("messages", "session_id")

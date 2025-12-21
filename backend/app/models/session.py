@@ -12,7 +12,9 @@ class ChatSession(Base):
     title = Column(String(255), index=True)
     description = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
-    updated_at = Column(DateTime(timezone=True), default=func.now(), onupdate=func.now(), index=True)
+    updated_at = Column(
+        DateTime(timezone=True), default=func.now(), onupdate=func.now(), index=True
+    )
 
     # Relationship to messages
     messages = relationship(

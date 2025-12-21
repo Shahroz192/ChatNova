@@ -6,14 +6,9 @@ import {
     Button,
     Card,
     ListGroup,
-    Alert,
 } from "react-bootstrap";
 import {
     User,
-    Bot,
-    MoreHorizontal,
-    Globe,
-    Loader,
 } from "lucide-react";
 import api, { streamChat } from "../../utils/api";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -26,7 +21,7 @@ import ChatInput from "./ChatInput";
 import ChatSidebar from "./ChatSidebar";
 import MessageContextMenu from "./MessageContextMenu";
 import type { Message } from "../../types/chat";
-import type { WebSearchOptions, SearchStatus } from "../../types/search";
+import type { WebSearchOptions } from "../../types/search";
 import "../../styles/ChatVariables.css";
 import "../../styles/ChatBase.css";
 import "../../styles/ChatSidebar.css";
@@ -85,16 +80,10 @@ const Chat: React.FC<ChatProps> = () => {
         include_snippets: true,
         safe_search: true
     });
-    const [searchStatus, setSearchStatus] = useState<SearchStatus>({
-        isSearching: false
-    });
     const [recentSearches] = useState<string[]>([]);
     const [searchSuggestions] = useState<string[]>([]);
 
-    const [activeContextMenu, setActiveContextMenu] = useState<number | null>(
-        null,
-    );
-    const [hoveredMessage, setHoveredMessage] = useState<number | null>(null);
+    const [activeContextMenu, setActiveContextMenu] = useState<{ id: number, type: 'user' | 'assistant' } | null>(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
     useEffect(() => {
@@ -119,12 +108,6 @@ const Chat: React.FC<ChatProps> = () => {
 
     const handleSearchOptionsChange = (newOptions: WebSearchOptions) => {
         setSearchOptions(newOptions);
-
-        setSearchStatus(prev => ({
-            ...prev,
-            isSearching: newOptions.search_web,
-            searchType: newOptions.search_type
-        }));
     };
 
     const handleSuggestionSelect = (suggestion: string) => {
@@ -301,14 +284,6 @@ const Chat: React.FC<ChatProps> = () => {
             const controller = new AbortController();
             setStreamingAbortController(controller);
 
-            if (searchOptions.search_web) {
-                setSearchStatus(prev => ({
-                    ...prev,
-                    isSearching: true,
-                    currentQuery: messageContent,
-                    searchType: searchOptions.search_type
-                }));
-            }
 
             streamChat(
                 messageContent,
@@ -338,9 +313,6 @@ const Chat: React.FC<ChatProps> = () => {
                     setStreamingResponse("");
                     streamingResponseRef.current = "";
 
-                    setSearchStatus({
-                        isSearching: false
-                    });
 
                     setInput("");
                 },
@@ -363,9 +335,6 @@ const Chat: React.FC<ChatProps> = () => {
                     setStreamingResponse("");
                     streamingResponseRef.current = "";
 
-                    setSearchStatus({
-                        isSearching: false
-                    });
                 },
             );
         } catch (error) {
@@ -386,12 +355,6 @@ const Chat: React.FC<ChatProps> = () => {
         }
     };
 
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    };
 
     const handleMessageClick = (messageId: number) => {
         setSelectedMessageId(
@@ -413,33 +376,6 @@ const Chat: React.FC<ChatProps> = () => {
         }
     };
 
-    const renderSearchStatus = () => {
-        if (!searchOptions.search_web) return null;
-
-        return (
-            <div className="search-status-indicator mb-3">
-                {searchStatus.isSearching ? (
-                    <Alert variant="info" className="searching-alert">
-                        <div className="d-flex align-items-center gap-2">
-                            <Loader size={16} className="animate-spin" />
-                            <span>
-                                Searching the web...
-                            </span>
-                        </div>
-                    </Alert>
-                ) : (
-                    <Alert variant="success" className="search-enabled-alert">
-                        <div className="d-flex align-items-center gap-2">
-                            <Globe size={16} />
-                            <span>
-                                Web search enabled
-                            </span>
-                        </div>
-                    </Alert>
-                )}
-            </div>
-        );
-    };
 
     return (
         <>
@@ -456,8 +392,6 @@ const Chat: React.FC<ChatProps> = () => {
                             models={models}
                             useTools={useTools}
                             setUseTools={setUseTools}
-                            showSearch={false}
-                            setShowSearch={() => { }}
                             isDropdownOpen={isDropdownOpen}
                             setIsDropdownOpen={setIsDropdownOpen}
                             setCurrentSessionId={setCurrentSessionId}
@@ -469,7 +403,6 @@ const Chat: React.FC<ChatProps> = () => {
                             className="d-flex flex-column"
                             style={{ height: "100vh" }}
                         >
-                            {renderSearchStatus()}
 
                             <div
                                 className="flex-grow-1 chat-messages-area"
@@ -482,15 +415,9 @@ const Chat: React.FC<ChatProps> = () => {
                                                 <div className="d-flex justify-content-center">
                                                     <div className="text-center py-4">
                                                         <h2 className="h3 fw-bold welcome-title mb-2">
-                                                            Welcome to
-                                                            ChatNova
+                                                            Chat Smarter,
+                                                            Innovate Faster
                                                         </h2>
-                                                        {searchOptions.search_web && (
-                                                            <p className="text-muted">
-                                                                <Globe size={16} className="me-2" />
-                                                                Web search is enabled - I can help you find current information!
-                                                            </p>
-                                                        )}
                                                     </div>
                                                 </div>
                                             </ListGroup.Item>
@@ -526,14 +453,6 @@ const Chat: React.FC<ChatProps> = () => {
                                                 <ListGroup.Item
                                                     key={msg.id}
                                                     className="border-0 message-item"
-                                                    onMouseEnter={() =>
-                                                        setHoveredMessage(
-                                                            msg.id,
-                                                        )
-                                                    }
-                                                    onMouseLeave={() =>
-                                                        setHoveredMessage(null)
-                                                    }
                                                 >
                                                     <div className="d-flex justify-content-end mb-2">
                                                         <div className="d-flex flex-column align-items-end position-relative">
@@ -550,13 +469,13 @@ const Chat: React.FC<ChatProps> = () => {
                                                                         msg.id,
                                                                     )
                                                                 }
-                                                                onContextMenu={(
-                                                                    e,
-                                                                ) => {
+                                                                onContextMenu={(e) => {
                                                                     e.preventDefault();
-                                                                    setActiveContextMenu(
-                                                                        msg.id,
-                                                                    );
+                                                                    setActiveContextMenu({ id: msg.id, type: 'user' });
+                                                                }}
+                                                                onDoubleClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    setActiveContextMenu({ id: msg.id, type: 'user' });
                                                                 }}
                                                             >
                                                                 <div className="d-flex align-items-center">
@@ -564,22 +483,18 @@ const Chat: React.FC<ChatProps> = () => {
                                                                     {msg.content}
                                                                 </div>
                                                             </Card>
-                                                            {(hoveredMessage === msg.id || activeContextMenu === msg.id) && (
-                                                                <div className="message-actions-overlay user">
-                                                                    <button
-                                                                        className="message-action-btn"
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setActiveContextMenu(
-                                                                                activeContextMenu === msg.id ? null : msg.id
-                                                                            );
-                                                                        }}
-                                                                        title="More actions"
-                                                                    >
-                                                                        <MoreHorizontal size={14} />
-                                                                    </button>
-                                                                </div>
-                                                            )}
+                                                            {activeContextMenu?.id === msg.id && activeContextMenu?.type === 'user' && (
+                                                                 <MessageContextMenu
+                                                                     message={msg}
+                                                                     isActive={true}
+                                                                     onClose={() => setActiveContextMenu(null)}
+                                                                     handleCopyMessage={handleCopyMessage}
+                                                                     handleRegenerateResponse={handleRegenerateResponse}
+                                                                     handleEditMessage={handleEditMessage}
+                                                                     handleDeleteMessage={handleDeleteMessage}
+                                                                     messageType="user"
+                                                                 />
+                                                             )}
                                                             <div className="d-flex align-items-center mt-1 me-2 gap-2">
                                                                 <Timestamp
                                                                     dateString={
@@ -603,30 +518,23 @@ const Chat: React.FC<ChatProps> = () => {
                                                                     "100%",
                                                             }}
                                                         >
-                                                            <Card
-                                                                body
-                                                                className="message-bubble-assistant"
-                                                                style={{
-                                                                    width: "fit-content",
-                                                                    maxWidth: "100%",
-                                                                    height: "auto",
-                                                                }}
+                                                            <div
+                                                                className="message-content-assistant"
                                                                 onClick={() =>
                                                                     handleMessageClick(
                                                                         msg.id,
                                                                     )
                                                                 }
-                                                                onContextMenu={(
-                                                                    e,
-                                                                ) => {
+                                                                onContextMenu={(e) => {
                                                                     e.preventDefault();
-                                                                    setActiveContextMenu(
-                                                                        msg.id,
-                                                                    );
+                                                                    setActiveContextMenu({ id: msg.id, type: 'assistant' });
+                                                                }}
+                                                                onDoubleClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    setActiveContextMenu({ id: msg.id, type: 'assistant' });
                                                                 }}
                                                             >
                                                                 <div className="d-flex align-items-start">
-                                                                    <Bot className="me-2 mt-1" />
                                                                     <div style={{ flex: 1 }}>
                                                                         {msg.id === streamingMessageId && isStreaming ? (
                                                                             <div className="streaming-response">
@@ -650,24 +558,19 @@ const Chat: React.FC<ChatProps> = () => {
                                                                         )}
                                                                     </div>
                                                                 </div>
-                                                            </Card>
-
-                                                            {(hoveredMessage === msg.id || activeContextMenu === msg.id) && (
-                                                                <div className="message-actions-overlay assistant">
-                                                                    <button
-                                                                        className="message-action-btn"
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setActiveContextMenu(
-                                                                                activeContextMenu === msg.id ? null : msg.id
-                                                                            );
-                                                                        }}
-                                                                        title="More actions"
-                                                                    >
-                                                                        <MoreHorizontal size={14} />
-                                                                    </button>
-                                                                </div>
-                                                            )}
+                                                            </div>
+                                                            {activeContextMenu?.id === msg.id && activeContextMenu?.type === 'assistant' && (
+                                                                 <MessageContextMenu
+                                                                     message={msg}
+                                                                     isActive={true}
+                                                                     onClose={() => setActiveContextMenu(null)}
+                                                                     handleCopyMessage={handleCopyMessage}
+                                                                     handleRegenerateResponse={handleRegenerateResponse}
+                                                                     handleEditMessage={handleEditMessage}
+                                                                     handleDeleteMessage={handleDeleteMessage}
+                                                                     messageType="assistant"
+                                                                 />
+                                                             )}
                                                             <div className="d-flex align-items-center justify-content-between mt-1 ms-2">
                                                                 <Timestamp
                                                                     dateString={
@@ -693,30 +596,6 @@ const Chat: React.FC<ChatProps> = () => {
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    <MessageContextMenu
-                                                        message={msg}
-                                                        isActive={
-                                                            activeContextMenu ===
-                                                            msg.id
-                                                        }
-                                                        onClose={() =>
-                                                            setActiveContextMenu(
-                                                                null,
-                                                            )
-                                                        }
-                                                        handleCopyMessage={
-                                                            handleCopyMessage
-                                                        }
-                                                        handleRegenerateResponse={
-                                                            handleRegenerateResponse
-                                                        }
-                                                        handleEditMessage={
-                                                            handleEditMessage
-                                                        }
-                                                        handleDeleteMessage={
-                                                            handleDeleteMessage
-                                                        }
-                                                    />
                                                 </ListGroup.Item>
                                             );
                                         })}
@@ -733,7 +612,6 @@ const Chat: React.FC<ChatProps> = () => {
                                 <ChatInput
                                     input={input}
                                     setInput={setInput}
-                                    handleKeyPress={handleKeyPress}
                                     sendMessage={sendMessage}
                                     loading={loading}
                                     searchOptions={searchOptions}

@@ -6,6 +6,14 @@ This script runs the database migrations to add performance indexes.
 import subprocess
 import sys
 import os
+import logging
+
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 
 def run_migrations():
@@ -15,7 +23,7 @@ def run_migrations():
         backend_dir = os.path.dirname(os.path.abspath(__file__))
         os.chdir(backend_dir)
 
-        print("Running database migrations to add performance indexes...")
+        logger.info("Running database migrations to add performance indexes...")
 
         # Run the migration
         result = subprocess.run(
@@ -25,15 +33,15 @@ def run_migrations():
         )
 
         if result.returncode == 0:
-            print("Database migrations completed successfully!")
-            print(result.stdout)
+            logger.info("Database migrations completed successfully!")
+            logger.info(result.stdout)
         else:
-            print("Error running migrations:")
-            print(result.stderr)
+            logger.error("Error running migrations:")
+            logger.error(result.stderr)
             return False
 
     except Exception as e:
-        print(f"Error running migrations: {e}")
+        logger.error(f"Error running migrations: {e}")
         return False
 
     return True

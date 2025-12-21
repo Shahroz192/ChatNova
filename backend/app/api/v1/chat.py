@@ -12,7 +12,7 @@ from app.schemas.session import (
     ChatSessionPagination,
 )
 from app.api.deps import get_db, get_current_active_user
-from app.services.ai_chat import ai_service, AIChatService
+from app.services.ai_chat import ai_service
 from app.services.session_service import session_service
 from app.models.user import User
 from app.core.profiler import request_profiler
@@ -230,7 +230,12 @@ async def chat(
     """
     response = ""
     async for chunk in ai_service.simple_chat(
-        message_in.content, message_in.model, current_user.id, db, session_id, message_in.search_web
+        message_in.content,
+        message_in.model,
+        current_user.id,
+        db,
+        session_id,
+        message_in.search_web,
     ):
         response += chunk
     msg = crud.message.create(
@@ -353,7 +358,12 @@ def chat_stream(
             # Stream the AI response
             full_response = ""
             async for chunk in ai_service.simple_chat(
-                message_in.content, message_in.model, current_user.id, db, session_id, message_in.search_web
+                message_in.content,
+                message_in.model,
+                current_user.id,
+                db,
+                session_id,
+                message_in.search_web,
             ):
                 full_response += chunk
 

@@ -31,7 +31,7 @@ class MessageCreate(MessageBase):
         if not v or not isinstance(v, str):
             raise ValueError("Model name is required")
 
-        # Basic model name validation - alphanumeric, hyphens, underscores only
+        # Basic model name validation - allows alphanumeric, dots, hyphens, underscores, colons, and slashes
         import re
 
         if not re.match(r"^[a-zA-Z0-9._\-:/]+$", v):

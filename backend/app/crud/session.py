@@ -1,3 +1,4 @@
+import logging
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import desc, asc, func
 from app.crud.base import CRUDBase
@@ -6,6 +7,9 @@ from app.models.message import Message  # Import Message for optimized queries
 from app.schemas.session import ChatSessionCreate, ChatSessionUpdate
 from typing import List, Optional
 from datetime import datetime
+
+
+logger = logging.getLogger(__name__)
 
 
 class CRUDChatSession(CRUDBase[ChatSession, ChatSessionCreate, ChatSessionUpdate]):
@@ -26,7 +30,7 @@ class CRUDChatSession(CRUDBase[ChatSession, ChatSessionCreate, ChatSessionUpdate
             db.refresh(db_obj)
             return db_obj
         except Exception as e:
-            print(f"Error creating session: {e}")
+            logger.error(f"Error creating session: {e}")
             raise
 
     def get_by_user(

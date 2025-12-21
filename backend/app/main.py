@@ -1,3 +1,4 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -17,7 +18,7 @@ try:
     Base.metadata.create_all(bind=engine)
     setup_db_profiling(engine)
 except Exception as e:
-    print(f"Database connection failed: {e}. Make sure PostgreSQL is running.")
+    logging.error(f"Database connection failed: {e}. Make sure PostgreSQL is running.")
 
 app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION)
 

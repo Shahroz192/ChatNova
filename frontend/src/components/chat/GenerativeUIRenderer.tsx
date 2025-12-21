@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import type { UIContainer, UIComponent, ChartData } from '../../types/generative-ui';
-import type { ImageGalleryData, SearchAnalyticsData } from '../../types/search';
+import type { ImageGalleryData } from '../../types/search';
 import ChartRenderer from './ChartRenderer';
 import SearchResults from './SearchResults';
 import NewsCard from './NewsCard';
 import ImageGallery from './ImageGallery';
-import SearchAnalytics from './SearchAnalytics';
 
 interface RendererProps {
     data: UIContainer | null;
@@ -251,37 +250,7 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
         );
     };
 
-    const renderSearchAnalytics = (props: any) => {
-        const {
-            total_searches,
-            average_results,
-            popular_queries,
-            search_types,
-            time_period
-        } = props;
 
-        const analyticsData: SearchAnalyticsData = {
-            total_searches,
-            average_results,
-            popular_queries,
-            search_types,
-            time_period
-        };
-
-        return (
-            <SearchAnalytics
-                data={analyticsData}
-                onExport={(format) => {
-                    // Handle export analytics
-                    console.log('Exporting analytics as:', format);
-                }}
-                onTimeRangeChange={(range) => {
-                    // Handle time range change
-                    console.log('Time range changed to:', range);
-                }}
-            />
-        );
-    };
 
     const renderLoading = (props: any) => {
         const { label } = props;
@@ -450,13 +419,6 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                         </ComponentWrapper>
                     );
 
-                case 'search_analytics':
-                    return (
-                        <ComponentWrapper width={props.width} key={key}>
-                            {renderSearchAnalytics(props)}
-                        </ComponentWrapper>
-                    );
-
                 case 'loading':
                     return (
                         <ComponentWrapper width={props.width} key={key}>
@@ -556,28 +518,314 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                     );
 
                 case 'button':
-                    const btnVariantStyles = {
-                        primary: 'bg-indigo-600 hover:bg-indigo-700 text-white focus:ring-indigo-500',
-                        secondary: 'bg-slate-200 hover:bg-slate-300 text-slate-900 focus:ring-slate-500',
-                        danger: 'bg-red-600 hover:bg-red-700 text-white focus:ring-red-500',
-                        success: 'bg-green-600 hover:bg-green-700 text-white focus:ring-green-500',
-                        warning: 'bg-yellow-500 hover:bg-yellow-600 text-white focus:ring-yellow-500',
-                        info: 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500',
-                    };
-                    const btnClass = btnVariantStyles[props.variant as keyof typeof btnVariantStyles || 'primary'];
+                     const btnVariantStyles = {
+                         primary: 'bg-indigo-600 hover:bg-indigo-700 text-white focus:ring-indigo-500',
+                         secondary: 'bg-slate-200 hover:bg-slate-300 text-slate-900 focus:ring-slate-500',
+                         danger: 'bg-red-600 hover:bg-red-700 text-white focus:ring-red-500',
+                         success: 'bg-green-600 hover:bg-green-700 text-white focus:ring-green-500',
+                         warning: 'bg-yellow-500 hover:bg-yellow-600 text-white focus:ring-yellow-500',
+                         info: 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500',
+                     };
+                     const btnClass = btnVariantStyles[props.variant as keyof typeof btnVariantStyles || 'primary'];
 
-                    return (
-                        <ComponentWrapper width={props.width} key={key}>
-                            <div className="mt-2">
-                                <button
-                                    onClick={() => alert(`Clicked: ${props.label}`)}
-                                    className={`w-full font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transform active:scale-95 transition-all duration-200 ${btnClass}`}
-                                >
-                                    {props.label}
-                                </button>
-                            </div>
-                        </ComponentWrapper>
-                    );
+                     return (
+                         <ComponentWrapper width={props.width} key={key}>
+                             <div className="mt-2">
+                                 <button
+                                     onClick={() => alert(`Clicked: ${props.label}`)}
+                                     className={`w-full font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transform active:scale-95 transition-all duration-200 ${btnClass}`}
+                                 >
+                                     {props.label}
+                                 </button>
+                             </div>
+                         </ComponentWrapper>
+                     );
+
+                case 'checkbox':
+                     return (
+                         <ComponentWrapper width={props.width} key={key}>
+                             <div className="flex items-center gap-3">
+                                 <input
+                                     id={inputId}
+                                     type="checkbox"
+                                     defaultChecked={props.value === 'true' || props.value === true}
+                                     className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                 />
+                                 <label htmlFor={inputId} className="text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                                     {props.label}
+                                 </label>
+                             </div>
+                         </ComponentWrapper>
+                     );
+
+                case 'radio':
+                     return (
+                         <ComponentWrapper width={props.width} key={key}>
+                             <fieldset className="space-y-3">
+                                 {props.label && (
+                                     <legend className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                                         {props.label}
+                                     </legend>
+                                 )}
+                                 <div className="space-y-2">
+                                     {Array.isArray(props.options) && props.options.map((option: any, idx: number) => (
+                                         <div key={idx} className="flex items-center gap-3">
+                                             <input
+                                                 id={`radio-${inputId}-${idx}`}
+                                                 type="radio"
+                                                 name={props.name || `radio-${inputId}`}
+                                                 value={option}
+                                                 defaultChecked={props.value === option}
+                                                 className="w-4 h-4 border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                             />
+                                             <label htmlFor={`radio-${inputId}-${idx}`} className="text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                                                 {option}
+                                             </label>
+                                         </div>
+                                     ))}
+                                 </div>
+                             </fieldset>
+                         </ComponentWrapper>
+                     );
+
+                case 'select':
+                     return (
+                         <ComponentWrapper width={props.width} key={key}>
+                             <div className="flex flex-col gap-1.5">
+                                 <label htmlFor={inputId} className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                                     {props.label}
+                                 </label>
+                                 <select
+                                     id={inputId}
+                                     defaultValue={props.value || ''}
+                                     className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900 transition-all outline-none text-slate-900 dark:text-slate-100"
+                                 >
+                                     <option value="">{props.placeholder || 'Select an option'}</option>
+                                     {Array.isArray(props.options) && props.options.map((option: any, idx: number) => (
+                                         <option key={idx} value={option}>
+                                             {option}
+                                         </option>
+                                     ))}
+                                 </select>
+                             </div>
+                         </ComponentWrapper>
+                     );
+
+                case 'layout':
+                case 'data':
+                case 'content':
+                case 'form':
+                     // Generic container wrappers - render children
+                     return (
+                         <ComponentWrapper width={props.width} key={key}>
+                             <div className={props.variant === 'card' ? 'p-4 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800' : ''}>
+                                 {props.label && (
+                                     <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-4">
+                                         {props.label}
+                                     </h3>
+                                 )}
+                                 {Array.isArray(props.children) && (
+                                     <div className="flex flex-col gap-4">
+                                         {props.children.map((child: any, idx: number) => renderComponent(child, idx))}
+                                     </div>
+                                 )}
+                             </div>
+                         </ComponentWrapper>
+                     );
+
+                case 'source_citation':
+                     return (
+                         <ComponentWrapper width={props.width} key={key}>
+                             <div className="text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900 p-2 rounded border border-slate-200 dark:border-slate-700">
+                                 Source: <a href={props.source_url} target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:underline">
+                                     {props.source_name || props.source_url}
+                                 </a>
+                                 {props.timestamp && <span className="ml-2 text-slate-400">{new Date(props.timestamp).toLocaleDateString()}</span>}
+                             </div>
+                         </ComponentWrapper>
+                     );
+
+                case 'search_summary':
+                     return (
+                         <ComponentWrapper width={props.width} key={key}>
+                             <div className="bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4">
+                                 <p className="text-sm text-slate-700 dark:text-slate-300 mb-2">
+                                     <span className="font-bold text-indigo-800 dark:text-indigo-200">{props.total_results || 0}</span> results found in <span className="font-bold text-indigo-800 dark:text-indigo-200">{props.search_time_ms || 0}ms</span>
+                                 </p>
+                                 {props.summary && <p className="text-sm text-slate-600 dark:text-slate-400 italic">{props.summary}</p>}
+                             </div>
+                         </ComponentWrapper>
+                     );
+
+                case 'related_searches':
+                     return (
+                         <ComponentWrapper width={props.width} key={key}>
+                             <div className="space-y-2">
+                                 {props.label && (
+                                     <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                                         {props.label}
+                                     </h4>
+                                 )}
+                                 <div className="flex flex-wrap gap-2">
+                                     {Array.isArray(props.searches) && props.searches.map((search: any, idx: number) => (
+                                         <button
+                                             key={idx}
+                                             className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 rounded-lg text-sm transition-colors border border-slate-200 dark:border-slate-600"
+                                         >
+                                             {search}
+                                         </button>
+                                     ))}
+                                 </div>
+                             </div>
+                         </ComponentWrapper>
+                     );
+
+                case 'search_controls':
+                     return (
+                         <ComponentWrapper width={props.width} key={key}>
+                             <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-4 space-y-4">
+                                 {props.label && (
+                                     <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                                         {props.label}
+                                     </h4>
+                                 )}
+                                 <div className="space-y-3">
+                                     {Array.isArray(props.filters) && props.filters.map((filter: any, fIdx: number) => (
+                                         <div key={fIdx}>
+                                             <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">{filter.label}</label>
+                                             <div className="flex flex-wrap gap-2 mt-1">
+                                                 {Array.isArray(filter.options) && filter.options.map((opt: any, oIdx: number) => (
+                                                     <button
+                                                         key={oIdx}
+                                                         className={`px-2 py-1 text-xs rounded border transition-all ${opt.active ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600'}`}
+                                                     >
+                                                         {opt.label}
+                                                     </button>
+                                                 ))}
+                                             </div>
+                                         </div>
+                                     ))}
+                                 </div>
+                                 {Array.isArray(props.sort_options) && props.sort_options.length > 0 && (
+                                     <div>
+                                         <label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Sort by</label>
+                                         <div className="flex gap-2 mt-1 flex-wrap">
+                                             {props.sort_options.map((sort: any, sIdx: number) => (
+                                                 <button
+                                                     key={sIdx}
+                                                     className={`px-2 py-1 text-xs rounded border transition-all ${sort.active ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600'}`}
+                                                 >
+                                                     {sort.label}
+                                                 </button>
+                                             ))}
+                                         </div>
+                                     </div>
+                                 )}
+                             </div>
+                         </ComponentWrapper>
+                     );
+
+                case 'tag_cloud':
+                     return (
+                         <ComponentWrapper width={props.width} key={key}>
+                             <div className="space-y-3">
+                                 {props.label && (
+                                     <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                                         {props.label}
+                                     </h4>
+                                 )}
+                                 <div className="flex flex-wrap gap-2">
+                                     {Array.isArray(props.tags) && props.tags.map((tag: any, idx: number) => {
+                                         // Size based on count/popularity
+                                         const maxCount = Math.max(...props.tags.map((t: any) => t.count || 1));
+                                         const sizeFactor = (tag.count || 1) / maxCount;
+                                         const textSize = 0.75 + sizeFactor * 0.5; // 0.75rem to 1.25rem
+                                         const opacityClass = tag.trending ? 'text-indigo-600 dark:text-indigo-400 font-bold' : 'text-slate-600 dark:text-slate-400';
+                                         return (
+                                             <button
+                                                 key={idx}
+                                                 style={{ fontSize: `${textSize}rem` }}
+                                                 className={`px-3 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors ${opacityClass}`}
+                                             >
+                                                 {tag.name}
+                                             </button>
+                                         );
+                                     })}
+                                 </div>
+                             </div>
+                         </ComponentWrapper>
+                     );
+
+                case 'timeline':
+                     return (
+                         <ComponentWrapper width={props.width} key={key}>
+                             <div className="space-y-4">
+                                 {props.label && (
+                                     <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                                         {props.label}
+                                     </h4>
+                                 )}
+                                 <div className="relative">
+                                     {Array.isArray(props.timeline) && props.timeline.map((item: any, idx: number) => (
+                                         <div key={idx} className="flex gap-4 pb-6 relative">
+                                             <div className="flex flex-col items-center">
+                                                 <div className="w-3 h-3 rounded-full bg-indigo-600 dark:bg-indigo-400 mt-1.5 relative z-10"></div>
+                                                 {idx !== props.timeline.length - 1 && (
+                                                     <div className="w-0.5 h-12 bg-slate-200 dark:bg-slate-700 my-2"></div>
+                                                 )}
+                                             </div>
+                                             <div className="flex-1 pt-0.5">
+                                                 <p className="text-xs font-mono text-slate-500 dark:text-slate-400">{item.date}</p>
+                                                 <h5 className="font-semibold text-slate-800 dark:text-slate-200">{item.title}</h5>
+                                                 {item.description && (
+                                                     <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">{item.description}</p>
+                                                 )}
+                                                 {item.category && (
+                                                     <span className="inline-block mt-1 px-2 py-0.5 text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded">
+                                                         {item.category}
+                                                     </span>
+                                                 )}
+                                             </div>
+                                         </div>
+                                     ))}
+                                 </div>
+                             </div>
+                         </ComponentWrapper>
+                     );
+
+                case 'geographic':
+                     return (
+                         <ComponentWrapper width={props.width} key={key}>
+                             <div className="space-y-4">
+                                 {props.label && (
+                                     <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                                         {props.label}
+                                     </h4>
+                                 )}
+                                 <div className="space-y-2">
+                                     {Array.isArray(props.locations) && props.locations.map((loc: any, idx: number) => {
+                                         // Normalize value for bar width (0-100)
+                                         const maxValue = Math.max(...props.locations.map((l: any) => l.value || 0));
+                                         const percentage = ((loc.value || 0) / maxValue) * 100;
+                                         return (
+                                             <div key={idx} className="space-y-1">
+                                                 <div className="flex justify-between text-sm">
+                                                     <span className="font-medium text-slate-700 dark:text-slate-300">{loc.location}</span>
+                                                     <span className="text-slate-600 dark:text-slate-400">{loc.value}</span>
+                                                 </div>
+                                                 <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+                                                     <div
+                                                         className="bg-indigo-600 dark:bg-indigo-400 h-full rounded-full transition-all"
+                                                         style={{ width: `${percentage}%` }}
+                                                     ></div>
+                                                 </div>
+                                             </div>
+                                         );
+                                     })}
+                                 </div>
+                             </div>
+                         </ComponentWrapper>
+                     );
 
                 default:
                     return (

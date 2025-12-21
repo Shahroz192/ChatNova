@@ -33,21 +33,6 @@ export interface ImageGalleryData {
   total_count?: number;
 }
 
-export interface SearchAnalyticsData {
-  total_searches: number;
-  average_results: number;
-  popular_queries: Array<{
-    query: string;
-    count: number;
-  }>;
-  search_types: {
-    general: number;
-    news: number;
-    images: number;
-  };
-  time_period: string;
-}
-
 export interface SearchControlsData {
   search_types: Array<{
     id: string;
@@ -71,35 +56,17 @@ export interface SearchControlsData {
 }
 
 export interface SearchQueryModifiers {
-  site?: string;        // site:example.com
-  filetype?: string;    // filetype:pdf
-  inurl?: string;       // inurl:blog
-  intitle?: string;     // intitle:"search term"
-  author?: string;      // author:"name"
+  site?: string;       
+  filetype?: string;   
+  inurl?: string;       
+  intitle?: string;     
+  author?: string;      
   date_range?: {
     start?: string;
     end?: string;
   };
   language?: string;
   region?: string;
-}
-
-export interface SearchSuggestion {
-  text: string;
-  type: 'query' | 'completion' | 'modifier';
-  category?: string;
-  popularity?: number;
-}
-
-export interface SearchCache {
-  query: string;
-  timestamp: number;
-  results: SearchResultData[];
-  metadata: {
-    total_results: number;
-    search_time_ms: number;
-    search_type: string;
-  };
 }
 
 export interface WebSearchOptions {
@@ -120,16 +87,6 @@ export interface SearchHistoryItem {
   results_count: number;
   search_type: string;
   web_search_enabled: boolean;
-}
-
-export interface SavedSearchItem {
-  id: string;
-  name: string;
-  query: string;
-  search_options: WebSearchOptions;
-  created_at: string;
-  last_used?: string;
-  usage_count: number;
 }
 
 export interface SearchStatus {

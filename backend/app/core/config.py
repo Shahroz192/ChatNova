@@ -1,3 +1,4 @@
+import logging
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
@@ -48,12 +49,13 @@ def validate_environment():
             "Please check your .env file or environment configuration."
         )
 
-    print("✅ All required environment variables validated successfully")
+    logging.info("✅ All required environment variables validated successfully")
 
 
-# Run validation on import
 try:
     validate_environment()
 except ValueError as e:
-    print(f"⚠️  Environment validation warning: {e}")
-    # Don't raise the error to allow startup in development mode
+    logging.error(f"Environment validation failed: {e}")
+    if settings.ENVIRONMENT != "development":
+        raise
+    logging.warning(f"⚠️  Environment validation warning (development mode): {e}")

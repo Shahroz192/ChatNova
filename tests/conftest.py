@@ -16,6 +16,7 @@ backend_dir = Path(__file__).parent.parent / "backend"
 env_file = backend_dir / ".env"
 if env_file.exists():
     from dotenv import load_dotenv
+
     load_dotenv(env_file)
 
 from app.main import app
@@ -55,6 +56,7 @@ def db_session():
 @pytest.fixture(scope="function")
 def client(db_session):
     """Create a test client with a database session."""
+
     def override_get_db():
         try:
             yield db_session
@@ -73,14 +75,10 @@ def test_user(db_session):
     """Create a test user."""
     unique_id = str(uuid.uuid4())[:8]  # Use first 8 chars of uuid for uniqueness
     user_data = UserCreate(
-        email=f"test_{unique_id}@example.com",
-        password="TestPassword123"
+        email=f"test_{unique_id}@example.com", password="TestPassword123"
     )
     hashed_password = get_password_hash(user_data.password)
-    user = User(
-        email=user_data.email,
-        hashed_password=hashed_password
-    )
+    user = User(email=user_data.email, hashed_password=hashed_password)
     db_session.add(user)
     db_session.commit()
     db_session.refresh(user)
@@ -93,10 +91,7 @@ def authenticated_client(client, test_user):
     # Login to get the cookie
     response = client.post(
         "/api/v1/auth/login",
-        data={
-            "username": test_user.email,
-            "password": "TestPassword123"
-        }
+        data={"username": test_user.email, "password": "TestPassword123"},
     )
     assert response.status_code == 200
     # Return the client with authentication

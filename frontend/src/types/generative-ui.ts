@@ -22,15 +22,20 @@ export interface UIComponent {
     | 'input'
     | 'textarea'
     | 'checkbox'
+    | 'radio'
     | 'select'
     | 'loading'
     | 'error'
     | 'search_results'
     | 'news_card'
     | 'image_gallery'
-    | 'search_analytics'
-    | 'pagination'
-    | 'search_controls';
+    | 'source_citation'
+    | 'search_summary'
+    | 'related_searches'
+    | 'search_controls'
+    | 'tag_cloud'
+    | 'timeline'
+    | 'geographic';
     props: Record<string, any>;
 }
 
@@ -53,8 +58,49 @@ export interface PaginationData {
 }
 
 export interface ChartData {
-    name: string;
-    value: number;
-    category?: string;
-    color?: string;
+     name: string;
+     value: number;
+     category?: string;
+     color?: string;
+}
+
+export interface TimelineData {
+     date: string;
+     title: string;
+     description: string;
+     category?: string;
+     importance?: number;
+}
+
+export interface TagData {
+     name: string;
+     count: number;
+     category?: string;
+     trending?: boolean;
+}
+
+export interface GeographicData {
+     location: string;
+     latitude?: number;
+     longitude?: number;
+     value: number;
+     label?: string;
+}
+
+export interface FilterOption {
+     value: string;
+     label: string;
+     active: boolean;
+}
+
+export interface FilterData {
+     id: string;
+     label: string;
+     options: FilterOption[];
+}
+
+export interface SortOption {
+     value: string;
+     label: string;
+     active: boolean;
 }

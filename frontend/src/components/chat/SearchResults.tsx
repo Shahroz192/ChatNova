@@ -3,12 +3,10 @@ import { Card, Button, Pagination } from 'react-bootstrap';
 import {
   ExternalLink,
   Share2,
-  Download,
   SortAsc,
   SortDesc
 } from 'lucide-react';
 import type { SearchResultData, SearchControlsData } from '../../types/search';
-import { exportSearchResults } from '../../utils/api';
 
 interface SearchResultsProps {
   results: SearchResultData[];
@@ -62,12 +60,6 @@ const SearchResults: React.FC<SearchResultsProps> = ({
     }
   };
 
-  const handleExport = (format: 'csv' | 'json' | 'txt') => {
-    const resultsToExport = selectedResults.size > 0
-      ? results.filter((_, i) => selectedResults.has(i))
-      : results;
-    exportSearchResults(resultsToExport, format);
-  };
 
   const formatTime = (ms: number) => {
     if (ms < 1000) return `${ms}ms`;
@@ -112,32 +104,6 @@ const SearchResults: React.FC<SearchResultsProps> = ({
               {sortOrder === 'desc' ? <SortDesc size={16} /> : <SortAsc size={16} />}
             </Button>
 
-            <div className="dropdown">
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                data-bs-toggle="dropdown"
-              >
-                <Download size={16} />
-              </Button>
-              <ul className="dropdown-menu">
-                <li>
-                  <button className="dropdown-item" onClick={() => handleExport('csv')}>
-                    Export as CSV
-                  </button>
-                </li>
-                <li>
-                  <button className="dropdown-item" onClick={() => handleExport('json')}>
-                    Export as JSON
-                  </button>
-                </li>
-                <li>
-                  <button className="dropdown-item" onClick={() => handleExport('txt')}>
-                    Export as Text
-                  </button>
-                </li>
-              </ul>
-            </div>
           </div>
         </div>
 
@@ -183,17 +149,6 @@ const SearchResults: React.FC<SearchResultsProps> = ({
                 </span>
               </div>
 
-              {selectedResults.size > 0 && (
-                <div className="d-flex gap-2">
-                  <Button
-                    variant="outline-primary"
-                    size="sm"
-                    onClick={() => handleExport('csv')}
-                  >
-                    Export Selected
-                  </Button>
-                </div>
-              )}
             </div>
           </div>
         )}

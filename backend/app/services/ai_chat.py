@@ -2,14 +2,14 @@ import os
 import asyncio
 import logging
 import re
+from html import escape
 from dotenv import load_dotenv
-from app.core.config import settings
 from app.core.generative_ui import GENERATIVE_UI_INSTRUCTION
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
 from langchain.memory import ConversationBufferMemory
 from mcp_use import MCPClient, MCPAgent
-from typing import Dict, Any, Optional, AsyncGenerator
+from typing import Dict, Any, Optional, AsyncGenerator, List
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_cerebras import ChatCerebras
 from langchain_groq import ChatGroq
@@ -19,13 +19,37 @@ from app.core.cache import cache_manager
 from app.core.security import decrypt_api_key
 from app.crud.user import user_api_key, user_mcp_server
 from app.crud.message import message as message_crud
-from app.services.web_search import web_search_service, SearchType
+from app.services.web_search import web_search_service
 from sqlalchemy.orm import Session
 import json
-from langchain.agents import initialize_agent, AgentType
-from langchain_community.tools import DuckDuckGoSearchRun
 
 load_dotenv()
+
+
+def sanitize_user_input(user_input: str) -> str:
+    """
+    Sanitize user input to prevent basic security issues.
+
+    Args:
+        user_input: Raw user input string
+
+    Returns:
+        Sanitized user input string
+    """
+    if not user_input:
+        return user_input
+
+    sanitized = user_input
+
+    # Remove null bytes and other control characters
+    sanitized = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "", sanitized)
+
+    # Limit length to prevent DOS attacks
+    max_length = 5000
+    if len(sanitized) > max_length:
+        sanitized = sanitized[:max_length]
+
+    return sanitized.strip()
 
 
 class AIChatService:
@@ -165,6 +189,28 @@ class AIChatService:
 
         return memory
 
+    async def _optimize_search_query(
+        self, message: str, chat_history: List[Any], llm: Any
+    ) -> str:
+        """Optimize the user's message into a search-engine friendly query."""
+        opt_prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "You are a search expert. Convert the user's request into a single, concise, and highly effective search engine query. "
+                    "If there is relevant conversation history, use it to make the query more specific. "
+                    "Output ONLY the optimized query string, no quotes or explanation.",
+                ),
+                MessagesPlaceholder(variable_name="chat_history"),
+                ("human", "{input}"),
+            ]
+        )
+        chain = opt_prompt | llm | StrOutputParser()
+        optimized_query = await chain.ainvoke(
+            {"input": message, "chat_history": chat_history}
+        )
+        return optimized_query.strip().strip('"')
+
     async def simple_chat(
         self,
         message: str,
@@ -174,6 +220,9 @@ class AIChatService:
         session_id: Optional[int] = None,
         search_web: bool = False,
     ) -> AsyncGenerator[str, None]:
+
+        sanitized_message = sanitize_user_input(message)
+
         llm = self.get_llm(model_name, user_id, db)
         if not llm:
             available_models = ", ".join(self.get_available_models(user_id, db))
@@ -183,79 +232,104 @@ class AIChatService:
 
         cached_response = None
         if user_id:
-            cached_response = cache_manager.get_llm_response(user_id, f"{message}:search:{search_web}", model_name)
+            if session_id:
+                pass
+            else:
+                cache_key = f"{sanitized_message}:search:{search_web}"
+                cached_response = cache_manager.get_llm_response(
+                    user_id, cache_key, model_name
+                )
 
         if cached_response:
-            print(f"Cache hit for user {user_id} with message: {message[:50]}...")
+            logging.info(f"Cache hit for user {user_id}")
             for chunk in cached_response:
                 yield chunk
                 await asyncio.sleep(0.01)
             return
 
         full_response = ""
+        chat_history = []
+        if session_id and db:
+            memory = self.load_session_history(session_id, db)
+            chat_history = memory.chat_memory.messages
 
         if search_web:
             try:
-                logging.info("using web search")
-                search_tool = web_search_service.get_tool()
-                agent = initialize_agent(
-                    tools=[search_tool],
-                    llm=llm,
-                    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-                    verbose=True,
-                    handle_parsing_errors=True
+                logging.info(f"Performing web search for: {sanitized_message[:50]}...")
+
+                optimized_query = await self._optimize_search_query(
+                    sanitized_message, chat_history, llm
                 )
-                
-                response = await agent.arun(message)
-                full_response = response
-                yield response
+                logging.info(f"Optimized query: {optimized_query}")
+                search_results = web_search_service.search(optimized_query)
 
-            except Exception as e:
-                logging.error(f"Agent search failed: {e}. Falling back to standard chat.")
-                yield f"Error performing search: {str(e)}"
-                return
+                system_prompt = (
+                    f"You are a sophisticated AI assistant with real-time web access.\n\n"
+                    f"{GENERATIVE_UI_INSTRUCTION}\n\n"
+                    "Citations: When using information from search results, cite them clearly using [Source Name/Number].\n"
+                    "Tone: Professional, helpful, and concise.\n"
+                    "Formatting: Use rich markdown. If multiple search results are relevant, you may use 'search_results' or 'news_card' UI components where appropriate, alongside your textual response."
+                )
 
-        else:
-            system_prompt = f"You are a helpful AI assistant.\n\n{GENERATIVE_UI_INSTRUCTION}"
-            
-            if session_id:
-                memory = self.load_session_history(session_id, db)
                 prompt = ChatPromptTemplate.from_messages(
                     [
                         ("system", system_prompt),
                         MessagesPlaceholder(variable_name="chat_history"),
-                        ("human", "{input}"),
+                        (
+                            "human",
+                            "Current Search Results:\n{search_results}\n\nUser Question: {input}",
+                        ),
                     ]
                 )
+
                 chain = prompt | llm | StrOutputParser()
+
                 async for chunk in chain.astream(
                     {
-                        "input": message,
-                        "chat_history": memory.chat_memory.messages
+                        "input": sanitized_message,
+                        "chat_history": chat_history,
+                        "search_results": search_results,
                     }
                 ):
                     full_response += chunk
                     yield chunk
-            else:
-                prompt = ChatPromptTemplate.from_messages(
-                    [
-                        ("system", system_prompt),
-                        ("human", "{input}"),
-                    ]
+
+            except Exception as e:
+                logging.error(
+                    f"Web search flow failed: {e}. Falling back to standard chat."
                 )
-                chain = prompt | llm | StrOutputParser()
-                async for chunk in chain.astream({"input": message}):
-                    full_response += chunk
-                    yield chunk
+                search_web = False
+        if not search_web or (not full_response and not search_web):
+            system_prompt = (
+                f"You are a helpful AI assistant.\n\n{GENERATIVE_UI_INSTRUCTION}"
+            )
+
+            prompt = ChatPromptTemplate.from_messages(
+                [
+                    ("system", system_prompt),
+                    MessagesPlaceholder(variable_name="chat_history"),
+                    ("human", "{input}"),
+                ]
+            )
+            chain = prompt | llm | StrOutputParser()
+
+            async for chunk in chain.astream(
+                {"input": sanitized_message, "chat_history": chat_history}
+            ):
+                full_response += chunk
+                yield chunk
 
         if full_response:
             if session_id:
                 memory = self.get_session_memory(session_id)
-                memory.chat_memory.add_user_message(message)
+                memory.chat_memory.add_user_message(sanitized_message)
                 memory.chat_memory.add_ai_message(full_response)
 
-            if user_id:
-                cache_manager.set_llm_response(user_id, f"{message}:search:{search_web}", model_name, full_response)
+            if user_id and not session_id:
+                cache_key = f"{sanitized_message}:search:{search_web}"
+                cache_manager.set_llm_response(
+                    user_id, cache_key, model_name, full_response
+                )
 
     async def agent_chat(
         self,
@@ -265,6 +339,9 @@ class AIChatService:
         db: Optional[Session] = None,
         session_id: Optional[int] = None,
     ) -> str:
+        # Sanitize user input to prevent prompt injection
+        sanitized_message = sanitize_user_input(message)
+
         try:
             mcp_config = (
                 self.get_user_mcp_config(user_id, db)
@@ -284,14 +361,14 @@ class AIChatService:
                 )
 
             cached_response = None
-            if user_id:
+            if user_id and not session_id:
                 cached_response = cache_manager.get_llm_response(
-                    user_id, message, model_name
+                    user_id, sanitized_message, model_name
                 )
 
             if cached_response:
-                print(
-                    f"Cache hit for agent chat user {user_id} with message: {message[:50]}..."
+                logging.info(
+                    f"Cache hit for agent chat user {user_id} with message: {sanitized_message[:50]}..."
                 )
                 return cached_response
 
@@ -299,9 +376,9 @@ class AIChatService:
                 memory = self.load_session_history(session_id, db)
                 agent = MCPAgent(llm=llm, client=user_mcp_client, max_steps=50)
                 history_str = "\n".join(
-                    [str(m.content) for m in memory.chat_memory.messages]
+                    [f"{'Human' if m.type == 'human' else 'AI'}: {m.content}" for m in memory.chat_memory.messages]
                 )
-                full_input = f"Previous conversation context:\\n{history_str}\\n\\nCurrent message: {message}"
+                full_input = f"Previous conversation context:\n{history_str}\n\nCurrent message: {message}"
                 response = await agent.run(full_input)
 
             else:
@@ -309,18 +386,24 @@ class AIChatService:
                     "session_id not provided, using default agent prompt without memory"
                 )
                 agent = MCPAgent(llm=llm, client=user_mcp_client, max_steps=50)
-                response = await agent.run(message)
+                response = await agent.run(sanitized_message)
 
-            if user_id:
-                cache_manager.set_llm_response(user_id, message, model_name, response)
+            if user_id and not session_id:
+                cache_manager.set_llm_response(
+                    user_id, sanitized_message, model_name, response
+                )
 
             return response
         except Exception as e:
-            print(f"Error in agent chat: {e}")
+            logging.error(f"Error in agent chat: {e}")
             return "Error in agent chat: " + str(e)
 
     async def compare_models(
-        self, message: str, user_id: Optional[int] = None, db: Optional[Session] = None, search_web: bool = False
+        self,
+        message: str,
+        user_id: Optional[int] = None,
+        db: Optional[Session] = None,
+        search_web: bool = False,
     ) -> Dict[str, str]:
         """Compare responses from all available models for the same input"""
         results = {}
@@ -330,7 +413,9 @@ class AIChatService:
         tasks = []
         for model_name in available_models:
             task = asyncio.create_task(
-                self._collect_model_response(message, model_name, user_id, db, search_web)
+                self._collect_model_response(
+                    message, model_name, user_id, db, search_web
+                )
             )
             tasks.append((model_name, task))
 
@@ -353,7 +438,11 @@ class AIChatService:
     ) -> str:
         """Helper method to collect the full response from an async generator"""
         full_response = ""
-        async for chunk in self.simple_chat(message, model_name, user_id, db, search_web=search_web):
+        # Sanitize the message before processing
+        sanitized_message = sanitize_user_input(message)
+        async for chunk in self.simple_chat(
+            sanitized_message, model_name, user_id, db, search_web=search_web
+        ):
             full_response += chunk
         return full_response
 
