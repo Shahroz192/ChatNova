@@ -851,8 +851,7 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
 
         return (
             <div
-                className="bg-white dark:bg-slate-800 p-8 rounded-xl shadow-xl border border-slate-100 dark:border-slate-700 w-full flex flex-col gap-6"
-                style={{ width: '415px' }}
+                className="bg-white/5 dark:bg-slate-900/50 p-6 rounded-xl shadow-xl border border-white/10 dark:border-white/5 w-full flex flex-col gap-6 backdrop-blur-sm"
             >
                 {data.type === 'container' ? (
                     rootChildren.map((child, index) => renderComponent(child, index))

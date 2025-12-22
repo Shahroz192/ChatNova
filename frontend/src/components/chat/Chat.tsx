@@ -290,6 +290,7 @@ const Chat: React.FC<ChatProps> = () => {
                 selectedModel,
                 sessionId,
                 searchOptions,
+                useTools,
                 (chunk) => {
                     streamingResponseRef.current += chunk;
                     setStreamingResponse(streamingResponseRef.current);
@@ -336,6 +337,41 @@ const Chat: React.FC<ChatProps> = () => {
                     streamingResponseRef.current = "";
 
                 },
+                (toolUpdate) => {
+                    setMessages((prev) =>
+                        prev.map((msg) => {
+                            if (msg.id === tempMessage.id) {
+                                const tools = msg.tool_calls ? [...msg.tool_calls] : [];
+                                
+                                if (toolUpdate.type === 'tool_start') {
+                                    // Add new tool call
+                                    tools.push({
+                                        tool: toolUpdate.tool,
+                                        input: toolUpdate.input,
+                                        status: 'running'
+                                    });
+                                } else if (toolUpdate.type === 'tool_end') {
+                                    // Mark last running tool as completed
+                                    // A naive approach assuming sequential execution
+                                    const runningIdx = tools.map(t => t.status).lastIndexOf('running');
+                                    if (runningIdx !== -1) {
+                                        tools[runningIdx] = {
+                                            ...tools[runningIdx],
+                                            output: toolUpdate.output,
+                                            status: 'completed'
+                                        };
+                                    }
+                                }
+                                
+                                return {
+                                    ...msg,
+                                    tool_calls: tools
+                                };
+                            }
+                            return msg;
+                        })
+                    );
+                }
             );
         } catch (error) {
             setMessages((prev) =>
@@ -378,7 +414,6 @@ const Chat: React.FC<ChatProps> = () => {
 
 
     return (
-        <>
             <div>
                 <Container
                     fluid
@@ -534,8 +569,22 @@ const Chat: React.FC<ChatProps> = () => {
                                                                     setActiveContextMenu({ id: msg.id, type: 'assistant' });
                                                                 }}
                                                             >
-                                                                <div className="d-flex align-items-start">
+                                                                <div className="d-flex w-100">
                                                                     <div style={{ flex: 1 }}>
+                                                                        {msg.tool_calls && msg.tool_calls.length > 0 && (
+                                                                             <div className="tool-calls mb-3">
+                                                                                 {msg.tool_calls.map((tool, idx) => (
+                                                                                     <div key={idx} className="tool-call-item text-muted small mb-1">
+                                                                                         <span className="fw-bold">🛠️ {tool.tool}</span>
+                                                                                         {tool.status === 'running' && <span className="ms-2 spinner-border spinner-border-sm" role="status" />}
+                                                                                         {tool.status === 'completed' && <span className="ms-2 text-success">✓</span>}
+                                                                                         <div className="tool-input ps-3 text-truncate" style={{maxWidth: '300px', opacity: 0.8}}>Input: {tool.input}</div>
+                                                                                         {tool.output && <div className="tool-output ps-3 text-truncate" style={{maxWidth: '300px', opacity: 0.8}}>Output: {tool.output}</div>}
+                                                                                     </div>
+                                                                                 ))}
+                                                                             </div>
+                                                                        )}
+                                                                        
                                                                         {msg.id === streamingMessageId && isStreaming ? (
                                                                             <div className="streaming-response">
                                                                                 <div style={{ whiteSpace: "pre-wrap" }}>
@@ -544,9 +593,9 @@ const Chat: React.FC<ChatProps> = () => {
                                                                                 <div className="streaming-cursor">|</div>
                                                                             </div>
                                                                         ) : (
-                                                                            <div className="flex-grow-1">
+                                                                            <div className="flex-grow-1 w-100">
                                                                                 {uiData ? (
-                                                                                    <div className="generative-ui-container mt-2 mb-2">
+                                                                                    <div className="generative-ui-container mt-2 mb-2 w-100">
                                                                                         <GenerativeUIRenderer data={uiData} />
                                                                                     </div>
                                                                                 ) : (
@@ -626,7 +675,6 @@ const Chat: React.FC<ChatProps> = () => {
                     </Row>
                 </Container>
             </div>
-        </>
     );
 };
 

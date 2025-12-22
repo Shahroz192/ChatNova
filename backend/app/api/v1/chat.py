@@ -391,6 +391,92 @@ def chat_stream(
     )
 
 
+@router.post("/chat/agent-stream")
+@request_profiler.profile_endpoint("/chat/agent-stream", "POST")
+def chat_agent_stream(
+    message_in: MessageCreate,
+    session_id: Optional[int] = Query(
+        None, description="Session ID for conversation context"
+    ),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Stream Agent response with tool execution details using Server-Sent Events.
+    Events are JSON objects with types: 'tool_start', 'tool_end', 'content'.
+    """
+
+    async def stream_response():
+        try:
+            # Create message record first
+            msg = crud.message.create(
+                db,
+                obj_in=message_in,
+                response="",  # Empty initial response
+                user_id=current_user.id,
+                session_id=session_id,
+            )
+
+            # If this is a new session or the session has "New Chat" as title, update it with the first message
+            if session_id:
+                session_obj = crud.session.get(db, id=session_id)
+                if session_obj and (
+                    session_obj.title == "New Chat"
+                    or not session_obj.title
+                    or session_obj.title.strip() == ""
+                ):
+                    # Truncate title to 60 characters to match frontend
+                    new_title = message_in.content[:60]
+                    if len(message_in.content) > 60:
+                        new_title += "..."
+                    crud.session.update(
+                        db,
+                        db_obj=session_obj,
+                        obj_in=ChatSessionUpdate(title=new_title),
+                    )
+
+            # Stream the AI response
+            full_response = ""
+            async for chunk in ai_service.agent_chat_stream(
+                message_in.content,
+                message_in.model,
+                current_user.id,
+                db,
+                session_id,
+            ):
+                # chunk is already a JSON string provided by agent_chat_stream
+                yield f"data: {chunk}\n\n"
+
+                # Accumulate content for DB update
+                try:
+                    data = json.loads(chunk)
+                    if data.get("type") == "content":
+                        full_response += data.get("content", "")
+                except:
+                    pass
+
+            # Update the message with the complete response
+            crud.message.update(db, db_obj=msg, obj_in={"response": full_response})
+
+            # Send completion signal
+            yield "data: [DONE]\n\n"
+
+        except Exception as e:
+            error_event = json.dumps({"type": "error", "content": str(e)})
+            yield f"data: {error_event}\n\n"
+
+    return StreamingResponse(
+        stream_response(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Cache-Control",
+        },
+    )
+
+
 @router.get("/chat/history", response_model=MessagePagination)
 @request_profiler.profile_endpoint("/chat/history", "GET")
 def get_chat_history(

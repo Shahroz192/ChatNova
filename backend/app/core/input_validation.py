@@ -118,12 +118,12 @@ class InputSanitizer:
         # Check for suspicious patterns that might indicate injection attempts
         suspicious_patterns = []
 
-        # Check for SQL injection patterns (less strict for benign words)
+        # Check for SQL injection patterns (context-aware to reduce false positives)
         sql_patterns = [
-            r"(?i)(union|select|insert|update|drop|create|alter|exec|execute)",
-            r'["\']\s*;\s*--',  # SQL comment
-            r"\bor\b\s+1\s*=\s*1\b",  # SQL injection 1=1
-            r"\band\b\s+1\s*=\s*1\b",  # SQL injection 1=1
+            r"(?i)\b(union\s+select|select\s+\*\s+from|insert\s+into|update\s+\w+\s+set|drop\s+table|drop\s+database|create\s+table|create\s+database|alter\s+table|exec\s*\(|execute\s*\()\b",  # SQL commands with context
+            r'["\']\\s*;\\s*--',  # SQL comment
+            r"\\bor\\b\\s+['\"]?1['\"]?\\s*=\\s*['\"]?1['\"]?\\b",  # SQL injection 1=1
+            r"\\band\\b\\s+['\"]?1['\"]?\\s*=\\s*['\"]?1['\"]?\\b",  # SQL injection 1=1
         ]
 
         for pattern in sql_patterns:

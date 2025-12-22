@@ -46,9 +46,11 @@ export const streamChat = async (
   model: string,
   sessionId?: number,
   searchOptions?: WebSearchOptions,
+  useTools?: boolean,
   onChunk?: (chunk: string) => void,
   onComplete?: () => void,
-  onError?: (error: string) => void
+  onError?: (error: string) => void,
+  onToolUpdate?: (update: any) => void
 ) => {
   try {
     const params = new URLSearchParams();
@@ -68,7 +70,12 @@ export const streamChat = async (
       if (searchOptions.modifiers) requestBody.search_modifiers = searchOptions.modifiers;
     }
 
-    const response = await fetch(`/api/v1/chat/stream?${params}`, {
+    let endpoint = '/api/v1/chat/stream';
+    if (useTools) {
+      endpoint = '/api/v1/chat/agent-stream';
+    }
+
+    const response = await fetch(`${endpoint}?${params}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -104,11 +111,25 @@ export const streamChat = async (
         if (line.startsWith('data: ')) {
           let data = line.slice(6).trim();
 
+          // Handle simple string data or JSON
           if (data.startsWith('"') && data.endsWith('"')) {
-            try {
-              data = JSON.parse(data);
-            } catch (e) {
-            }
+             // It might be a simple JSON string message
+              try {
+                // Double parse if it's a stringified JSON string? 
+                // In standard chat stream it sends plain text sometimes wrapped or raw chunks?
+                // The backend sends `data: {chunk}\n\n` or `data: JSON\n\n`
+                // Let's try to parse as JSON first if it looks like object
+              } catch(e) {}
+          }
+          
+          let parsedData = null;
+          try {
+              parsedData = JSON.parse(data);
+          } catch (e) {
+              // Not valid JSON, maybe just string content?
+              // In agent stream, everything is JSON. In normal chat, it might be raw string chunks if not handled carefully, 
+              // but looking at valid SSE, data usually is just the string. 
+              // However, Chat.tsx logic before was `chunk` being the string.
           }
 
           if (data === '[DONE]') {
@@ -120,11 +141,33 @@ export const streamChat = async (
           } else if (data.startsWith('ERROR:')) {
             onError?.(data.slice(6));
             return;
-          } else if (data) {
-            if (data.includes('"type":"container"') && data.includes('search_results')) {
-              hasSearchData = true;
-            }
-            onChunk?.(data);
+          } else {
+             // Check if it is an Agent Event (JSON)
+             if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData)) {
+                 if (parsedData.type === 'tool_start' || parsedData.type === 'tool_end') {
+                     onToolUpdate?.(parsedData);
+                 } else if (parsedData.type === 'content') {
+                     onChunk?.(parsedData.content);
+                 } else if (parsedData.type === 'error') {
+                     onError?.(parsedData.content);
+                 } else {
+                     // Fallback for generative UI in standard chat (legacy check)
+                    if (JSON.stringify(parsedData).includes('"type":"container"') && JSON.stringify(parsedData).includes('search_results')) {
+                        hasSearchData = true;
+                        onChunk?.(JSON.stringify(parsedData)); // Pass full JSON for generative UI
+                    } else {
+                        // Regular message chunk probably in JSON format? 
+                        // If it's none of the above, key might be missing or logic differs.
+                        // For standard chat, parsedData might be just the chunk string if JSON.parse worked on a quoted string?
+                        // Actually standard chat `yield chunk` sends the string. `f"data: {chunk}\n\n"` in python.
+                        // If chunk is `Hello`, data is `Hello`. JSON.parse fails. passed as string.
+                        // If chunk is `{"foo": "bar"}`, data is `{"foo": "bar"}`. JSON.parse works.
+                    }
+                 }
+             } else {
+                 // It's a string chunk (standard chat)
+                 onChunk?.(data);
+             }
           }
         }
       }

@@ -113,6 +113,7 @@ class AIChatService:
         model_name: str,
         user_id: Optional[int] = None,
         db: Optional[Session] = None,
+        streaming: bool = False,
     ):
         if model_name not in self.llm_configs:
             return None
@@ -146,9 +147,14 @@ class AIChatService:
         else:
             api_key_param = f"{llm_class.__name__.lower().replace('chat', '')}_api_key"
 
+        # Some classes might not accept streaming kwarg directly in init if strictly typed, but most LangChain Chat models do or accept **kwargs
+        kwargs = {api_key_param: api_key}
+        if streaming:
+            kwargs["streaming"] = True
+
         return llm_class(
             model=model,
-            **{api_key_param: api_key},
+            **kwargs,
         )
 
     def get_available_models(
@@ -220,10 +226,9 @@ class AIChatService:
         session_id: Optional[int] = None,
         search_web: bool = False,
     ) -> AsyncGenerator[str, None]:
-
         sanitized_message = sanitize_user_input(message)
 
-        llm = self.get_llm(model_name, user_id, db)
+        llm = self.get_llm(model_name, user_id, db, streaming=True)
         if not llm:
             available_models = ", ".join(self.get_available_models(user_id, db))
             raise ValueError(
@@ -376,7 +381,10 @@ class AIChatService:
                 memory = self.load_session_history(session_id, db)
                 agent = MCPAgent(llm=llm, client=user_mcp_client, max_steps=50)
                 history_str = "\n".join(
-                    [f"{'Human' if m.type == 'human' else 'AI'}: {m.content}" for m in memory.chat_memory.messages]
+                    [
+                        f"{'Human' if m.type == 'human' else 'AI'}: {m.content}"
+                        for m in memory.chat_memory.messages
+                    ]
                 )
                 full_input = f"Previous conversation context:\n{history_str}\n\nCurrent message: {message}"
                 response = await agent.run(full_input)
@@ -397,6 +405,147 @@ class AIChatService:
         except Exception as e:
             logging.error(f"Error in agent chat: {e}")
             return "Error in agent chat: " + str(e)
+
+    async def agent_chat_stream(
+        self,
+        message: str,
+        model_name: str,
+        user_id: Optional[int] = None,
+        db: Optional[Session] = None,
+        session_id: Optional[int] = None,
+    ) -> AsyncGenerator[str, None]:
+        # Define callback handler locally or use a helper class
+        from langchain_core.callbacks import AsyncCallbackHandler
+
+        class AgentStreamingCallbackHandler(AsyncCallbackHandler):
+            def __init__(self, queue: asyncio.Queue):
+                self.queue = queue
+
+            async def on_tool_start(
+                self, serialized: Dict[str, Any], input_str: str, **kwargs: Any
+            ) -> None:
+                event = {
+                    "type": "tool_start",
+                    "tool": serialized.get("name"),
+                    "input": input_str,
+                }
+                await self.queue.put(json.dumps(event))
+
+            async def on_tool_end(self, output: str, **kwargs: Any) -> None:
+                event = {"type": "tool_end", "output": output}
+                await self.queue.put(json.dumps(event))
+
+            async def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
+                event = {"type": "content", "content": token}
+                await self.queue.put(json.dumps(event))
+
+        sanitized_message = sanitize_user_input(message)
+
+        try:
+            mcp_config = (
+                self.get_user_mcp_config(user_id, db)
+                if user_id and db
+                else {"mcpServers": {}}
+            )
+            if not mcp_config["mcpServers"]:
+                yield json.dumps(
+                    {"type": "error", "content": "No MCP servers configured for user."}
+                )
+                return
+
+            user_mcp_client = MCPClient.from_dict(mcp_config)
+
+            # Use streaming=True
+            llm = self.get_llm(model_name, user_id, db, streaming=True)
+            if not llm:
+                available_models = ", ".join(self.get_available_models(user_id, db))
+                yield json.dumps(
+                    {
+                        "type": "error",
+                        "content": f"Invalid model '{model_name}'. Available: {available_models}",
+                    }
+                )
+                return
+
+            # Check cache
+            cached_response = None
+            if user_id and not session_id:
+                cached_response = cache_manager.get_llm_response(
+                    user_id, sanitized_message, model_name
+                )
+
+            if cached_response:
+                yield json.dumps({"type": "content", "content": cached_response})
+                return
+
+            queue = asyncio.Queue()
+            handler = AgentStreamingCallbackHandler(queue)
+
+            # Initialize agent with callback
+            if session_id:
+                memory = self.load_session_history(session_id, db)
+                agent = MCPAgent(
+                    llm=llm, client=user_mcp_client, max_steps=50, callbacks=[handler]
+                )
+                history_str = "\n".join(
+                    [
+                        f"{'Human' if m.type == 'human' else 'AI'}: {m.content}"
+                        for m in memory.chat_memory.messages
+                    ]
+                )
+                full_input = f"Previous conversation context:\n{history_str}\n\nCurrent message: {message}"
+                input_arg = full_input
+            else:
+                agent = MCPAgent(
+                    llm=llm, client=user_mcp_client, max_steps=50, callbacks=[handler]
+                )
+                input_arg = sanitized_message
+
+            # Run agent in background
+            task = asyncio.create_task(agent.run(input_arg))
+
+            full_response = ""
+
+            # Loop until task is done OR queue is empty
+            while not task.done() or not queue.empty():
+                try:
+                    try:
+                        item = await asyncio.wait_for(queue.get(), timeout=0.1)
+                        yield item
+
+                        try:
+                            data = json.loads(item)
+                            if data.get("type") == "content":
+                                full_response += data.get("content", "")
+                        except:
+                            pass
+
+                    except asyncio.TimeoutError:
+                        continue
+
+                except Exception as e:
+                    logging.error(f"Error in stream loop: {e}")
+                    break
+
+            if task.done() and task.exception():
+                e = task.exception()
+                logging.error(f"Agent task failed: {e}")
+                yield json.dumps({"type": "error", "content": str(e)})
+
+            if full_response:
+                if session_id:
+                    memory = self.get_session_memory(session_id)
+                    memory.chat_memory.add_user_message(sanitized_message)
+                    memory.chat_memory.add_ai_message(full_response)
+
+                if user_id and not session_id:
+                    cache_manager.set_llm_response(
+                        user_id, sanitized_message, model_name, full_response
+                    )
+
+        except Exception as e:
+            logging.error(f"Error in agent chat stream: {e}")
+            yield json.dumps({"type": "error", "content": str(e)})
 
     async def compare_models(
         self,
