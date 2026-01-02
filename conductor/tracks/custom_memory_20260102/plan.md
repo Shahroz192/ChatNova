@@ -13,7 +13,7 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Backend - Custom Instructions' (Protocol in workflow.md)
 
 ## Phase 2: Backend - Long-term Memory System
-- [ ] Task: Create UserMemory Model
+- [~] Task: Create UserMemory Model
     - [ ] Subtask: Write Tests: Create tests for `UserMemory` model creation and retrieval.
     - [ ] Subtask: Implement Feature: Create `UserMemory` SQLAlchemy model and Alembic migration.
 - [ ] Task: Memory CRUD API
@@ -28,9 +28,9 @@
 - [ ] Task: Conductor - User Manual Verification 'Phase 2: Backend - Long-term Memory System' (Protocol in workflow.md)
 
 ## Phase 3: Frontend - Personalization UI
-- [ ] Task: Settings UI - Custom Instructions
-    - [ ] Subtask: Write Tests: Create component tests for the Custom Instructions input form.
-    - [ ] Subtask: Implement Feature: Add "Personalization" tab to Settings modal. Implement text area for updating `custom_instructions`.
+- [x] Task: Settings UI - Custom Instructions [c12941d]
+    - [x] Subtask: Write Tests: Create component tests for the Custom Instructions input form.
+    - [x] Subtask: Implement Feature: Add "Personalization" tab to Settings modal. Implement text area for updating `custom_instructions`.
 - [ ] Task: Settings UI - Memory Management
     - [ ] Subtask: Write Tests: Create component tests for the Memory List and Delete actions.
     - [ ] Subtask: Implement Feature: Implement a list view of memories in the Settings modal with delete functionality. Connect to `useAuth` or a new `useMemory` hook.
