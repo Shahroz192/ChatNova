@@ -103,14 +103,17 @@ def verify_token(token: str, db: Session = None):
         token_jti = payload.get("jti")
 
         if not user_id or not token_jti:
+            print(f"DEBUG: Missing sub or jti. user_id={user_id}, jti={token_jti}")
             return None
 
         # Check if token is blacklisted
         if db and token_blacklist_crud.is_token_blacklisted(db, token_jti=token_jti):
+            print(f"DEBUG: Token blacklisted. jti={token_jti}")
             return None
 
         return user_id
-    except JWTError:
+    except JWTError as e:
+        print(f"DEBUG: JWTError: {e}")
         return None
 
 
@@ -127,7 +130,9 @@ def extract_token_jti(token: str) -> Optional[str]:
     """
     try:
         # Decode without signature validation to extract jti
-        unverified = jwt.decode(token, options={"verify_signature": False})
+        unverified = jwt.decode(
+            token, settings.SECRET_KEY, options={"verify_signature": False}
+        )
         return unverified.get("jti")
     except JWTError:
         return None
@@ -144,7 +149,9 @@ def get_token_expires_at(token: str) -> Optional[datetime]:
     """
     try:
         # Decode without signature validation to extract exp
-        unverified = jwt.decode(token, options={"verify_signature": False})
+        unverified = jwt.decode(
+            token, settings.SECRET_KEY, options={"verify_signature": False}
+        )
         exp_timestamp = unverified.get("exp")
         if exp_timestamp:
             return datetime.fromtimestamp(exp_timestamp, tz=UTC)

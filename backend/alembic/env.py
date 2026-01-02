@@ -14,6 +14,7 @@ if config.config_file_name is not None:
 
 sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), "..")))
 from app.database import Base
+from app.core.config import settings
 
 target_metadata = Base.metadata
 
@@ -23,7 +24,7 @@ def run_migrations_offline() -> None:
 
     Configures the context with a URL and emits strings to script output.
     """
-    url = config.get_main_option("sqlalchemy.url")
+    url = settings.DATABASE_URL
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -40,8 +41,10 @@ def run_migrations_online() -> None:
 
     Creates an Engine and associates a connection with the context.
     """
+    configuration = config.get_section(config.config_ini_section, {})
+    configuration["sqlalchemy.url"] = settings.DATABASE_URL
     connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
+        configuration,
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

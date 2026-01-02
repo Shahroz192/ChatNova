@@ -54,6 +54,7 @@ class User(UserBase):
     id: int
     password: str = Field(None, min_length=8)
     messages_used: int
+    custom_instructions: Optional[str] = None
     created_at: Optional[datetime]
 
     @field_validator("password")
@@ -90,6 +91,7 @@ class User(UserBase):
 class UserUpdate(BaseModel):
     password: Optional[str] = Field(None, min_length=8)
     messages_used: Optional[int] = None
+    custom_instructions: Optional[str] = None
 
     @field_validator("password")
     @classmethod

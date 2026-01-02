@@ -8,8 +8,7 @@ def set_auth_cookie(response: Response, token: str) -> None:
         key="access_token",
         value=token,
         httponly=True,
-        secure=settings.ENVIRONMENT
-        != "development", 
+        secure=settings.ENVIRONMENT not in ["development", "testing"],
         samesite="lax",  
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  
         path="/api/v1", 

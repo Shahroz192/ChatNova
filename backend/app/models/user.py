@@ -12,6 +12,7 @@ class User(Base):
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
     messages_used = Column(Integer, default=0, index=True)
+    custom_instructions = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     api_keys = relationship("UserAPIKey", back_populates="user")
