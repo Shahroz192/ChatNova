@@ -13,6 +13,7 @@ from app.schemas.user import (
     UserMCPServer,
     UserMCPServerCreate,
     UserMCPServerUpdate,
+    UserInstructionsUpdate,
 )
 from app.crud.user import user_api_key, user_mcp_server
 from typing import List
@@ -39,7 +40,35 @@ def update_user_me(
     """
     Update current user.
     """
-    return crud.user.update(db, db_obj=current_user, obj_in=user_in)
+    from app.core.cache import cache_manager
+
+    # Invalidate cache
+    cache_manager.cache.delete(f"user:{current_user.id}")
+
+    # Fetch fresh user to ensure it's attached to session for update
+    db_user = crud.user.get(db, id=current_user.id)
+    return crud.user.update(db, db_obj=db_user, obj_in=user_in)
+
+
+@router.patch("/users/me/instructions", response_model=schemas.User)
+@request_profiler.profile_endpoint("/users/me/instructions", "PATCH")
+def update_user_instructions(
+    instr_in: UserInstructionsUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Update user custom instructions.
+    """
+    from app.core.cache import cache_manager
+
+    # Invalidate cache
+    cache_manager.cache.delete(f"user:{current_user.id}")
+
+    # Fetch fresh user to ensure it's attached to session for update
+    db_user = crud.user.get(db, id=current_user.id)
+    user_update = schemas.UserUpdate(custom_instructions=instr_in.custom_instructions)
+    return crud.user.update(db, db_obj=db_user, obj_in=user_update)
 
 
 @router.post("/users/me/api-keys", response_model=UserAPIKey)

@@ -36,9 +36,12 @@ def get_current_user(
     if cached_user_data:
         # Convert cached user data back to User object
         import json
+        from datetime import datetime
 
         user_dict = json.loads(cached_user_data)
-        user_obj = User(**user_dict)
+        if user_dict.get("created_at"):
+            user_dict["created_at"] = datetime.fromisoformat(user_dict["created_at"])
+        return User(**user_dict)
     else:
         # Get user from database
         user_obj = user.get(db, id=user_id)
@@ -58,6 +61,7 @@ def get_current_user(
                     "email": user_obj.email,
                     "is_active": user_obj.is_active,
                     "messages_used": user_obj.messages_used,
+                    "custom_instructions": user_obj.custom_instructions,
                     "created_at": user_obj.created_at.isoformat()
                     if user_obj.created_at
                     else None,

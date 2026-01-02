@@ -118,6 +118,10 @@ class UserUpdate(BaseModel):
         return v
 
 
+class UserInstructionsUpdate(BaseModel):
+    custom_instructions: str
+
+
 class UserAPIKeyBase(BaseModel):
     model_name: str
     encrypted_key: str
