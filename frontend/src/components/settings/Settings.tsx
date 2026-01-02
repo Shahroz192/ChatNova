@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Nav, Card, Button, Form } from 'react-bootstrap';
-import { Key, Server, User, History } from 'lucide-react';
+import { Key, Server, User, History, Sparkles } from 'lucide-react';
 import BYOKForm from './BYOKForm';
 import MCPServerForm from './MCPServerForm';
 import MCPServerList from './MCPServerList';
+import PersonalizationForm from './PersonalizationForm';
 import HistoryManagement from '../chat/HistoryManagement';
 import api from '../../utils/api';
 import '../../styles/Settings.css';
@@ -19,7 +20,7 @@ interface User {
 interface SettingsProps {}
 
 const Settings: React.FC<SettingsProps> = () => {
-  const [activeTab, setActiveTab] = useState<'keys' | 'servers' | 'account' | 'privacy' | 'appearance' | 'history'>('keys');
+  const [activeTab, setActiveTab] = useState<'keys' | 'personalization' | 'servers' | 'account' | 'privacy' | 'appearance' | 'history'>('keys');
 
   return (
     <div className="settings-page">
@@ -41,6 +42,18 @@ const Settings: React.FC<SettingsProps> = () => {
                 >
                   <Key size={18} className="mr-2" />
                   <span className="font-weight-medium">API Keys</span>
+                </Nav.Link>
+              </Nav.Item>
+              <Nav.Item className="mb-2">
+                <Nav.Link
+                  eventKey="personalization"
+                  active={activeTab === 'personalization'}
+                  onClick={() => setActiveTab('personalization')}
+                  className="d-flex align-items-center py-2 px-3 rounded-lg"
+                  style={{ transition: 'all 0.2s ease' }}
+                >
+                  <Sparkles size={18} className="mr-2" />
+                  <span className="font-weight-medium">Personalization</span>
                 </Nav.Link>
               </Nav.Item>
               <Nav.Item className="mb-2">
@@ -109,6 +122,20 @@ const Settings: React.FC<SettingsProps> = () => {
                   </Card.Header>
                   <Card.Body>
                     <BYOKForm />
+                  </Card.Body>
+                </Card>
+              )}
+
+              {activeTab === 'personalization' && (
+                <Card>
+                  <Card.Header>
+                    <Card.Title>Custom Instructions</Card.Title>
+                    <Card.Text>
+                      Customize how the AI responds to you.
+                    </Card.Text>
+                  </Card.Header>
+                  <Card.Body>
+                    <PersonalizationForm />
                   </Card.Body>
                 </Card>
               )}
