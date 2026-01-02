@@ -257,6 +257,17 @@ class AIChatService:
             memory = self.load_session_history(session_id, db)
             chat_history = memory.chat_memory.messages
 
+        # Get custom instructions
+        custom_instructions = ""
+        if user_id and db:
+            from app.crud.user import user as user_crud
+
+            db_user = user_crud.get(db, id=user_id)
+            if db_user and db_user.custom_instructions:
+                custom_instructions = (
+                    f"\n\n### User Custom Instructions\n{db_user.custom_instructions}"
+                )
+
         if search_web:
             try:
                 logging.info(f"Performing web search for: {sanitized_message[:50]}...")
@@ -273,6 +284,7 @@ class AIChatService:
                     "Citations: When using information from search results, cite them clearly using [Source Name/Number].\n"
                     "Tone: Professional, helpful, and concise.\n"
                     "Formatting: Use rich markdown. If multiple search results are relevant, you may use 'search_results' or 'news_card' UI components where appropriate, alongside your textual response."
+                    f"{custom_instructions}"
                 )
 
                 prompt = ChatPromptTemplate.from_messages(
@@ -306,6 +318,7 @@ class AIChatService:
         if not search_web or (not full_response and not search_web):
             system_prompt = (
                 f"You are a helpful AI assistant.\n\n{GENERATIVE_UI_INSTRUCTION}"
+                f"{custom_instructions}"
             )
 
             prompt = ChatPromptTemplate.from_messages(
@@ -364,6 +377,17 @@ class AIChatService:
                     f"Invalid model '{model_name}' or API key not available. Available models: {available_models}"
                 )
 
+            # Get custom instructions
+            custom_instructions = ""
+            if user_id and db:
+                from app.crud.user import user as user_crud
+
+                db_user = user_crud.get(db, id=user_id)
+                if db_user and db_user.custom_instructions:
+                    custom_instructions = (
+                        f"USER CUSTOM INSTRUCTIONS:\n{db_user.custom_instructions}\n\n"
+                    )
+
             cached_response = None
             if user_id and not session_id:
                 cached_response = cache_manager.get_llm_response(
@@ -385,7 +409,7 @@ class AIChatService:
                         for m in memory.chat_memory.messages
                     ]
                 )
-                full_input = f"Previous conversation context:\n{history_str}\n\nCurrent message: {message}"
+                full_input = f"{custom_instructions}Previous conversation context:\n{history_str}\n\nCurrent message: {message}"
                 response = await agent.run(full_input)
 
             else:
@@ -393,7 +417,8 @@ class AIChatService:
                     "session_id not provided, using default agent prompt without memory"
                 )
                 agent = MCPAgent(llm=llm, client=user_mcp_client, max_steps=50)
-                response = await agent.run(sanitized_message)
+                full_input = f"{custom_instructions}Current message: {sanitized_message}"
+                response = await agent.run(full_input)
 
             if user_id and not session_id:
                 cache_manager.set_llm_response(
@@ -466,6 +491,17 @@ class AIChatService:
                 )
                 return
 
+            # Get custom instructions
+            custom_instructions = ""
+            if user_id and db:
+                from app.crud.user import user as user_crud
+
+                db_user = user_crud.get(db, id=user_id)
+                if db_user and db_user.custom_instructions:
+                    custom_instructions = (
+                        f"USER CUSTOM INSTRUCTIONS:\n{db_user.custom_instructions}\n\n"
+                    )
+
             # Check cache
             cached_response = None
             if user_id and not session_id:
@@ -492,13 +528,13 @@ class AIChatService:
                         for m in memory.chat_memory.messages
                     ]
                 )
-                full_input = f"Previous conversation context:\n{history_str}\n\nCurrent message: {message}"
+                full_input = f"{custom_instructions}Previous conversation context:\n{history_str}\n\nCurrent message: {message}"
                 input_arg = full_input
             else:
                 agent = MCPAgent(
                     llm=llm, client=user_mcp_client, max_steps=50, callbacks=[handler]
                 )
-                input_arg = sanitized_message
+                input_arg = f"{custom_instructions}Current message: {sanitized_message}"
 
             # Run agent in background
             task = asyncio.create_task(agent.run(input_arg))
