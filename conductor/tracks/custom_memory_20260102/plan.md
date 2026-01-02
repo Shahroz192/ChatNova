@@ -7,9 +7,9 @@
 - [x] Task: API for Custom Instructions [5a62ea4]
     - [x] Subtask: Write Tests: Create API tests for `PATCH /users/me/instructions`.
     - [x] Subtask: Implement Feature: Update `users.py` router to handle instruction updates.
-- [ ] Task: Integrate Instructions into AI Context
-    - [ ] Subtask: Write Tests: Create unit tests for `AIChatService` verifying system prompt includes custom instructions.
-    - [ ] Subtask: Implement Feature: Modify `AIChatService` (or `generative_ui.py` system prompt builder) to append the user's custom instructions.
+- [x] Task: Integrate Instructions into AI Context [9bc57f0]
+    - [x] Subtask: Write Tests: Create unit tests for `AIChatService` verifying system prompt includes custom instructions.
+    - [x] Subtask: Implement Feature: Modify `AIChatService` (or `generative_ui.py` system prompt builder) to append the user's custom instructions.
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Backend - Custom Instructions' (Protocol in workflow.md)
 
 ## Phase 2: Backend - Long-term Memory System
