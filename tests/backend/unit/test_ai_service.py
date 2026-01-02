@@ -2,11 +2,7 @@
 Tests for the AI service functionality
 """
 
-import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
 from app.services.ai_chat import AIChatService
-from app.crud.user import user_api_key
-from app.core.security import encrypt_api_key
 
 
 def test_get_available_models():

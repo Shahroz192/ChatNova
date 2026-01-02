@@ -2,7 +2,6 @@ import os
 import asyncio
 import logging
 import re
-from html import escape
 from dotenv import load_dotenv
 from app.core.generative_ui import GENERATIVE_UI_INSTRUCTION
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder

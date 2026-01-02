@@ -1,8 +1,6 @@
-import pytest
 from sqlalchemy.orm import Session
 from app import crud
 from app.schemas.session import ChatSessionCreate, ChatSessionUpdate
-from app.models.session import ChatSession
 from app.models.user import User
 
 

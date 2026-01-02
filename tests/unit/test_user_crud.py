@@ -1,10 +1,7 @@
-import pytest
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 from app import crud
 from app.schemas.user import UserCreate, UserUpdate
 from app.models.user import User
-from app.core.security import get_password_hash
 
 
 def test_create_user(db_session: Session):

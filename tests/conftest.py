@@ -22,11 +22,8 @@ if env_file.exists():
 from app.main import app
 from app.database import Base, get_db
 from app.models.user import User
-from app.models.session import ChatSession
-from app.models.message import Message
 from app.core.security import get_password_hash
 from app.schemas.user import UserCreate
-from app import crud
 
 
 # Create an in-memory SQLite database for testing

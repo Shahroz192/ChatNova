@@ -2,12 +2,9 @@
 Unit tests for backend CRUD operations
 """
 
-import pytest
 from sqlalchemy.orm import Session
 from app.crud.user import user, user_api_key, user_mcp_server
 from app.crud.message import message
-from app.models.user import User
-from app.models.message import Message
 from app.schemas.user import UserCreate, UserAPIKeyCreate, UserMCPServerCreate
 from app.schemas.message import MessageCreate
 

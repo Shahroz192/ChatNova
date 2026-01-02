@@ -2,15 +2,10 @@
 Unit tests for backend API endpoints with mocked AI services
 """
 
-import pytest
 from fastapi.testclient import TestClient
-from app.main import app
 from app.crud.user import user
 from app.schemas.user import UserCreate
-from app.core.security import create_access_token
-from app.models.user import User
 from sqlalchemy.orm import Session
-import json
 
 
 def test_health_check(client: TestClient):

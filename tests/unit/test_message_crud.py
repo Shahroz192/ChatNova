@@ -1,10 +1,7 @@
-import pytest
 from sqlalchemy.orm import Session
 from app import crud
 from app.schemas.message import MessageCreate
-from app.models.message import Message
 from app.models.user import User
-from app.models.session import ChatSession
 
 
 def test_create_message(db_session: Session, test_user: User):
