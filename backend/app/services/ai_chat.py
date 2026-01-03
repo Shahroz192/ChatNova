@@ -216,6 +216,93 @@ class AIChatService:
         )
         return optimized_query.strip().strip('"')
 
+    async def get_relevant_memories(
+        self, query: str, user_id: int, db: Session, llm: Any
+    ) -> str:
+        """Retrieve and filter relevant memories for the current query."""
+        from app.crud.memory import memory as memory_crud
+
+        # 1. Fetch all memories for the user
+        memories = memory_crud.get_by_user(db, user_id=user_id, limit=100)
+        if not memories:
+            return ""
+
+        # 2. If many memories, use LLM to filter them
+        memory_list = [f"- {m.content}" for m in memories]
+        memory_text = "\n".join(memory_list)
+
+        filter_prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "You are a context manager. Given a list of user memories and a new user query, select only the memories that are relevant to answering the query. "
+                    "If none are relevant, output 'NONE'. "
+                    "Output the selected memories exactly as they appear in the list, one per line. "
+                    "Memories:\n{memories}",
+                ),
+                ("human", "{query}"),
+            ]
+        )
+
+        chain = filter_prompt | llm | StrOutputParser()
+        try:
+            filtered_memories = await chain.ainvoke(
+                {"memories": memory_text, "query": query}
+            )
+            if filtered_memories.strip() == "NONE":
+                return ""
+            return f"\n\n### User Context (Memories)\n{filtered_memories}"
+        except Exception as e:
+            logging.error(f"Error filtering memories: {e}")
+            # Fallback to including a few recent ones
+            return f"\n\n### User Context (Memories)\n" + "\n".join(memory_list[:5])
+
+    async def extract_and_save_memories(
+        self, message: str, user_id: int, db: Session, model_name: str = "gemini-2.5-flash"
+    ):
+        """Extract permanent facts from a user message and save them to memory."""
+        from app.crud.memory import memory as memory_crud
+        from app.schemas.memory import MemoryCreate
+
+        llm = self.get_llm(model_name)
+        if not llm:
+            return
+
+        extract_prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "You are a memory assistant. Extract any new, permanent facts about the user from the message. "
+                    "Focus on facts like identity, location, job, family, pets, and strong preferences. "
+                    "Ignore temporary feelings, questions, or greetings. "
+                    "Output each fact as a simple, standalone sentence. If no new facts found, output 'NONE'.",
+                ),
+                ("human", "{message}"),
+            ]
+        )
+
+        chain = extract_prompt | llm | StrOutputParser()
+        try:
+            result = await chain.ainvoke({"message": message})
+            if result.strip() == "NONE":
+                return
+
+            facts = [f.strip("- ").strip() for f in result.split("\n") if f.strip()]
+            
+            # Get existing memories to avoid duplicates
+            existing_memories = memory_crud.get_by_user(db, user_id=user_id, limit=100)
+            existing_contents = [m.content.lower() for m in existing_memories]
+
+            for fact in facts:
+                if fact.lower() not in existing_contents and fact != "NONE":
+                    memory_crud.create_with_user(
+                        db, obj_in=MemoryCreate(content=fact), user_id=user_id
+                    )
+                    logging.info(f"Saved new memory for user {user_id}: {fact}")
+
+        except Exception as e:
+            logging.error(f"Error extracting memories: {e}")
+
     async def simple_chat(
         self,
         message: str,
@@ -268,6 +355,13 @@ class AIChatService:
                     f"\n\n### User Custom Instructions\n{db_user.custom_instructions}"
                 )
 
+        # Get relevant memories
+        relevant_memories = ""
+        if user_id and db:
+            relevant_memories = await self.get_relevant_memories(
+                sanitized_message, user_id, db, llm
+            )
+
         if search_web:
             try:
                 logging.info(f"Performing web search for: {sanitized_message[:50]}...")
@@ -285,6 +379,7 @@ class AIChatService:
                     "Tone: Professional, helpful, and concise.\n"
                     "Formatting: Use rich markdown. If multiple search results are relevant, you may use 'search_results' or 'news_card' UI components where appropriate, alongside your textual response."
                     f"{custom_instructions}"
+                    f"{relevant_memories}"
                 )
 
                 prompt = ChatPromptTemplate.from_messages(
@@ -319,6 +414,7 @@ class AIChatService:
             system_prompt = (
                 f"You are a helpful AI assistant.\n\n{GENERATIVE_UI_INSTRUCTION}"
                 f"{custom_instructions}"
+                f"{relevant_memories}"
             )
 
             prompt = ChatPromptTemplate.from_messages(
@@ -388,6 +484,13 @@ class AIChatService:
                         f"USER CUSTOM INSTRUCTIONS:\n{db_user.custom_instructions}\n\n"
                     )
 
+            # Get relevant memories
+            relevant_memories = ""
+            if user_id and db:
+                relevant_memories = await self.get_relevant_memories(
+                    sanitized_message, user_id, db, llm
+                )
+
             cached_response = None
             if user_id and not session_id:
                 cached_response = cache_manager.get_llm_response(
@@ -409,7 +512,7 @@ class AIChatService:
                         for m in memory.chat_memory.messages
                     ]
                 )
-                full_input = f"{custom_instructions}Previous conversation context:\n{history_str}\n\nCurrent message: {message}"
+                full_input = f"{custom_instructions}{relevant_memories}\n\nPrevious conversation context:\n{history_str}\n\nCurrent message: {message}"
                 response = await agent.run(full_input)
 
             else:
@@ -417,7 +520,7 @@ class AIChatService:
                     "session_id not provided, using default agent prompt without memory"
                 )
                 agent = MCPAgent(llm=llm, client=user_mcp_client, max_steps=50)
-                full_input = f"{custom_instructions}Current message: {sanitized_message}"
+                full_input = f"{custom_instructions}{relevant_memories}\n\nCurrent message: {sanitized_message}"
                 response = await agent.run(full_input)
 
             if user_id and not session_id:
@@ -528,13 +631,13 @@ class AIChatService:
                         for m in memory.chat_memory.messages
                     ]
                 )
-                full_input = f"{custom_instructions}Previous conversation context:\n{history_str}\n\nCurrent message: {message}"
+                full_input = f"{custom_instructions}{relevant_memories}\n\nPrevious conversation context:\n{history_str}\n\nCurrent message: {message}"
                 input_arg = full_input
             else:
                 agent = MCPAgent(
                     llm=llm, client=user_mcp_client, max_steps=50, callbacks=[handler]
                 )
-                input_arg = f"{custom_instructions}Current message: {sanitized_message}"
+                input_arg = f"{custom_instructions}{relevant_memories}\n\nCurrent message: {sanitized_message}"
 
             # Run agent in background
             task = asyncio.create_task(agent.run(input_arg))

@@ -17,6 +17,7 @@ class User(Base):
 
     api_keys = relationship("UserAPIKey", back_populates="user")
     mcp_servers = relationship("UserMCPServer", back_populates="user")
+    memories = relationship("UserMemory", back_populates="user", cascade="all, delete-orphan")
 
 
 class UserAPIKey(Base):

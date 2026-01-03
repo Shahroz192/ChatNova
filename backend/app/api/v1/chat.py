@@ -1,6 +1,6 @@
 import asyncio
 from typing import Optional, Dict, Any
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app import crud
@@ -217,6 +217,7 @@ def delete_session_messages(
 @request_profiler.profile_endpoint("/chat", "POST")
 async def chat(
     message_in: MessageCreate,
+    background_tasks: BackgroundTasks,
     session_id: Optional[int] = Query(
         None, description="Session ID for conversation context"
     ),
@@ -261,6 +262,15 @@ async def chat(
             crud.session.update(
                 db, db_obj=session_obj, obj_in=ChatSessionUpdate(title=new_title)
             )
+
+    # Extract memories from the user message in background
+    background_tasks.add_task(
+        ai_service.extract_and_save_memories,
+        message_in.content,
+        current_user.id,
+        db,
+        message_in.model
+    )
 
     return msg
 
@@ -315,6 +325,7 @@ def chat_with_tools(
 @request_profiler.profile_endpoint("/chat/stream", "POST")
 def chat_stream(
     message_in: MessageCreate,
+    background_tasks: BackgroundTasks,
     session_id: Optional[int] = Query(
         None, description="Session ID for conversation context"
     ),
@@ -373,6 +384,15 @@ def chat_stream(
             # Update the message with the complete response
             crud.message.update(db, db_obj=msg, obj_in={"response": full_response})
 
+            # Extract memories in background after response is complete
+            background_tasks.add_task(
+                ai_service.extract_and_save_memories,
+                message_in.content,
+                current_user.id,
+                db,
+                message_in.model
+            )
+
             # Send completion signal
             yield "data: [DONE]\n\n"
 
@@ -395,6 +415,7 @@ def chat_stream(
 @request_profiler.profile_endpoint("/chat/agent-stream", "POST")
 def chat_agent_stream(
     message_in: MessageCreate,
+    background_tasks: BackgroundTasks,
     session_id: Optional[int] = Query(
         None, description="Session ID for conversation context"
     ),
@@ -457,6 +478,15 @@ def chat_agent_stream(
 
             # Update the message with the complete response
             crud.message.update(db, db_obj=msg, obj_in={"response": full_response})
+
+            # Extract memories in background
+            background_tasks.add_task(
+                ai_service.extract_and_save_memories,
+                message_in.content,
+                current_user.id,
+                db,
+                message_in.model
+            )
 
             # Send completion signal
             yield "data: [DONE]\n\n"
