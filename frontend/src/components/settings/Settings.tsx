@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Nav, Card, Button, Form } from 'react-bootstrap';
-import { Key, Server, User, History, Sparkles } from 'lucide-react';
+import { Key, Server, User, History, Sparkles, Brain } from 'lucide-react';
 import BYOKForm from './BYOKForm';
 import MCPServerForm from './MCPServerForm';
 import MCPServerList from './MCPServerList';
 import PersonalizationForm from './PersonalizationForm';
+import MemoryManagement from './MemoryManagement';
 import HistoryManagement from '../chat/HistoryManagement';
 import api from '../../utils/api';
 import '../../styles/Settings.css';
@@ -20,7 +21,7 @@ interface User {
 interface SettingsProps {}
 
 const Settings: React.FC<SettingsProps> = () => {
-  const [activeTab, setActiveTab] = useState<'keys' | 'personalization' | 'servers' | 'account' | 'privacy' | 'appearance' | 'history'>('keys');
+  const [activeTab, setActiveTab] = useState<'keys' | 'personalization' | 'memory' | 'servers' | 'account' | 'privacy' | 'appearance' | 'history'>('keys');
 
   return (
     <div className="settings-page">
@@ -54,6 +55,18 @@ const Settings: React.FC<SettingsProps> = () => {
                 >
                   <Sparkles size={18} className="mr-2" />
                   <span className="font-weight-medium">Personalization</span>
+                </Nav.Link>
+              </Nav.Item>
+              <Nav.Item className="mb-2">
+                <Nav.Link
+                  eventKey="memory"
+                  active={activeTab === 'memory'}
+                  onClick={() => setActiveTab('memory')}
+                  className="d-flex align-items-center py-2 px-3 rounded-lg"
+                  style={{ transition: 'all 0.2s ease' }}
+                >
+                  <Brain size={18} className="mr-2" />
+                  <span className="font-weight-medium">Manage Memory</span>
                 </Nav.Link>
               </Nav.Item>
               <Nav.Item className="mb-2">
@@ -136,6 +149,20 @@ const Settings: React.FC<SettingsProps> = () => {
                   </Card.Header>
                   <Card.Body>
                     <PersonalizationForm />
+                  </Card.Body>
+                </Card>
+              )}
+
+              {activeTab === 'memory' && (
+                <Card>
+                  <Card.Header>
+                    <Card.Title>Long-term Memory</Card.Title>
+                    <Card.Text>
+                      Facts the AI has learned about you across sessions.
+                    </Card.Text>
+                  </Card.Header>
+                  <Card.Body>
+                    <MemoryManagement />
                   </Card.Body>
                 </Card>
               )}
