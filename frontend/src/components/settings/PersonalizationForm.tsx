@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Form, Button, Alert, Card } from "react-bootstrap";
+import { Form, Button, Alert } from "react-bootstrap";
 import { Save, Sparkles } from "lucide-react";
 import api from "../../utils/api";
 

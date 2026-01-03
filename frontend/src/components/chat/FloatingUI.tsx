@@ -15,7 +15,6 @@ const FloatingUI: React.FC<FloatingUIProps> = ({
   onClose, 
   title, 
   children, 
-  position = 'center' 
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [shouldRender, setShouldRender] = useState(isOpen);
