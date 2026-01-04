@@ -14,6 +14,7 @@ mcp-use
 langchain-google-genai
 langchain-cerebras
 langchain-groq
+groq
 python-dotenv
 httpx
 pydantic

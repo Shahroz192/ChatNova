@@ -47,11 +47,11 @@
     margin: var(--space-1) 0;
 }
 
-.dark-mode .context-menu-item {
+[data-bs-theme="dark"] .context-menu-item {
     color: var(--text-primary);
 }
 
-.dark-mode .context-menu-item:hover {
+[data-bs-theme="dark"] .context-menu-item:hover {
     background-color: var(--bg-tertiary);
 }
 
@@ -128,15 +128,15 @@
     text-decoration: underline;
 }
 
-.dark-mode .markdown-content {
+[data-bs-theme="dark"] .markdown-content {
     color: var(--text-primary);
 }
 
-.dark-mode .markdown-content code {
+[data-bs-theme="dark"] .markdown-content code {
     background-color: var(--bg-tertiary);
 }
 
-.dark-mode .markdown-content pre {
+[data-bs-theme="dark"] .markdown-content pre {
     background-color: var(--bg-tertiary);
     border-color: var(--border-light);
 }
@@ -163,7 +163,7 @@
     margin-top: 200px;
 }
 
-.dark-mode .welcome-title {
+[data-bs-theme="dark"] .welcome-title {
     color: #ffffff;
 }
 
@@ -345,7 +345,7 @@
     border-right-color: transparent;
 }
 
-.dark-mode .spinner-border {
+[data-bs-theme="dark"] .spinner-border {
     border-color: var(--primary);
     border-right-color: transparent;
 }
@@ -462,22 +462,22 @@
     color: #721c24;
 }
 
-.dark-mode .message-status.sending {
+[data-bs-theme="dark"] .message-status.sending {
     background-color: rgba(255, 193, 7, 0.2);
     color: #d39e00;
 }
 
-.dark-mode .message-status.sent {
+[data-bs-theme="dark"] .message-status.sent {
     background-color: rgba(40, 167, 69, 0.2);
     color: #28a745;
 }
 
-.dark-mode .message-status.delivered {
+[data-bs-theme="dark"] .message-status.delivered {
     background-color: rgba(0, 123, 255, 0.2);
     color: #007bff;
 }
 
-.dark-mode .message-status.failed {
+[data-bs-theme="dark"] .message-status.failed {
     background-color: rgba(220, 53, 69, 0.2);
     color: #dc3545;
 }

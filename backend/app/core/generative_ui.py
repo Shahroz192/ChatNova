@@ -148,6 +148,11 @@ interface GeographicData {{
 2. Example: `[{{ "name": "A", "value": 10 }}, {{ "name": "B", "value": 20 }}]`
 3. DO NOT use keys like "category", "count", "label", "amount", etc. ALWAYS map them to "name" and "value".
 
+**CRITICAL RULES FOR SEARCH RESULTS:**
+1. If you use the `search_results` component, you MUST also include a `text` component in the container.
+2. The `text` component should provide a direct answer or summary based on the search results.
+3. Place the `text` component BEFORE the `search_results` component.
+
 **Search Result Component Usage:**
 - Use 'search_results' for displaying multiple search results with pagination
 - Use 'news_card' for individual news article display
@@ -163,10 +168,17 @@ interface GeographicData {{
 - Use 'error' for search error handling
 
 **Examples:**
-1. **Search Results**:
+1. **Search Results with Answer (REQUIRED PATTERN)**:
 {{
   "type": "container",
   "children": [
+    {{
+      "type": "text",
+      "props": {{
+        "text": "Artificial Intelligence (AI) refers to the simulation of human intelligence in machines...",
+        "variant": "primary"
+      }}
+    }},
     {{
       "type": "search_results",
       "props": {{

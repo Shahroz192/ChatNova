@@ -12,6 +12,7 @@ import {
   ArcElement,
 } from 'chart.js';
 import { Bar, Line, Pie } from 'react-chartjs-2';
+import { useTheme } from '../../hooks/useTheme';
 
 // Register chart.js components
 ChartJS.register(
@@ -33,6 +34,8 @@ interface ChartProps {
 }
 
 const ChartRenderer: React.FC<ChartProps> = ({ type, data, label }) => {
+  const { isDark } = useTheme();
+  
   // Emphasize hierarchy: sort by value so the most important category is first (at the "top" of the circle for pie charts)
   const sortedData = [...data].sort((a, b) => b.value - a.value);
 
@@ -40,6 +43,10 @@ const ChartRenderer: React.FC<ChartProps> = ({ type, data, label }) => {
   const values = sortedData.map(item => item.value);
 
   const isPie = type === 'pie';
+
+  // Use theme-aware colors
+  const textColor = isDark ? '#94a3b8' : '#64748b'; // slate-400 : slate-500
+  const gridColor = isDark ? 'rgba(148, 163, 184, 0.1)' : 'rgba(100, 116, 139, 0.1)';
 
   const chartData = {
     labels: labels,
@@ -80,13 +87,13 @@ const ChartRenderer: React.FC<ChartProps> = ({ type, data, label }) => {
         // Put legend on the right for clearer hierarchy, especially for pie charts
         position: isPie ? ('right' as const) : ('top' as const),
         labels: {
-          color: '#64748b', // slate-500 for dark mode support
+          color: textColor,
         }
       },
       title: {
         display: true,
         text: label,
-        color: '#64748b', // slate-500 for dark mode support
+        color: textColor,
       },
     },
     scales:
@@ -95,19 +102,19 @@ const ChartRenderer: React.FC<ChartProps> = ({ type, data, label }) => {
             x: {
               grid: {
                 display: false,
-                color: 'rgba(100, 116, 139, 0.1)', // slate-400 with low opacity
+                color: gridColor,
               },
               ticks: {
-                color: '#64748b', // slate-500 for dark mode support
+                color: textColor,
               }
             },
             y: {
               beginAtZero: true,
               grid: {
-                color: 'rgba(100, 116, 139, 0.1)', // slate-400 with low opacity
+                color: gridColor,
               },
               ticks: {
-                color: '#64748b', // slate-500 for dark mode support
+                color: textColor,
               }
             },
           }

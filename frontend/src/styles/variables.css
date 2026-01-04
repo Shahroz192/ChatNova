@@ -111,3 +111,36 @@
   --z-tooltip: 1070;
   --z-toast: 1080;
 }
+
+[data-bs-theme="dark"] {
+  --primary: var(--gray-200);
+  --primary-hover: var(--gray-100);
+  --primary-light: var(--gray-400);
+  --secondary: var(--gray-400);
+  --accent: var(--gray-300);
+
+  /* Background Colors */
+  --bg-primary: var(--gray-950);
+  --bg-secondary: var(--gray-900);
+  --bg-tertiary: var(--gray-850);
+  --bg-chat: var(--gray-950);
+  --bg-sidebar: var(--gray-900);
+
+  /* Text Colors */
+  --text-primary: var(--gray-100);
+  --text-secondary: var(--gray-400);
+  --text-tertiary: var(--gray-500);
+  --text-inverse: var(--gray-900);
+
+  /* Border Colors */
+  --border-light: var(--gray-850);
+  --border-medium: var(--gray-800);
+  --border-dark: var(--gray-700);
+
+  /* Shadow System - Adjusted for dark mode */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.5), 0 1px 2px -1px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+}

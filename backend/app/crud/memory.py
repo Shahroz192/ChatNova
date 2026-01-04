@@ -1,8 +1,9 @@
-from typing import List, Optional
+from typing import List
 from sqlalchemy.orm import Session
 from app.crud.base import CRUDBase
 from app.models.memory import UserMemory
 from app.schemas.memory import MemoryCreate, MemoryUpdate
+
 
 class CRUDMemory(CRUDBase[UserMemory, MemoryCreate, MemoryUpdate]):
     def get_by_user(
@@ -28,5 +29,6 @@ class CRUDMemory(CRUDBase[UserMemory, MemoryCreate, MemoryUpdate]):
         db.commit()
         db.refresh(db_obj)
         return db_obj
+
 
 memory = CRUDMemory(UserMemory)

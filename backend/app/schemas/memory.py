@@ -2,14 +2,18 @@ from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
 
+
 class MemoryBase(BaseModel):
     content: str
+
 
 class MemoryCreate(MemoryBase):
     pass
 
+
 class MemoryUpdate(BaseModel):
     content: Optional[str] = None
+
 
 class Memory(MemoryBase):
     id: int

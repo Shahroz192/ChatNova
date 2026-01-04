@@ -14,6 +14,8 @@ To be the premier open-source AI interaction platform that bridges the gap betwe
 - **Multi-Provider AI Orchestration**: Seamless integration and switching between Google Gemini, Cerebras, and Groq via LangChain.
 - **Generative UI (Interactive Visuals)**: Real-time generation of interactive charts (Bar, Line, Pie) and image galleries based on AI intent.
 - **Persistent Session Management**: Robust history tracking and session-based conversations powered by PostgreSQL.
+- **Themable UI (Dark Mode Support)**: Full support for Light and Dark modes with automatic system preference detection.
+- **Personalization (Custom Instructions & Memory)**: Implementation of global custom instructions and a long-term memory system that selectively retrieves relevant facts to personalize AI responses.
 - **BYOK & Model Management**: User-level API key encryption and management for various LLM providers.
 - **High-Performance Streaming**: SSE-based real-time response delivery with optimized backend profiling.
 

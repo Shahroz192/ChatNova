@@ -14,7 +14,6 @@ export const useTheme = () => {
   };
 
   const isDark = resolvedTheme === 'dark';
-  const isLight = resolvedTheme === 'light';
 
   return {
     theme,
@@ -22,7 +21,6 @@ export const useTheme = () => {
     resolvedTheme,
     toggleTheme,
     isDark,
-    isLight,
     isSystem: theme === 'system'
   };
 };

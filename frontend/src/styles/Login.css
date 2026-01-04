@@ -5,7 +5,7 @@
   background-color: var(--bg-secondary);
 }
 
-body.dark-mode .auth-page-bg {
+body[data-bs-theme="dark"] .auth-page-bg {
   background-color: #09090b !important; /* Very dark background */
 }
 
@@ -20,7 +20,7 @@ body.dark-mode .auth-page-bg {
   margin: 0 auto;
 }
 
-body.dark-mode .login-card {
+body[data-bs-theme="dark"] .login-card {
   background-color: #27272a !important; /* Dark gray card background */
 }
 
@@ -69,7 +69,7 @@ body.dark-mode .login-card {
   box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
 }
 
-body.dark-mode .login-input:focus {
+body[data-bs-theme="dark"] .login-input:focus {
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1) !important;
 }
 
@@ -118,7 +118,7 @@ body.dark-mode .login-input:focus {
   border-radius: var(--radius-md);
 }
 
-body.dark-mode .login-error {
+body[data-bs-theme="dark"] .login-error {
   color: #f87171 !important;
   background-color: rgba(248, 113, 113, 0.1) !important;
   border-color: rgba(248, 113, 113, 0.2) !important;
@@ -136,11 +136,11 @@ body.dark-mode .login-error {
   text-decoration: underline;
 }
 
-body.dark-mode .login-link {
+body[data-bs-theme="dark"] .login-link {
   color: #d4d4d8 !important; /* Light gray */
 }
 
-body.dark-mode .login-link:hover {
+body[data-bs-theme="dark"] .login-link:hover {
   color: #fafafa !important; /* White */
 }
 
@@ -152,19 +152,19 @@ body.dark-mode .login-link:hover {
 }
 
 /* Dark mode text colors */
-body.dark-mode .login-title {
+body[data-bs-theme="dark"] .login-title {
   color: #fafafa !important; /* White text */
 }
 
-body.dark-mode .login-subtitle {
+body[data-bs-theme="dark"] .login-subtitle {
   color: #d4d4d8 !important; /* Light gray text */
 }
 
-body.dark-mode .login-label {
+body[data-bs-theme="dark"] .login-label {
   color: #fafafa !important; /* White text */
 }
 
-body.dark-mode .login-link-container {
+body[data-bs-theme="dark"] .login-link-container {
   color: #d4d4d8 !important; /* Light gray text */
 }
 

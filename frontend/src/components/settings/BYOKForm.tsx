@@ -5,81 +5,96 @@ import "../../styles/BYOKForm.css";
 
 const BYOKForm: React.FC = () => {
   const [apiKeys, setApiKeys] = useState<{ [key: string]: string }>({});
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [availableProviders, setAvailableProviders] = useState<string[]>([]);
   const [isTesting, setIsTesting] = useState<{ [key: string]: boolean }>({});
   const [notification, setNotification] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
 
-  const models = [
-    "gemini-2.5-flash",
-    "qwen-3-235b-a22b-instruct-2507",
-    "qwen-3-235b-a22b-thinking-2507",
-    "moonshotai/kimi-k2-instruct-0905",
+  const providers = [
+    "Google",
+    "Cerebras",
+    "Groq",
   ];
 
   useEffect(() => {
-    fetchAvailableModels();
+    fetchAvailableProviders();
   }, []);
 
-  const fetchAvailableModels = async () => {
+  const fetchAvailableProviders = async () => {
     try {
       const response = await api.get("/users/me/api-keys");
-      setAvailableModels(response.data.map((key: { model_name: string }) => key.model_name));
+      setAvailableProviders(response.data.map((key: { model_name: string }) => key.model_name));
     } catch (error) {
       console.error("Failed to fetch saved API keys", error);
     }
   };
 
-  const handleKeyChange = (model: string, key: string) => {
-    setApiKeys((prev) => ({ ...prev, [model]: key }));
+  const handleKeyChange = (provider: string, key: string) => {
+    setApiKeys((prev) => ({ ...prev, [provider]: key }));
   };
 
-  const handleTestKey = async (model: string) => {
-    const key = apiKeys[model];
+  const handleTestKey = async (provider: string) => {
+    const key = apiKeys[provider];
     if (!key) return;
-    setIsTesting((prev) => ({ ...prev, [model]: true }));
+    setIsTesting((prev) => ({ ...prev, [provider]: true }));
     try {
-      const response = await api.post("/users/me/api-keys", {
-        model_name: model,
-        encrypted_key: key,
-      });
-      if (response.status === 200) {
-        setNotification({
-          type: "success",
-          message: `API key for ${model} is valid!`,
-        });
-      } else {
-        throw new Error("Invalid key");
-      }
-    } catch (error) {
-      setNotification({
-        type: "error",
-        message: `Invalid API key for ${model}. Please check and try again.`,
-      });
-    } finally {
-      setIsTesting((prev) => ({ ...prev, [model]: false }));
-    }
-  };
-
-  const handleSaveKey = async (model: string) => {
-    const key = apiKeys[model];
-    if (!key) return;
-    try {
-      await api.post("/users/me/api-keys", {
-        model_name: model,
+      await api.post(`/chat/models/test/${provider}`, {
         encrypted_key: key,
       });
       setNotification({
         type: "success",
-        message: `API key for ${model} saved successfully!`,
+        message: `${provider} API key is valid!`,
       });
-      setApiKeys((prev) => ({ ...prev, [model]: "" }));
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.detail || error.message || "Unknown error";
+      setNotification({
+        type: "error",
+        message: `Invalid ${provider} API key: ${errorMsg}`,
+      });
+    } finally {
+      setIsTesting((prev) => ({ ...prev, [provider]: false }));
+    }
+  };
+
+  const handleSaveKey = async (provider: string) => {
+    const key = apiKeys[provider];
+    if (!key) return;
+    try {
+      await api.post("/users/me/api-keys", {
+        model_name: provider, // Using 'model_name' field to store provider
+        encrypted_key: key,
+      });
+      setNotification({
+        type: "success",
+        message: `API key for ${provider} saved successfully!`,
+      });
+      setApiKeys((prev) => ({ ...prev, [provider]: "" }));
+      fetchAvailableProviders();
     } catch (error) {
       setNotification({
         type: "error",
-        message: `Failed to save key for ${model}. Please try again.`,
+        message: `Failed to save key for ${provider}. Please try again.`,
+      });
+    }
+  };
+
+  const handleDeleteKey = async (provider: string) => {
+    if (!window.confirm(`Are you sure you want to delete the ${provider} API key?`)) {
+      return;
+    }
+    try {
+      await api.delete(`/users/me/api-keys/${provider}`);
+      setNotification({
+        type: "success",
+        message: `API key for ${provider} deleted successfully.`,
+      });
+      fetchAvailableProviders();
+    } catch (error) {
+      setNotification({
+        type: "error",
+        message: `Failed to delete key for ${provider}. Please try again.`,
       });
     }
   };
@@ -91,8 +106,7 @@ const BYOKForm: React.FC = () => {
           Manage API Keys
         </h3>
         <p className="text-sm text-gray-600 byok-text-color">
-          Enter your API keys for the supported models. Only models with keys
-          will be available for selection.
+          Enter your API keys for the supported providers. All models from a provider will be unlocked.
         </p>
       </div>
 
@@ -101,7 +115,7 @@ const BYOKForm: React.FC = () => {
           <thead className="byok-table-header">
             <tr>
               <th className="py-3 px-4 byok-table-header-cell text-left text-sm font-semibold byok-table-header-text">
-                Provider/Model
+                Provider
               </th>
               <th className="py-3 px-4 byok-table-header-cell text-left text-sm font-semibold byok-table-header-text">
                 API Key
@@ -112,25 +126,25 @@ const BYOKForm: React.FC = () => {
             </tr>
           </thead>
           <tbody className="byok-table-body">
-            {models.map((model) => (
-              <tr key={model} className="byok-table-row">
+            {providers.map((provider) => (
+              <tr key={provider} className="byok-table-row">
                 <td className="py-3 px-4">
                   <div className="flex items-center space-x-2">
                     <span
-                      className={`font-medium ${availableModels.includes(model)
+                      className={`font-medium ${availableProviders.includes(provider)
                           ? "byok-model-available"
                           : "byok-model-unavailable"
                         }`}
                     >
-                      {model}
+                      {provider}
                     </span>
-                    {availableModels.includes(model) && (
+                    {availableProviders.includes(provider) && (
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium byok-badge-active">
                         Active
                       </span>
                     )}
                   </div>
-                  {!availableModels.includes(model) && (
+                  {!availableProviders.includes(provider) && (
                     <span className="text-xs byok-model-required block mt-1">
                       Key required
                     </span>
@@ -140,34 +154,48 @@ const BYOKForm: React.FC = () => {
                   <input
                     type="password"
                     value={
-                      availableModels.includes(model)
+                      availableProviders.includes(provider)
                         ? "•••••"
-                        : apiKeys[model] || ""
+                        : apiKeys[provider] || ""
                     }
-                    onChange={(e) => handleKeyChange(model, e.target.value)}
+                    onChange={(e) => handleKeyChange(provider, e.target.value)}
                     className="w-full p-2 byok-input-field rounded-lg transition-all"
                     placeholder={
-                      availableModels.includes(model) ? "" : "Enter API key..."
+                      availableProviders.includes(provider) ? "Key saved" : "Enter API key..."
                     }
-                    disabled={availableModels.includes(model)}
+                    disabled={availableProviders.includes(provider)}
                   />
                 </td>
                 <td className="py-3 px-4">
                   <div className="d-inline-flex align-items-center gap-2">
-                    <button
-                      onClick={() => handleTestKey(model)}
-                      disabled={isTesting[model] || !apiKeys[model]}
-                      className="btn btn-primary"
-                    >
-                      {isTesting[model] ? "Testing..." : "Test"}
-                    </button>
-                    <button
-                      onClick={() => handleSaveKey(model)}
-                      disabled={!apiKeys[model]}
-                      className="btn btn-success"
-                    >
-                      Save
-                    </button>
+                    {availableProviders.includes(provider) ? (
+                      <>
+                        <button
+                          onClick={() => handleDeleteKey(provider)}
+                          className="btn btn-danger"
+                          title="Delete API key"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => handleTestKey(provider)}
+                          disabled={isTesting[provider] || !apiKeys[provider]}
+                          className="btn btn-primary"
+                        >
+                          {isTesting[provider] ? "Testing..." : "Test"}
+                        </button>
+                        <button
+                          onClick={() => handleSaveKey(provider)}
+                          disabled={!apiKeys[provider]}
+                          className="btn btn-success"
+                        >
+                          Save
+                        </button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>

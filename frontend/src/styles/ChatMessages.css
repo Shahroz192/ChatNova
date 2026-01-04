@@ -34,11 +34,11 @@
   position: relative;
 }
 
-.dark-mode .message-content-assistant {
+[data-bs-theme="dark"] .message-content-assistant {
   color: var(--text-primary) !important;
 }
 
-.dark-mode .message-bubble-user {
+[data-bs-theme="dark"] .message-bubble-user {
   background: linear-gradient(135deg, var(--gray-200) 0%, var(--gray-300) 100%) !important;
   color: var(--gray-900) !important;
 }
@@ -127,7 +127,7 @@
   height: 28px;
 }
 
-.dark-mode .message-actions-overlay .message-action-btn {
+[data-bs-theme="dark"] .message-actions-overlay .message-action-btn {
   background-color: var(--bg-tertiary);
   border-color: var(--border-medium);
 }

@@ -2,6 +2,8 @@ import os
 import asyncio
 import logging
 import re
+import tempfile
+from io import BytesIO
 from dotenv import load_dotenv
 from app.core.generative_ui import GENERATIVE_UI_INSTRUCTION
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -12,6 +14,7 @@ from typing import Dict, Any, Optional, AsyncGenerator, List
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_cerebras import ChatCerebras
 from langchain_groq import ChatGroq
+import groq
 from app.core.config import mcp_path
 from app.core.ai_profiler import profile_ai_service
 from app.core.cache import cache_manager
@@ -59,26 +62,33 @@ class AIChatService:
         except Exception as e:
             logging.error(f"Error initializing MCP client: {e}")
 
+        # Mapping of providers to their API key parameter names
+        self.provider_configs = {
+            "Google": {"api_key_param": "google_api_key"},
+            "Cerebras": {"api_key_param": "cerebras_api_key"},
+            "Groq": {"api_key_param": "groq_api_key"}
+        }
+
         self.llm_configs = {
             "gemini-2.5-flash": {
                 "class": ChatGoogleGenerativeAI,
                 "model": "gemini-2.5-flash",
-                "key_env": "GOOGLE_API_KEY",
+                "provider": "Google",
             },
             "qwen-3-235b-a22b-instruct-2507": {
                 "class": ChatCerebras,
                 "model": "qwen-3-235b-a22b-instruct-2507",
-                "key_env": "CEREBRAS_API_KEY",
+                "provider": "Cerebras",
             },
             "qwen-3-235b-a22b-thinking-2507": {
                 "class": ChatCerebras,
                 "model": "qwen-3-235b-a22b-thinking-2507",
-                "key_env": "CEREBRAS_API_KEY",
+                "provider": "Cerebras",
             },
             "moonshotai/kimi-k2-instruct-0905": {
                 "class": ChatGroq,
                 "model": "moonshotai/kimi-k2-instruct-0905",
-                "key_env": "GROQ_API_KEY",
+                "provider": "Groq",
             },
         }
 
@@ -107,6 +117,28 @@ class AIChatService:
             logging.error(f"Invalid MCP server configuration for user {user_id}")
             return {"mcpServers": {}}
 
+    def get_provider_key(self, provider: str, user_id: Optional[int] = None, db: Optional[Session] = None) -> Optional[str]:
+        """Get API key for a specific provider."""
+        if provider not in self.provider_configs:
+            return None
+        
+        if not user_id or not db:
+            return None
+            
+        user_key_obj = user_api_key.get_by_user_and_model(
+            db, user_id=user_id, model_name=provider
+        )
+        if user_key_obj:
+            try:
+                return decrypt_api_key(user_key_obj.encrypted_key)
+            except Exception as e:
+                logging.error(
+                    f"Error decrypting API key for user {user_id}, provider {provider}: {e}"
+                )
+                return None
+        
+        return None
+
     def get_llm(
         self,
         model_name: str,
@@ -118,33 +150,17 @@ class AIChatService:
             return None
 
         config = self.llm_configs[model_name]
+        provider = config["provider"]
         llm_class = config["class"]
         model = config["model"]
 
-        api_key = None
-        if user_id and db:
-            user_key_obj = user_api_key.get_by_user_and_model(
-                db, user_id=user_id, model_name=model_name
-            )
-            if user_key_obj:
-                try:
-                    api_key = decrypt_api_key(user_key_obj.encrypted_key)
-                except Exception as e:
-                    logging.error(
-                        f"Error decrypting API key for user {user_id}, model {model_name}: {e}"
-                    )
-                    return None
-
-        if not api_key:
-            api_key = os.getenv(config["key_env"])
+        api_key = self.get_provider_key(provider, user_id, db)
 
         if not api_key:
             return None
 
-        if llm_class == ChatGoogleGenerativeAI:
-            api_key_param = "google_api_key"
-        else:
-            api_key_param = f"{llm_class.__name__.lower().replace('chat', '')}_api_key"
+        provider_config = self.provider_configs[provider]
+        api_key_param = provider_config["api_key_param"]
 
         # Some classes might not accept streaming kwarg directly in init if strictly typed, but most LangChain Chat models do or accept **kwargs
         kwargs = {api_key_param: api_key}
@@ -156,12 +172,39 @@ class AIChatService:
             **kwargs,
         )
 
+    def get_llm_by_provider(self, provider: str, api_key: str):
+        """Get LLM instance for a provider with a provided API key (for validation)."""
+        if provider not in self.provider_configs:
+            return None
+            
+        config = self.provider_configs[provider]
+        api_key_param = config["api_key_param"]
+        
+        # Get the model name for this provider
+        model_name = None
+        for name, cfg in self.llm_configs.items():
+            if cfg.get("provider") == provider:
+                model_name = name
+                break
+        
+        if not model_name:
+            return None
+            
+        llm_config = self.llm_configs[model_name]
+        llm_class = llm_config["class"]
+        model = llm_config["model"]
+        
+        kwargs = {api_key_param: api_key}
+        return llm_class(model=model, **kwargs)
+
     def get_available_models(
         self, user_id: Optional[int] = None, db: Optional[Session] = None
     ):
         available = []
-        for model_name in self.llm_configs:
-            if self.get_llm(model_name, user_id, db):
+        for model_name, config in self.llm_configs.items():
+            provider = config["provider"]
+            # Check if we have a key for this provider
+            if self.get_provider_key(provider, user_id, db):
                 available.append(model_name)
         return available
 
@@ -255,10 +298,14 @@ class AIChatService:
         except Exception as e:
             logging.error(f"Error filtering memories: {e}")
             # Fallback to including a few recent ones
-            return f"\n\n### User Context (Memories)\n" + "\n".join(memory_list[:5])
+            return "\n\n### User Context (Memories)\n" + "\n".join(memory_list[:5])
 
     async def extract_and_save_memories(
-        self, message: str, user_id: int, db: Session, model_name: str = "gemini-2.5-flash"
+        self,
+        message: str,
+        user_id: int,
+        db: Session,
+        model_name: str = "gemini-2.5-flash",
     ):
         """Extract permanent facts from a user message and save them to memory."""
         from app.crud.memory import memory as memory_crud
@@ -288,7 +335,7 @@ class AIChatService:
                 return
 
             facts = [f.strip("- ").strip() for f in result.split("\n") if f.strip()]
-            
+
             # Get existing memories to avoid duplicates
             existing_memories = memory_crud.get_by_user(db, user_id=user_id, limit=100)
             existing_contents = [m.content.lower() for m in existing_memories]
@@ -732,6 +779,44 @@ class AIChatService:
         ):
             full_response += chunk
         return full_response
+
+    def transcribe_audio(self, audio_file: bytes, filename: str = "audio.wav", api_key: Optional[str] = None, user_id: Optional[int] = None, db: Optional[Session] = None) -> str:
+        """
+        Transcribe audio using Groq's Whisper model.
+
+        Args:
+            audio_file: Audio file content as bytes
+            filename: Name of the audio file
+            api_key: Groq API key (optional, will use user's saved key if not provided)
+            user_id: User ID to fetch API key for
+            db: Database session to fetch API key
+
+        Returns:
+            Transcribed text
+        """
+        if not api_key and user_id and db:
+            api_key = self.get_provider_key("Groq", user_id, db)
+            
+        if not api_key:
+            raise ValueError("GROQ_API_KEY not configured. Please add your API key in settings.")
+
+        try:
+            client = groq.Groq(api_key=api_key)
+
+            # Create a temporary file-like object from the audio bytes
+            audio_io = BytesIO(audio_file)
+            audio_io.name = filename
+
+            response = client.audio.transcriptions.create(
+                file=audio_io,
+                model="whisper-large-v3",
+                language="en",
+            )
+
+            return response.text
+        except Exception as e:
+            logging.error(f"Error transcribing audio: {e}")
+            raise ValueError(f"Transcription failed: {str(e)}")
 
 
 ai_service = profile_ai_service(AIChatService)()

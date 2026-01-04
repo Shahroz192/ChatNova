@@ -38,8 +38,14 @@ const Chat: React.FC<ChatProps> = () => {
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
     const [models, setModels] = useState<string[]>([]);
-    const [selectedModel, setSelectedModel] = useState("gemini-2.5-flash");
-    const [useTools, setUseTools] = useState(false);
+    const [selectedModel, setSelectedModel] = useState(() => {
+        const saved = localStorage.getItem("selectedModel");
+        return saved || "gemini-2.5-flash";
+    });
+    const [useTools, setUseTools] = useState(() => {
+        const saved = localStorage.getItem("useTools");
+        return saved === "true";
+    });
     const [selectedMessageId, setSelectedMessageId] = useState<number | null>(
         null,
     );
@@ -73,14 +79,27 @@ const Chat: React.FC<ChatProps> = () => {
         streamingResponseRef.current = "";
     };
 
-    const [searchOptions, setSearchOptions] = useState<WebSearchOptions>({
-        search_web: false,
-        search_type: 'general',
-        max_results: 10,
-        include_snippets: true,
-        safe_search: true
+    const [searchOptions, setSearchOptions] = useState<WebSearchOptions>(() => {
+        const saved = localStorage.getItem("searchOptions");
+        if (saved) {
+            try {
+                return JSON.parse(saved);
+            } catch {
+                // Return default if parse fails
+            }
+        }
+        return {
+            search_web: false,
+            search_type: 'general',
+            max_results: 10,
+            include_snippets: true,
+            safe_search: true
+        };
     });
-    const [recentSearches] = useState<string[]>([]);
+    const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+        const saved = localStorage.getItem("recentSearches");
+        return saved ? JSON.parse(saved) : [];
+    });
     const [searchSuggestions] = useState<string[]>([]);
 
     const [activeContextMenu, setActiveContextMenu] = useState<{ id: number, type: 'user' | 'assistant' } | null>(null);
@@ -116,6 +135,10 @@ const Chat: React.FC<ChatProps> = () => {
 
     const handleRecentSearchSelect = (query: string) => {
         setInput(query);
+        setRecentSearches(prev => {
+            const filtered = prev.filter(q => q !== query);
+            return [query, ...filtered].slice(0, 10); 
+        });
     };
 
     const handleCopyMessage = (message: Message) => {
@@ -216,15 +239,29 @@ const Chat: React.FC<ChatProps> = () => {
         return false;
     };
 
+    useEffect(() => {
+        localStorage.setItem("selectedModel", selectedModel);
+    }, [selectedModel]);
+
+    useEffect(() => {
+        localStorage.setItem("useTools", useTools.toString());
+    }, [useTools]);
+
+    useEffect(() => {
+        localStorage.setItem("searchOptions", JSON.stringify(searchOptions));
+    }, [searchOptions]);
+
+    useEffect(() => {
+        localStorage.setItem("recentSearches", JSON.stringify(recentSearches));
+    }, [recentSearches]);
+
     const loadModels = async () => {
         try {
-            const response = await api.get("/users/me/api-keys");
-            const userModels = response.data.map(
-                (key: { model_name: string }) => key.model_name
-            );
-            setModels(userModels);
-            if (userModels.length > 0) {
-                setSelectedModel(userModels[0]);
+            const response = await api.get("/chat/models");
+            const availableModels = response.data.models;
+            setModels(availableModels);
+            if (availableModels.length > 0 && !availableModels.includes(selectedModel)) {
+                setSelectedModel(availableModels[0]);
             }
         } catch (error) {
             showError("Loading Error", "Failed to load AI models.");
@@ -253,6 +290,14 @@ const Chat: React.FC<ChatProps> = () => {
         if (!input.trim()) return;
 
         setLoading(true);
+
+        // Add to recent searches if web search is enabled
+        if (searchOptions.search_web && input.trim()) {
+            setRecentSearches(prev => {
+                const filtered = prev.filter(q => q !== input.trim());
+                return [input.trim(), ...filtered].slice(0, 10);
+            });
+        }
 
         try {
             let sessionId = currentSessionId;

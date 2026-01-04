@@ -15,7 +15,6 @@ if config.config_file_name is not None:
 sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), "..")))
 from app.database import Base
 from app.core.config import settings
-import app.models # Import all models
 
 target_metadata = Base.metadata
 

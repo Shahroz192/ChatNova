@@ -180,4 +180,23 @@ export const streamChat = async (
   }
 };
 
+export const transcribeAudio = async (audioBlob: Blob): Promise<string> => {
+  const formData = new FormData();
+  formData.append('audio', audioBlob, 'audio.wav');
+
+  const response = await fetch('/api/v1/chat/transcribe', {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Transcription failed: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  return data.text;
+};
+
 export default api;

@@ -22,9 +22,9 @@
 }
 
 .search-toggle-btn.active {
-    background-color: var(--bs-primary);
+    background-color: var(--primary);
     color: white;
-    border-color: var(--bs-primary);
+    border-color: var(--primary);
 }
 
 /* Search input enhancements */
@@ -34,8 +34,8 @@
 }
 
 .search-input:focus {
-    border-left-color: var(--bs-primary);
-    box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.25);
+    border-left-color: var(--primary);
+    box-shadow: 0 0 0 0.2rem rgba(0, 0, 0, 0.1);
 }
 
 .search-indicator {
@@ -53,12 +53,12 @@
 }
 
 .searching-alert {
-    border-left: 4px solid var(--bs-info);
+    border-left: 4px solid var(--gray-500);
     animation: pulse 2s infinite;
 }
 
 .search-enabled-alert {
-    border-left: 4px solid var(--bs-success);
+    border-left: 4px solid var(--gray-700);
 }
 
 @keyframes pulse {
@@ -77,8 +77,8 @@
 
 /* Search modifiers panel */
 .search-modifiers-panel {
-    background: var(--bs-light);
-    border: 1px solid var(--bs-border-color);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-medium);
     border-radius: 0.5rem;
     padding: 1rem;
     max-height: 300px;
@@ -87,7 +87,7 @@
 
 .search-modifiers-panel .form-label {
     font-weight: 600;
-    color: var(--bs-body-color);
+    color: var(--text-primary);
     margin-bottom: 0.25rem;
 }
 
@@ -105,20 +105,20 @@
 
 .suggestion-item:hover,
 .recent-search-item:hover {
-    background-color: var(--bs-light);
+    background-color: var(--bg-secondary);
     cursor: pointer;
 }
 
 .suggestion-item:active,
 .recent-search-item:active {
-    background-color: var(--bs-primary);
+    background-color: var(--primary);
     color: white;
 }
 
 .suggestions-header,
 .recent-searches-header {
-    background-color: var(--bs-light);
-    border-bottom: 1px solid var(--bs-border-color);
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-medium);
 }
 
 /* Search results component styles */
@@ -127,12 +127,12 @@
 }
 
 .search-results-header {
-    border-bottom: 1px solid var(--bs-border-color);
+    border-bottom: 1px solid var(--border-medium);
     padding-bottom: 1rem;
 }
 
 .search-results-title {
-    color: var(--bs-body-color);
+    color: var(--text-primary);
     font-weight: 600;
     margin-bottom: 0.5rem;
 }
@@ -145,14 +145,14 @@
 }
 
 .search-result-item {
-    border: 1px solid var(--bs-border-color);
+    border: 1px solid var(--border-medium);
     border-radius: 0.5rem;
     transition: all 0.2s ease;
 }
 
 .search-result-item:hover {
     box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
-    border-color: var(--bs-primary);
+    border-color: var(--primary);
 }
 
 .search-result-title {
@@ -162,17 +162,17 @@
 }
 
 .search-result-title a {
-    color: var(--bs-body-color);
+    color: var(--text-primary);
     text-decoration: none;
     transition: color 0.2s ease;
 }
 
 .search-result-title a:hover {
-    color: var(--bs-primary);
+    color: var(--primary);
 }
 
 .search-result-snippet {
-    color: var(--bs-secondary-color);
+    color: var(--text-secondary);
     line-height: 1.5;
     margin-bottom: 0.75rem;
 }
@@ -203,14 +203,14 @@
 }
 
 .bulk-actions {
-    background-color: var(--bs-light);
+    background-color: var(--bg-secondary);
     border-radius: 0.375rem;
     padding: 0.75rem;
 }
 
 /* News card styles */
 .news-card {
-    border: 1px solid var(--bs-border-color);
+    border: 1px solid var(--border-medium);
     border-radius: 0.5rem;
     transition: all 0.2s ease;
     height: 100%;
@@ -218,7 +218,7 @@
 
 .news-card:hover {
     box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
-    border-color: var(--bs-primary);
+    border-color: var(--primary);
 }
 
 .news-card-thumbnail {
@@ -242,17 +242,17 @@
 }
 
 .news-card-title a {
-    color: var(--bs-body-color);
+    color: var(--text-primary);
     text-decoration: none;
     transition: color 0.2s ease;
 }
 
 .news-card-title a:hover {
-    color: var(--bs-primary);
+    color: var(--primary);
 }
 
 .news-card-snippet {
-    color: var(--bs-secondary-color);
+    color: var(--text-secondary);
     line-height: 1.5;
     margin-bottom: 1rem;
 }
@@ -263,7 +263,7 @@
 
 .news-card-source {
     font-weight: 600;
-    color: var(--bs-body-color);
+    color: var(--text-primary);
 }
 
 .news-card-tag {
@@ -277,11 +277,11 @@
 .news-card-actions {
     margin-top: auto;
     padding-top: 1rem;
-    border-top: 1px solid var(--bs-border-color);
+    border-top: 1px solid var(--border-medium);
 }
 
 .news-card-footer {
-    background-color: var(--bs-light);
+    background-color: var(--bg-secondary);
     border-radius: 0 0 0.5rem 0.5rem;
     margin-top: auto;
 }
@@ -316,12 +316,12 @@
 .image-gallery-header {
     margin-bottom: 1rem;
     padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--bs-border-color);
+    border-bottom: 1px solid var(--border-medium);
 }
 
 .image-gallery-title-main {
     font-weight: 600;
-    color: var(--bs-body-color);
+    color: var(--text-primary);
 }
 
 .image-gallery-controls {
@@ -356,7 +356,7 @@
 }
 
 .image-gallery-card {
-    border: 1px solid var(--bs-border-color);
+    border: 1px solid var(--border-medium);
     border-radius: 0.5rem;
     overflow: hidden;
     transition: all 0.2s ease;
@@ -449,7 +449,7 @@
 }
 
 .image-gallery-alt {
-    color: var(--bs-secondary-color);
+    color: var(--text-secondary);
     font-size: 0.85rem;
     line-height: 1.4;
     margin-bottom: 0.5rem;
@@ -461,7 +461,7 @@
 }
 
 .image-gallery-bulk-actions {
-    background-color: var(--bs-light);
+    background-color: var(--bg-secondary);
     border-radius: 0.375rem;
     padding: 0.75rem;
 }
@@ -500,12 +500,12 @@
 .search-analytics-header {
     margin-bottom: 2rem;
     padding-bottom: 1rem;
-    border-bottom: 1px solid var(--bs-border-color);
+    border-bottom: 1px solid var(--border-medium);
 }
 
 .search-analytics-title {
     font-weight: 600;
-    color: var(--bs-body-color);
+    color: var(--text-primary);
     margin-bottom: 0.5rem;
 }
 
@@ -516,7 +516,7 @@
 }
 
 .metric-card {
-    border: 1px solid var(--bs-border-color);
+    border: 1px solid var(--border-medium);
     border-radius: 0.5rem;
     transition: all 0.2s ease;
     height: 100%;
@@ -524,7 +524,7 @@
 
 .metric-card:hover {
     box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
-    border-color: var(--bs-primary);
+    border-color: var(--primary);
 }
 
 .metric-icon {
@@ -536,17 +536,17 @@
 .metric-value {
     font-size: 2rem;
     font-weight: 700;
-    color: var(--bs-body-color);
+    color: var(--text-primary);
 }
 
 .metric-label {
     font-size: 0.9rem;
-    color: var(--bs-secondary-color);
+    color: var(--text-secondary);
     font-weight: 500;
 }
 
 .chart-card {
-    border: 1px solid var(--bs-border-color);
+    border: 1px solid var(--border-medium);
     border-radius: 0.5rem;
     height: 100%;
 }
@@ -574,15 +574,15 @@
 
 .stat-group-title {
     font-weight: 600;
-    color: var(--bs-body-color);
+    color: var(--text-primary);
     margin-bottom: 1rem;
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--bs-border-color);
+    border-bottom: 1px solid var(--border-medium);
 }
 
 .stat-item {
     padding: 0.5rem 0;
-    border-bottom: 1px solid var(--bs-border-color);
+    border-bottom: 1px solid var(--border-medium);
 }
 
 .stat-item:last-child {
@@ -591,10 +591,10 @@
 
 /* Search analytics compact variant */
 .search-analytics-compact {
-    border: 1px solid var(--bs-border-color);
+    border: 1px solid var(--border-medium);
     border-radius: 0.5rem;
     padding: 0.75rem;
-    background: var(--bs-light);
+    background: var(--bg-secondary);
 }
 
 /* Responsive design */
@@ -696,7 +696,7 @@
     align-items: center;
     justify-content: center;
     padding: 2rem;
-    color: var(--bs-secondary-color);
+    color: var(--text-secondary);
 }
 
 .search-error {
@@ -711,7 +711,7 @@
 .no-results {
     text-align: center;
     padding: 3rem 1rem;
-    color: var(--bs-secondary-color);
+    color: var(--text-secondary);
 }
 
 .no-results svg {

@@ -1,0 +1,26 @@
+/* Fix for Sidebar Buttons in Dark Mode */
+[data-bs-theme="dark"] .sidebar .btn-link {
+    color: var(--text-primary) !important;
+}
+
+[data-bs-theme="dark"] .sidebar .btn-link:hover {
+    color: var(--text-secondary) !important;
+    background-color: var(--bg-tertiary) !important;
+}
+
+/* Fix for Settings Sidebar Background in Dark Mode */
+[data-bs-theme="dark"] .col-md-3.bg-light.border-end.d-flex.flex-column.p-4.sidebar-fixed {
+    background: var(--bg-sidebar) !important;
+    border-right-color: var(--border-medium) !important;
+}
+
+/* Ensure Settings Page content text is visible */
+[data-bs-theme="dark"] .settings-page {
+    color: var(--text-primary);
+}
+
+[data-bs-theme="dark"] .settings-page h2,
+[data-bs-theme="dark"] .settings-page h4,
+[data-bs-theme="dark"] .settings-page label {
+    color: var(--text-primary);
+}

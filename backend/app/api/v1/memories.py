@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Any
-from app import schemas, crud
+from app import schemas
 from app.api.deps import get_current_active_user, get_db
 from app.models.user import User
 from app.crud.memory import memory as memory_crud
 
 router = APIRouter()
+
 
 @router.get("/memories", response_model=List[schemas.Memory])
 def read_memories(
@@ -20,6 +21,7 @@ def read_memories(
     """
     return memory_crud.get_by_user(db, user_id=current_user.id, skip=skip, limit=limit)
 
+
 @router.post("/memories", response_model=schemas.Memory)
 def create_memory(
     *,
@@ -31,6 +33,7 @@ def create_memory(
     Create a new memory for the current user.
     """
     return memory_crud.create_with_user(db, obj_in=memory_in, user_id=current_user.id)
+
 
 @router.delete("/memories/{memory_id}", response_model=schemas.Memory)
 def delete_memory(

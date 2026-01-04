@@ -4,9 +4,12 @@ import {
   Search,
   Globe,
   Loader,
-  Clock
+  Clock,
+  Mic,
+  Square
 } from 'lucide-react';
 import type { WebSearchOptions } from '../../types/search';
+import { transcribeAudio } from '../../utils/api';
 
 interface ChatInputProps {
   input: string;
@@ -21,6 +24,8 @@ interface ChatInputProps {
   onRecentSearchSelect?: (query: string) => void;
 }
 
+type RecordingState = 'idle' | 'recording' | 'processing';
+
 const ChatInput: React.FC<ChatInputProps> = ({
   input,
   setInput,
@@ -34,8 +39,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
   onRecentSearchSelect
 }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [recordingState, setRecordingState] = useState<RecordingState>('idle');
+  const [recordingTime, setRecordingTime] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -43,6 +53,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
     }
   }, [input]);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, []);
 
   const handleWebSearchToggle = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -64,8 +82,99 @@ const ChatInput: React.FC<ChatInputProps> = ({
     onRecentSearchSelect?.(query);
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm'
+      });
+      
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
+      };
+      
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop());
+        await transcribeRecording();
+      };
+      
+      mediaRecorder.start();
+      setRecordingState('recording');
+      setRecordingTime(0);
+      
+      timerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+      
+    } catch (err) {
+      console.error('Error accessing microphone:', err);
+      alert('Could not access microphone. Please check permissions.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const transcribeRecording = async () => {
+    setRecordingState('processing');
+    
+    try {
+      const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+      const text = await transcribeAudio(audioBlob);
+      setInput(input + (input ? ' ' : '') + text);
+    } catch (err) {
+      console.error('Transcription error:', err);
+      alert('Transcription failed. Please try again.');
+    } finally {
+      setRecordingState('idle');
+      setRecordingTime(0);
+    }
+  };
+
+  const toggleRecording = () => {
+    if (recordingState === 'idle') {
+      startRecording();
+    } else if (recordingState === 'recording') {
+      stopRecording();
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   return (
     <div className="chat-input-wrapper">
+      {recordingState !== 'idle' && (
+        <div className="recording-indicator">
+          <div className="recording-pulse"></div>
+          <span className="recording-text">
+            {recordingState === 'processing' ? 'Transcribing...' : `Recording ${formatTime(recordingTime)}`}
+          </span>
+        </div>
+      )}
+      
       <div className="chat-input-container-modern">
         {/* Suggestions dropdown */}
         {showSuggestions && (searchSuggestions.length > 0 || recentSearches.length > 0) && (
@@ -110,7 +219,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         )}
 
         {/* Unified Input Area */}
-        <div className={`modern-input-box ${searchOptions.search_web ? 'search-mode' : ''}`}>
+        <div className={`modern-input-box ${searchOptions.search_web ? 'search-mode' : ''} ${recordingState === 'recording' ? 'recording-active' : ''}`}>
           <div className="input-prefix">
             <button
               className={`action-icon-btn ${searchOptions.search_web ? 'active' : ''}`}
@@ -119,6 +228,19 @@ const ChatInput: React.FC<ChatInputProps> = ({
               type="button"
             >
               {searchOptions.search_web ? <Globe size={18} /> : <Search size={18} />}
+            </button>
+            <button
+              className={`action-icon-btn mic-btn ${recordingState === 'recording' ? 'recording' : ''}`}
+              onClick={toggleRecording}
+              title={recordingState === 'idle' ? 'Start recording' : 'Stop recording'}
+              type="button"
+              disabled={recordingState === 'processing'}
+            >
+              {recordingState === 'recording' ? (
+                <Square size={18} />
+              ) : (
+                <Mic size={18} />
+              )}
             </button>
           </div>
 
@@ -141,20 +263,19 @@ const ChatInput: React.FC<ChatInputProps> = ({
               }
             }}
             onFocus={() => {
-              if (input.length > 0) {
-                setShowSuggestions(true);
-              }
+              setShowSuggestions(true);
             }}
             onBlur={() => {
               setTimeout(() => setShowSuggestions(false), 200);
             }}
-            placeholder="Ask anything..."
+            placeholder={recordingState === 'processing' ? 'Transcribing...' : 'Ask anything...'}
+            disabled={recordingState === 'processing'}
           />
 
           <div className="input-suffix">
             <button
               onClick={sendMessage}
-              disabled={loading || !input.trim()}
+              disabled={loading || !input.trim() || recordingState === 'processing'}
               className="send-icon-btn"
               title="Send message"
             >

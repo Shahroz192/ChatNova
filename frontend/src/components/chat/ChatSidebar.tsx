@@ -2,6 +2,7 @@ import React from 'react';
 import { Col, Form, Button } from 'react-bootstrap';
 import { Settings, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { ThemeToggle } from '../common/ThemeToggle';
 
 interface ChatSidebarProps {
   selectedModel: string;
@@ -77,7 +78,8 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
         className="mb-2"
       />
 
-      <div className="mt-auto d-flex justify-content-center gap-3">
+      <div className="mt-auto d-flex justify-content-center gap-3 align-items-center">
+        <ThemeToggle className="p-2" />
         <Button
           variant="link"
           onClick={async () => {

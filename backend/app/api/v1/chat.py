@@ -1,6 +1,6 @@
 import asyncio
 from typing import Optional, Dict, Any
-from fastapi import APIRouter, Depends, Query, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, Query, HTTPException, BackgroundTasks, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app import crud
@@ -18,6 +18,7 @@ from app.models.user import User
 from app.core.profiler import request_profiler
 import gzip
 import json
+import logging
 
 router = APIRouter()
 
@@ -269,7 +270,7 @@ async def chat(
         message_in.content,
         current_user.id,
         db,
-        message_in.model
+        message_in.model,
     )
 
     return msg
@@ -390,7 +391,7 @@ def chat_stream(
                 message_in.content,
                 current_user.id,
                 db,
-                message_in.model
+                message_in.model,
             )
 
             # Send completion signal
@@ -485,7 +486,7 @@ def chat_agent_stream(
                 message_in.content,
                 current_user.id,
                 db,
-                message_in.model
+                message_in.model,
             )
 
             # Send completion signal
@@ -710,6 +711,47 @@ async def test_ai_models(
     }
 
 
+@router.post("/chat/models/test/{provider}")
+@request_profiler.profile_endpoint("/chat/models/test/{provider}", "POST")
+async def test_provider_key(
+    provider: str,
+    request: Dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Test a provider's API key by making a simple validation call.
+    """
+    # The frontend sends the raw key, even though the field is named 'encrypted_key'
+    api_key = request.get("encrypted_key")
+    if not api_key:
+        raise HTTPException(status_code=400, detail="API key is required")
+    
+    # Get a model for this provider
+    provider_models = {
+        "Google": "gemini-2.5-flash",
+        "Cerebras": "qwen-3-235b-a22b-instruct-2507",
+        "Groq": "moonshotai/kimi-k2-instruct-0905",
+    }
+    
+    model_name = provider_models.get(provider)
+    if not model_name:
+        raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
+    
+    # Create a temporary LLM instance to test the key
+    llm = ai_service.get_llm_by_provider(provider, api_key)
+    if not llm:
+        raise HTTPException(status_code=400, detail=f"Failed to initialize {provider} client")
+    
+    # Make a simple test call
+    from langchain_core.messages import HumanMessage
+    try:
+        response = llm.invoke([HumanMessage(content="Hi")])
+        return {"status": "success", "message": f"{provider} API key is valid!"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"API call failed: {str(e)}")
+
+
 @router.get("/chat/models", response_model=Dict[str, Any])
 @request_profiler.profile_endpoint("/chat/models", "GET")
 def get_available_models(
@@ -725,3 +767,27 @@ def get_available_models(
         "models": ai_service.get_available_models(current_user.id, db),
         "total": len(ai_service.get_available_models(current_user.id, db)),
     }
+
+
+@router.post("/chat/transcribe")
+@request_profiler.profile_endpoint("/chat/transcribe", "POST")
+def transcribe_audio(
+    audio: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Transcribe audio using Groq's Whisper model.
+    Accepts an audio file and returns the transcribed text.
+    """
+    try:
+        audio_content = audio.file.read()
+        transcription = ai_service.transcribe_audio(
+            audio_content, 
+            audio.filename or "audio.wav", 
+            user_id=current_user.id,
+            db=db
+        )
+        return {"text": transcription}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")

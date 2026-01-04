@@ -2,7 +2,7 @@
 - **Framework**: React 19
 - **Language**: TypeScript 5.9
 - **Build Tool**: Vite 7
-- **Styling**: Bootstrap 5 & React-Bootstrap
+- **Styling**: Bootstrap 5, React-Bootstrap & next-themes
 - **Visualization**: Chart.js & React-Chartjs-2
 - **State/Communication**: React Hooks, SSE (Server-Sent Events) for streaming.
 
