@@ -25,7 +25,7 @@ from app.services.web_search import web_search_service
 from sqlalchemy.orm import Session
 import json
 
-load_dotenv()
+load_dotenv() 
 
 
 def sanitize_user_input(user_input: str) -> str:
@@ -155,6 +155,16 @@ class AIChatService:
         model = config["model"]
 
         api_key = self.get_provider_key(provider, user_id, db)
+        
+        if not api_key:
+            env_key_map = {
+                "Google": "GOOGLE_API_KEY",
+                "Cerebras": "CEREBRAS_API_KEY",
+                "Groq": "GROQ_API_KEY"
+            }
+            env_key_name = env_key_map.get(provider)
+            if env_key_name:
+                api_key = os.getenv(env_key_name)
 
         if not api_key:
             return None
@@ -162,7 +172,6 @@ class AIChatService:
         provider_config = self.provider_configs[provider]
         api_key_param = provider_config["api_key_param"]
 
-        # Some classes might not accept streaming kwarg directly in init if strictly typed, but most LangChain Chat models do or accept **kwargs
         kwargs = {api_key_param: api_key}
         if streaming:
             kwargs["streaming"] = True
@@ -198,14 +207,26 @@ class AIChatService:
         return llm_class(model=model, **kwargs)
 
     def get_available_models(
-        self, user_id: Optional[int] = None, db: Optional[Session] = None
+        self,
+        user_id: Optional[int] = None,
+        db: Optional[Session] = None,
     ):
         available = []
         for model_name, config in self.llm_configs.items():
             provider = config["provider"]
-            # Check if we have a key for this provider
+            
             if self.get_provider_key(provider, user_id, db):
                 available.append(model_name)
+                continue
+                
+            env_key_map = {
+                "Google": "GOOGLE_API_KEY",
+                "Cerebras": "CEREBRAS_API_KEY",
+                "Groq": "GROQ_API_KEY"
+            }
+            if os.getenv(env_key_map.get(provider, "")):
+                available.append(model_name)
+                
         return available
 
     def get_session_memory(self, session_id: int) -> ConversationBufferMemory:
@@ -222,7 +243,9 @@ class AIChatService:
             del self.session_memories[session_id]
 
     def load_session_history(
-        self, session_id: int, db: Session
+        self,
+        session_id: int,
+        db: Session
     ) -> ConversationBufferMemory:
         """Load conversation history into memory for a session"""
         memory = self.get_session_memory(session_id)
@@ -238,7 +261,10 @@ class AIChatService:
         return memory
 
     async def _optimize_search_query(
-        self, message: str, chat_history: List[Any], llm: Any
+        self,
+        message: str,
+        chat_history: List[Any],
+        llm: Any
     ) -> str:
         """Optimize the user's message into a search-engine friendly query."""
         opt_prompt = ChatPromptTemplate.from_messages(
@@ -260,7 +286,11 @@ class AIChatService:
         return optimized_query.strip().strip('"')
 
     async def get_relevant_memories(
-        self, query: str, user_id: int, db: Session, llm: Any
+        self,
+        query: str,
+        user_id: int,
+        db: Session,
+        llm: Any
     ) -> str:
         """Retrieve and filter relevant memories for the current query."""
         from app.crud.memory import memory as memory_crud
@@ -270,8 +300,12 @@ class AIChatService:
         if not memories:
             return ""
 
-        # 2. If many memories, use LLM to filter them
+        # 2. Optimization: If few memories, provide them all directly to save an LLM call latency
         memory_list = [f"- {m.content}" for m in memories]
+        if len(memories) <= 5:
+            return "\n\n### User Context (Memories)\n" + "\n".join(memory_list)
+
+        # 3. If many memories, use LLM to filter them
         memory_text = "\n".join(memory_list)
 
         filter_prompt = ChatPromptTemplate.from_messages(
@@ -297,19 +331,18 @@ class AIChatService:
             return f"\n\n### User Context (Memories)\n{filtered_memories}"
         except Exception as e:
             logging.error(f"Error filtering memories: {e}")
-            # Fallback to including a few recent ones
             return "\n\n### User Context (Memories)\n" + "\n".join(memory_list[:5])
 
     async def extract_and_save_memories(
         self,
         message: str,
         user_id: int,
-        db: Session,
         model_name: str = "gemini-2.5-flash",
     ):
         """Extract permanent facts from a user message and save them to memory."""
         from app.crud.memory import memory as memory_crud
         from app.schemas.memory import MemoryCreate
+        from app.database import SessionLocal
 
         llm = self.get_llm(model_name)
         if not llm:
@@ -336,16 +369,17 @@ class AIChatService:
 
             facts = [f.strip("- ").strip() for f in result.split("\n") if f.strip()]
 
-            # Get existing memories to avoid duplicates
-            existing_memories = memory_crud.get_by_user(db, user_id=user_id, limit=100)
-            existing_contents = [m.content.lower() for m in existing_memories]
+            with SessionLocal() as db:
+                # Get existing memories to avoid duplicates
+                existing_memories = memory_crud.get_by_user(db, user_id=user_id, limit=100)
+                existing_contents = [m.content.lower() for m in existing_memories]
 
-            for fact in facts:
-                if fact.lower() not in existing_contents and fact != "NONE":
-                    memory_crud.create_with_user(
-                        db, obj_in=MemoryCreate(content=fact), user_id=user_id
-                    )
-                    logging.info(f"Saved new memory for user {user_id}: {fact}")
+                for fact in facts:
+                    if fact.lower() not in existing_contents and fact != "NONE":
+                        memory_crud.create_with_user(
+                            db, obj_in=MemoryCreate(content=fact), user_id=user_id
+                        )
+                        logging.info(f"Saved new memory for user {user_id}: {fact}")
 
         except Exception as e:
             logging.error(f"Error extracting memories: {e}")
@@ -596,7 +630,10 @@ class AIChatService:
                 self.queue = queue
 
             async def on_tool_start(
-                self, serialized: Dict[str, Any], input_str: str, **kwargs: Any
+                self,
+                serialized: Dict[str, Any],
+                input_str: str,
+                **kwargs: Any,
             ) -> None:
                 event = {
                     "type": "tool_start",
@@ -651,6 +688,13 @@ class AIChatService:
                     custom_instructions = (
                         f"USER CUSTOM INSTRUCTIONS:\n{db_user.custom_instructions}\n\n"
                     )
+
+            # Get relevant memories
+            relevant_memories = ""
+            if user_id and db:
+                relevant_memories = await self.get_relevant_memories(
+                    sanitized_message, user_id, db, llm
+                )
 
             # Check cache
             cached_response = None
@@ -796,6 +840,9 @@ class AIChatService:
         """
         if not api_key and user_id and db:
             api_key = self.get_provider_key("Groq", user_id, db)
+            
+        if not api_key:
+            api_key = os.getenv("GROQ_API_KEY")
             
         if not api_key:
             raise ValueError("GROQ_API_KEY not configured. Please add your API key in settings.")

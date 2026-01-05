@@ -269,7 +269,6 @@ async def chat(
         ai_service.extract_and_save_memories,
         message_in.content,
         current_user.id,
-        db,
         message_in.model,
     )
 
@@ -390,7 +389,6 @@ def chat_stream(
                 ai_service.extract_and_save_memories,
                 message_in.content,
                 current_user.id,
-                db,
                 message_in.model,
             )
 
@@ -722,8 +720,7 @@ async def test_provider_key(
     """
     Test a provider's API key by making a simple validation call.
     """
-    # The frontend sends the raw key, even though the field is named 'encrypted_key'
-    api_key = request.get("encrypted_key")
+    api_key = request.get("api_key")
     if not api_key:
         raise HTTPException(status_code=400, detail="API key is required")
     

@@ -11,8 +11,7 @@ from sqlalchemy.orm import Session
 def test_health_check(client: TestClient):
     """Test the health check endpoint"""
     response = client.get("/")
-    # This might fail if there's no root route, which is OK
-    assert response.status_code in [200, 404]  # 404 is fine if no root route exists
+    assert response.status_code in [200, 404]
 
 
 def test_user_registration(client: TestClient, db_session: Session):
@@ -48,7 +47,6 @@ def test_user_login(client: TestClient, db_session: Session):
     user_in = UserCreate(**user_data)
     created_user = user.create(db_session, obj_in=user_in)
 
-    # Test login - should set cookie instead of returning token in response
     login_data = {"username": user_data["email"], "password": user_data["password"]}
 
     response = client.post("/api/v1/auth/login", data=login_data)

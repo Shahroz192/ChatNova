@@ -41,7 +41,7 @@ const BYOKForm: React.FC = () => {
     setIsTesting((prev) => ({ ...prev, [provider]: true }));
     try {
       await api.post(`/chat/models/test/${provider}`, {
-        encrypted_key: key,
+        api_key: key,
       });
       setNotification({
         type: "success",
