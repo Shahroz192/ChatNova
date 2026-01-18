@@ -1,9 +1,11 @@
 import logging
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
+import os
 
 
-mcp_path = "/home/shahroz/ChatNova/backend/app/mcp.json"
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+mcp_path = os.path.join(_current_dir, "../mcp.json")
 
 
 class Settings(BaseSettings):
@@ -27,7 +29,12 @@ class Settings(BaseSettings):
     CEREBRAS_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
 
-    model_config = SettingsConfigDict(env_file=".env")
+    # CORS Configuration
+    CORS_ORIGINS: str = (
+        "http://localhost:5173,http://localhost:3000,http://localhost:8000"
+    )
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()

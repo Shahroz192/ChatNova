@@ -5,6 +5,7 @@ import bcrypt
 from cryptography.fernet import Fernet
 import os
 import uuid
+import logging
 from sqlalchemy.orm import Session
 from .config import settings
 from app.crud.token_blacklist import token_blacklist_crud
@@ -103,17 +104,19 @@ def verify_token(token: str, db: Session = None):
         token_jti = payload.get("jti")
 
         if not user_id or not token_jti:
-            print(f"DEBUG: Missing sub or jti. user_id={user_id}, jti={token_jti}")
+            logging.warning(
+                f"Token missing sub or jti. user_id={user_id}, jti={token_jti}"
+            )
             return None
 
         # Check if token is blacklisted
         if db and token_blacklist_crud.is_token_blacklisted(db, token_jti=token_jti):
-            print(f"DEBUG: Token blacklisted. jti={token_jti}")
+            logging.info(f"Token blacklisted: jti={token_jti}")
             return None
 
         return user_id
     except JWTError as e:
-        print(f"DEBUG: JWTError: {e}")
+        logging.warning(f"JWT validation error: {e}")
         return None
 
 

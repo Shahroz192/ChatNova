@@ -1,113 +1,59 @@
-/* Enhanced Sidebar Styling */
+/* Elite Sidebar Styling */
 .sidebar {
     background: var(--bg-sidebar) !important;
     border-right: 1px solid var(--border-light) !important;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    position: relative;
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 25%;
+    padding: var(--space-6) var(--space-4) !important;
+    transition: background var(--transition-normal);
+    overflow-y: auto;
+    z-index: 100;
 }
 
 [data-bs-theme="dark"] .sidebar {
-    border-right: 1px solid var(--border-light) !important;
+    border-right-color: var(--border-light) !important;
 }
 
-.sidebar::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(
-        180deg,
-        rgba(255, 255, 255, 0.02) 0%,
-        rgba(0, 0, 0, 0.02) 100%
-    );
-    pointer-events: none;
-}
-
-[data-bs-theme="dark"] .sidebar::before {
-    background: linear-gradient(
-        180deg,
-        rgba(255, 255, 255, 0.01) 0%,
-        rgba(0, 0, 0, 0.1) 100%
-    );
-}
-
-/* ChatNova Title Styling - Monochrome Theme Consistency */
+/* ChatNova Title Styling */
 .chatnova-title {
+    font-family: var(--font-family-display);
     color: var(--text-primary);
     font-weight: var(--font-weight-bold);
-    font-size: var(--font-size-xl);
-    line-height: var(--line-height-tight);
-    letter-spacing: -0.025em;
+    font-size: var(--font-size-2xl);
+    line-height: var(--line-height-none);
+    letter-spacing: -0.03em;
     margin: 0;
-    transition: color var(--transition-fast);
-}
-
-[data-bs-theme="dark"] .chatnova-title {
-    color: var(--text-primary);
-}
-
-/* Additional aggressive styling for select in sidebar */
-.sidebar select {
-    background-color: var(--bg-primary) !important;
-    color: var(--text-primary) !important;
-    border: 1px solid var(--border-medium) !important;
-}
-
-[data-bs-theme="dark"] .sidebar select {
-    background-color: var(--bg-secondary) !important;
-    color: var(--text-primary) !important;
-    border: 1px solid var(--border-medium) !important;
-}
-
-[data-bs-theme="dark"] .sidebar select option {
-    background-color: var(--gray-900) !important;
-    color: var(--text-primary) !important;
-    padding: 8px 12px !important;
-    border: none !important;
-}
-
-/* Custom select wrapper */
-.custom-select-wrapper {
     position: relative;
+    display: inline-block;
 }
 
-.custom-select-wrapper::after {
-    content: "";
-    position: absolute;
-    top: 50%;
-    right: 12px;
-    transform: translateY(-50%);
-    width: 0;
-    height: 0;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 4px solid var(--text-secondary);
-    pointer-events: none;
-}
-
-[data-bs-theme="dark"] .custom-select-wrapper::after {
-    border-top-color: var(--text-secondary);
+.chatnova-title::after {
+    content: '.';
+    color: var(--accent);
 }
 
 /* Form Group and Label */
 .form-group {
-    margin-bottom: var(--space-4);
+    margin-bottom: var(--space-6);
 }
 
 .form-label {
-    color: var(--text-primary);
+    color: var(--text-secondary);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-xs);
     font-weight: var(--font-weight-medium);
-    margin-bottom: var(--space-2);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: var(--space-3);
+    display: block;
 }
 
-[data-bs-theme="dark"] .form-label {
-    color: var(--text-primary);
-}
-
-/* Custom Dropdown Styles */
+/* Elite Custom Dropdown */
 .custom-dropdown {
     position: relative;
     width: 100%;
@@ -115,102 +61,105 @@
 
 .dropdown-button {
     width: 100%;
-    padding: 10px 12px;
+    padding: var(--space-3) var(--space-4);
     background: var(--bg-primary);
     border: 1px solid var(--border-medium);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-lg);
     color: var(--text-primary);
+    font-family: var(--font-family-sans);
     font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
     cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    transition: var(--transition-fast);
+    transition: all var(--transition-fast);
+    box-shadow: var(--shadow-sm);
 }
 
 .dropdown-button:hover {
     background: var(--bg-secondary);
     border-color: var(--border-dark);
+    transform: translateY(-1px);
 }
 
 .dropdown-button:focus {
     outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent-glow);
 }
 
 [data-bs-theme="dark"] .dropdown-button {
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    border-color: var(--border-medium);
+    background: var(--bg-tertiary);
+    border-color: var(--border-light);
 }
 
 [data-bs-theme="dark"] .dropdown-button:hover {
-    background: var(--bg-tertiary);
-    border-color: var(--border-dark);
-}
-
-[data-bs-theme="dark"] .dropdown-button:focus {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+    background: var(--bg-secondary);
 }
 
 .dropdown-arrow {
-    font-size: 12px;
-    font-weight: bold;
-    color: var(--text-secondary);
-    transition: var(--transition-fast);
+    font-size: 10px;
+    color: var(--text-tertiary);
+    transition: transform var(--transition-normal);
 }
 
-[data-bs-theme="dark"] .dropdown-arrow {
-    color: var(--text-secondary);
+.custom-dropdown:focus-within .dropdown-arrow {
+    transform: rotate(180deg);
 }
 
 .dropdown-options {
     position: absolute;
-    top: 100%;
+    top: calc(100% + 8px);
     left: 0;
     right: 0;
     background: var(--bg-primary);
-    border: 1px solid var(--border-medium);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
     z-index: var(--z-dropdown);
-    max-height: 200px;
+    max-height: 240px;
     overflow-y: auto;
-    margin-top: 4px;
+    padding: var(--space-1);
+    animation: fadeIn var(--transition-fast);
+}
+
+[data-bs-theme="dark"] .dropdown-options {
+    background: var(--bg-tertiary);
+    border-color: var(--border-light);
 }
 
 .dropdown-option {
-    padding: 10px 12px;
+    padding: var(--space-2) var(--space-3);
     cursor: pointer;
-    transition: var(--transition-fast);
+    transition: all var(--transition-fast);
     color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    border-radius: var(--radius-md);
+    margin-bottom: 2px;
 }
 
 .dropdown-option:hover {
     background: var(--bg-secondary);
-}
-
-.dropdown-option:first-child {
-    border-top-left-radius: var(--radius-md);
-    border-top-right-radius: var(--radius-md);
-}
-
-.dropdown-option:last-child {
-    border-bottom-left-radius: var(--radius-md);
-    border-bottom-right-radius: var(--radius-md);
-}
-
-[data-bs-theme="dark"] .dropdown-options {
-    background: var(--bg-secondary);
-    border-color: var(--border-medium);
+    color: var(--text-primary);
 }
 
 [data-bs-theme="dark"] .dropdown-option:hover {
-    background: var(--bg-tertiary);
+    background: var(--bg-secondary);
 }
 
-[data-bs-theme="dark"] .dropdown-option {
+/* Sidebar Footer Buttons */
+.sidebar .btn-link {
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+}
+
+.sidebar .btn-link:hover {
     color: var(--text-primary);
+    background-color: var(--bg-tertiary);
+    transform: scale(1.1);
+}
+
+[data-bs-theme="dark"] .sidebar .btn-link:hover {
+    background-color: var(--bg-tertiary);
 }

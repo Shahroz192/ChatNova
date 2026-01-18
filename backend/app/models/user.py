@@ -15,8 +15,12 @@ class User(Base):
     custom_instructions = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    api_keys = relationship("UserAPIKey", back_populates="user")
-    mcp_servers = relationship("UserMCPServer", back_populates="user")
+    api_keys = relationship(
+        "UserAPIKey", back_populates="user", cascade="all, delete-orphan"
+    )
+    mcp_servers = relationship(
+        "UserMCPServer", back_populates="user", cascade="all, delete-orphan"
+    )
     memories = relationship(
         "UserMemory", back_populates="user", cascade="all, delete-orphan"
     )
@@ -26,7 +30,7 @@ class UserAPIKey(Base):
     __tablename__ = "user_api_keys"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
     model_name = Column(String, index=True)
     encrypted_key = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -39,7 +43,7 @@ class UserMCPServer(Base):
     __tablename__ = "user_mcp_servers"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
     mcp_servers_config = Column(String)  # JSON string containing mcpServers config
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

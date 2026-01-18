@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from app.crud.user import user
 from app.schemas.user import UserCreate
 from sqlalchemy.orm import Session
+from unittest.mock import patch
 
 
 def test_health_check(client: TestClient):
@@ -105,9 +106,22 @@ def test_chat_endpoint(client: TestClient, db_session: Session):
         "model": "gemini-2.5-flash",  # Use a valid model from the service
     }
 
-    response = client.post("/api/v1/chat", json=chat_data)
-    # With mocked AI service, this should work
-    assert response.status_code in [200, 422]  # 200 if works, 422 for validation error
+    # Mock AIChatService methods used in the endpoint
+    # The endpoint imports ai_service from app.api.v1.chat
+    with patch("app.api.v1.chat.ai_service.simple_chat") as mock_chat:
+        # Mocking an async generator
+        async def mock_simple_chat(*args, **kwargs):
+            yield "Hello!"
+            yield " How can I help?"
+        
+        mock_chat.return_value = mock_simple_chat()
+        
+        # Also need to ensure get_llm returns something or is bypassed
+        # and get_available_models includes the model
+        with patch("app.api.v1.chat.ai_service.get_available_models", return_value=["gemini-2.5-flash"]):
+            response = client.post("/api/v1/chat", json=chat_data)
+            assert response.status_code == 200
+            assert "Hello!" in response.text
 
 
 def test_get_chat_history(client: TestClient, db_session: Session):

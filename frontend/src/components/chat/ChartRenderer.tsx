@@ -13,6 +13,7 @@ import {
 } from 'chart.js';
 import { Bar, Line, Pie } from 'react-chartjs-2';
 import { useTheme } from '../../hooks/useTheme';
+import '../../styles/GenerativeUI.css';
 
 // Register chart.js components
 ChartJS.register(
@@ -141,8 +142,7 @@ const ChartRenderer: React.FC<ChartProps> = ({ type, data, label }) => {
 
   return (
     <div
-      className="w-full h-full min-h-[400px] sm:min-h-[480px] lg:min-h-[560px] bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-4"
-      style={{ position: 'relative', height: '100%' }}
+      className="gen-ui-chart-container"
     >
       {renderChart()}
     </div>

@@ -1,8 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
-    Container,
-    Row,
-    Col,
     Button,
     Card,
     ListGroup,
@@ -459,267 +456,243 @@ const Chat: React.FC<ChatProps> = () => {
 
 
     return (
-            <div>
-                <Container
-                    fluid
-                    className="vh-100 d-flex flex-column"
-                    style={{ background: "var(--bg-chat)" }}
-                >
-                    <Row className="flex-grow-1">
-                        <ChatSidebar
-                            selectedModel={selectedModel}
-                            setSelectedModel={setSelectedModel}
-                            models={models}
-                            useTools={useTools}
-                            setUseTools={setUseTools}
-                            isDropdownOpen={isDropdownOpen}
-                            setIsDropdownOpen={setIsDropdownOpen}
-                            setCurrentSessionId={setCurrentSessionId}
-                            setMessages={setMessages}
-                        />
+        <div className="chat-layout">
+            <ChatSidebar
+                selectedModel={selectedModel}
+                setSelectedModel={setSelectedModel}
+                models={models}
+                useTools={useTools}
+                setUseTools={setUseTools}
+                isDropdownOpen={isDropdownOpen}
+                setIsDropdownOpen={setIsDropdownOpen}
+                setCurrentSessionId={setCurrentSessionId}
+                setMessages={setMessages}
+            />
 
-                        <Col
-                            md={9}
-                            className="d-flex flex-column"
-                            style={{ height: "100vh" }}
-                        >
+            <div className="chat-main-content">
+                {messages.length === 0 && (
+                    <div className="welcome-overlay">
+                        <h2 className="h3 fw-bold welcome-title">
+                            Chat Smarter,
+                            Innovate Faster
+                        </h2>
+                    </div>
+                )}
+                <div className="chat-messages-area">
+                    <div className="p-4">
+                        <ListGroup variant="flush">
+                            {messages.map((msg) => {
 
-                            <div
-                                className="flex-grow-1 chat-messages-area"
-                                style={{ overflowY: "auto" }}
-                            >
-                                <div className="p-4">
-                                    <ListGroup variant="flush">
-                                        {messages.length === 0 && (
-                                            <ListGroup.Item className="border-0 message-item">
-                                                <div className="d-flex justify-content-center">
-                                                    <div className="text-center py-4">
-                                                        <h2 className="h3 fw-bold welcome-title mb-2">
-                                                            Chat Smarter,
-                                                            Innovate Faster
-                                                        </h2>
+                                let uiData: UIContainer | null = null;
+                                if (msg.response) {
+                                    try {
+                                        let jsonString = msg.response.trim();
+
+                                        const jsonBlockMatch = jsonString.match(/```json\n([\s\S]*?)\n```/);
+                                        if (jsonBlockMatch) {
+                                            jsonString = jsonBlockMatch[1];
+                                        } else {
+                                            const firstOpenBrace = jsonString.indexOf('{');
+                                            const lastCloseBrace = jsonString.lastIndexOf('}');
+                                            if (firstOpenBrace !== -1 && lastCloseBrace !== -1 && lastCloseBrace > firstOpenBrace) {
+                                                jsonString = jsonString.substring(firstOpenBrace, lastCloseBrace + 1);
+                                            }
+                                        }
+
+                                        const parsed = JSON.parse(jsonString);
+                                        if (parsed.type === 'container' && Array.isArray(parsed.children)) {
+                                            uiData = parsed;
+                                        }
+                                    } catch (e) {
+                                    }
+                                }
+
+                                return (
+                                    <ListGroup.Item
+                                        key={msg.id}
+                                        className="border-0 message-item"
+                                    >
+                                        <div className="d-flex justify-content-end mb-2">
+                                            <div className="d-flex flex-column align-items-end position-relative">
+                                                <Card
+                                                    body
+                                                    className="message-bubble-user"
+                                                    style={{
+                                                        width: "fit-content",
+                                                        maxWidth:
+                                                            "95%",
+                                                    }}
+                                                    onClick={() =>
+                                                        handleMessageClick(
+                                                            msg.id,
+                                                        )
+                                                    }
+                                                    onContextMenu={(e) => {
+                                                        e.preventDefault();
+                                                        setActiveContextMenu({ id: msg.id, type: 'user' });
+                                                    }}
+                                                    onDoubleClick={(e) => {
+                                                        e.preventDefault();
+                                                        setActiveContextMenu({ id: msg.id, type: 'user' });
+                                                    }}
+                                                >
+                                                    <div className="d-flex align-items-center">
+                                                        <User className="me-2" />
+                                                        {msg.content}
+                                                    </div>
+                                                </Card>
+                                                {activeContextMenu?.id === msg.id && activeContextMenu?.type === 'user' && (
+                                                    <MessageContextMenu
+                                                        message={msg}
+                                                        isActive={true}
+                                                        onClose={() => setActiveContextMenu(null)}
+                                                        handleCopyMessage={handleCopyMessage}
+                                                        handleRegenerateResponse={handleRegenerateResponse}
+                                                        handleEditMessage={handleEditMessage}
+                                                        handleDeleteMessage={handleDeleteMessage}
+                                                        messageType="user"
+                                                    />
+                                                )}
+                                                <div className="d-flex align-items-center mt-1 me-2 gap-2">
+                                                    <Timestamp
+                                                        dateString={
+                                                            msg.created_at
+                                                        }
+                                                    />
+                                                    <MessageStatus
+                                                        status={
+                                                            msg.status ||
+                                                            "sent"
+                                                        }
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="d-flex justify-content-start">
+                                            <div
+                                                className="d-flex flex-column align-items-start position-relative"
+                                                style={{
+                                                    maxWidth:
+                                                        "100%",
+                                                }}
+                                            >
+                                                <div
+                                                    className="message-content-assistant"
+                                                    onClick={() =>
+                                                        handleMessageClick(
+                                                            msg.id,
+                                                        )
+                                                    }
+                                                    onContextMenu={(e) => {
+                                                        e.preventDefault();
+                                                        setActiveContextMenu({ id: msg.id, type: 'assistant' });
+                                                    }}
+                                                    onDoubleClick={(e) => {
+                                                        e.preventDefault();
+                                                        setActiveContextMenu({ id: msg.id, type: 'assistant' });
+                                                    }}
+                                                >
+                                                    <div className="d-flex w-100">
+                                                        <div style={{ flex: 1 }}>
+                                                            {msg.tool_calls && msg.tool_calls.length > 0 && (
+                                                                <div className="tool-calls mb-3">
+                                                                    {msg.tool_calls.map((tool, idx) => (
+                                                                        <div key={idx} className="tool-call-item text-muted small mb-1">
+                                                                            <span className="fw-bold">🛠️ {tool.tool}</span>
+                                                                            {tool.status === 'running' && <span className="ms-2 spinner-border spinner-border-sm" role="status" />}
+                                                                            {tool.status === 'completed' && <span className="ms-2 text-success">✓</span>}
+                                                                            <div className="tool-input ps-3 text-truncate" style={{maxWidth: '300px', opacity: 0.8}}>Input: {tool.input}</div>
+                                                                            {tool.output && <div className="tool-output ps-3 text-truncate" style={{maxWidth: '300px', opacity: 0.8}}>Output: {tool.output}</div>}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {msg.id === streamingMessageId && isStreaming ? (
+                                                                <div className="streaming-response">
+                                                                    <MarkdownRenderer content={streamingResponse + " ▋"} />
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex-grow-1 w-100">
+                                                                    {uiData ? (
+                                                                        <div className="generative-ui-container mt-2 mb-2 w-100">
+                                                                            <GenerativeUIRenderer data={uiData} />
+                                                                        </div>
+                                                                    ) : (
+                                                                        <MarkdownRenderer
+                                                                            content={msg.response || ""}
+                                                                        />
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </ListGroup.Item>
-                                        )}
-
-                                        {messages.map((msg) => {
-
-                                            let uiData: UIContainer | null = null;
-                                            if (msg.response) {
-                                                try {
-                                                    let jsonString = msg.response.trim();
-
-                                                    const jsonBlockMatch = jsonString.match(/```json\n([\s\S]*?)\n```/);
-                                                    if (jsonBlockMatch) {
-                                                        jsonString = jsonBlockMatch[1];
-                                                    } else {
-                                                        const firstOpenBrace = jsonString.indexOf('{');
-                                                        const lastCloseBrace = jsonString.lastIndexOf('}');
-                                                        if (firstOpenBrace !== -1 && lastCloseBrace !== -1 && lastCloseBrace > firstOpenBrace) {
-                                                            jsonString = jsonString.substring(firstOpenBrace, lastCloseBrace + 1);
+                                                {activeContextMenu?.id === msg.id && activeContextMenu?.type === 'assistant' && (
+                                                    <MessageContextMenu
+                                                        message={msg}
+                                                        isActive={true}
+                                                        onClose={() => setActiveContextMenu(null)}
+                                                        handleCopyMessage={handleCopyMessage}
+                                                        handleRegenerateResponse={handleRegenerateResponse}
+                                                        handleEditMessage={handleEditMessage}
+                                                        handleDeleteMessage={handleDeleteMessage}
+                                                        messageType="assistant"
+                                                    />
+                                                )}
+                                                <div className="d-flex align-items-center justify-content-between mt-1 ms-2">
+                                                    <Timestamp
+                                                        dateString={
+                                                            msg.created_at
                                                         }
-                                                    }
-
-                                                    const parsed = JSON.parse(jsonString);
-                                                    if (parsed.type === 'container' && Array.isArray(parsed.children)) {
-                                                        uiData = parsed;
-                                                    }
-                                                } catch (e) {
-                                                }
-                                            }
-
-                                            return (
-                                                <ListGroup.Item
-                                                    key={msg.id}
-                                                    className="border-0 message-item"
-                                                >
-                                                    <div className="d-flex justify-content-end mb-2">
-                                                        <div className="d-flex flex-column align-items-end position-relative">
-                                                            <Card
-                                                                body
-                                                                className="message-bubble-user"
-                                                                style={{
-                                                                    width: "fit-content",
-                                                                    maxWidth:
-                                                                        "95%",
-                                                                }}
-                                                                onClick={() =>
-                                                                    handleMessageClick(
-                                                                        msg.id,
-                                                                    )
+                                                        className="me-2"
+                                                    />
+                                                    {msg.id ===
+                                                        streamingMessageId &&
+                                                        isStreaming && (
+                                                            <Button
+                                                                variant="outline-danger"
+                                                                size="sm"
+                                                                onClick={
+                                                                    cancelStreaming
                                                                 }
-                                                                onContextMenu={(e) => {
-                                                                    e.preventDefault();
-                                                                    setActiveContextMenu({ id: msg.id, type: 'user' });
-                                                                }}
-                                                                onDoubleClick={(e) => {
-                                                                    e.preventDefault();
-                                                                    setActiveContextMenu({ id: msg.id, type: 'user' });
-                                                                }}
+                                                                className="cancel-streaming-btn"
+                                                                title="Cancel streaming"
                                                             >
-                                                                <div className="d-flex align-items-center">
-                                                                    <User className="me-2" />
-                                                                    {msg.content}
-                                                                </div>
-                                                            </Card>
-                                                            {activeContextMenu?.id === msg.id && activeContextMenu?.type === 'user' && (
-                                                                 <MessageContextMenu
-                                                                     message={msg}
-                                                                     isActive={true}
-                                                                     onClose={() => setActiveContextMenu(null)}
-                                                                     handleCopyMessage={handleCopyMessage}
-                                                                     handleRegenerateResponse={handleRegenerateResponse}
-                                                                     handleEditMessage={handleEditMessage}
-                                                                     handleDeleteMessage={handleDeleteMessage}
-                                                                     messageType="user"
-                                                                 />
-                                                             )}
-                                                            <div className="d-flex align-items-center mt-1 me-2 gap-2">
-                                                                <Timestamp
-                                                                    dateString={
-                                                                        msg.created_at
-                                                                    }
-                                                                />
-                                                                <MessageStatus
-                                                                    status={
-                                                                        msg.status ||
-                                                                        "sent"
-                                                                    }
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="d-flex justify-content-start">
-                                                        <div
-                                                            className="d-flex flex-column align-items-start position-relative"
-                                                            style={{
-                                                                maxWidth:
-                                                                    "100%",
-                                                            }}
-                                                        >
-                                                            <div
-                                                                className="message-content-assistant"
-                                                                onClick={() =>
-                                                                    handleMessageClick(
-                                                                        msg.id,
-                                                                    )
-                                                                }
-                                                                onContextMenu={(e) => {
-                                                                    e.preventDefault();
-                                                                    setActiveContextMenu({ id: msg.id, type: 'assistant' });
-                                                                }}
-                                                                onDoubleClick={(e) => {
-                                                                    e.preventDefault();
-                                                                    setActiveContextMenu({ id: msg.id, type: 'assistant' });
-                                                                }}
-                                                            >
-                                                                <div className="d-flex w-100">
-                                                                    <div style={{ flex: 1 }}>
-                                                                        {msg.tool_calls && msg.tool_calls.length > 0 && (
-                                                                             <div className="tool-calls mb-3">
-                                                                                 {msg.tool_calls.map((tool, idx) => (
-                                                                                     <div key={idx} className="tool-call-item text-muted small mb-1">
-                                                                                         <span className="fw-bold">🛠️ {tool.tool}</span>
-                                                                                         {tool.status === 'running' && <span className="ms-2 spinner-border spinner-border-sm" role="status" />}
-                                                                                         {tool.status === 'completed' && <span className="ms-2 text-success">✓</span>}
-                                                                                         <div className="tool-input ps-3 text-truncate" style={{maxWidth: '300px', opacity: 0.8}}>Input: {tool.input}</div>
-                                                                                         {tool.output && <div className="tool-output ps-3 text-truncate" style={{maxWidth: '300px', opacity: 0.8}}>Output: {tool.output}</div>}
-                                                                                     </div>
-                                                                                 ))}
-                                                                             </div>
-                                                                        )}
-                                                                        
-                                                                        {msg.id === streamingMessageId && isStreaming ? (
-                                                                            <div className="streaming-response">
-                                                                                <div style={{ whiteSpace: "pre-wrap" }}>
-                                                                                    {streamingResponse}
-                                                                                </div>
-                                                                                <div className="streaming-cursor">|</div>
-                                                                            </div>
-                                                                        ) : (
-                                                                            <div className="flex-grow-1 w-100">
-                                                                                {uiData ? (
-                                                                                    <div className="generative-ui-container mt-2 mb-2 w-100">
-                                                                                        <GenerativeUIRenderer data={uiData} />
-                                                                                    </div>
-                                                                                ) : (
-                                                                                    <MarkdownRenderer
-                                                                                        content={msg.response || ""}
-                                                                                    />
-                                                                                )}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            {activeContextMenu?.id === msg.id && activeContextMenu?.type === 'assistant' && (
-                                                                 <MessageContextMenu
-                                                                     message={msg}
-                                                                     isActive={true}
-                                                                     onClose={() => setActiveContextMenu(null)}
-                                                                     handleCopyMessage={handleCopyMessage}
-                                                                     handleRegenerateResponse={handleRegenerateResponse}
-                                                                     handleEditMessage={handleEditMessage}
-                                                                     handleDeleteMessage={handleDeleteMessage}
-                                                                     messageType="assistant"
-                                                                 />
-                                                             )}
-                                                            <div className="d-flex align-items-center justify-content-between mt-1 ms-2">
-                                                                <Timestamp
-                                                                    dateString={
-                                                                        msg.created_at
-                                                                    }
-                                                                    className="me-2"
-                                                                />
-                                                                {msg.id ===
-                                                                    streamingMessageId &&
-                                                                    isStreaming && (
-                                                                        <Button
-                                                                            variant="outline-danger"
-                                                                            size="sm"
-                                                                            onClick={
-                                                                                cancelStreaming
-                                                                            }
-                                                                            className="cancel-streaming-btn"
-                                                                            title="Cancel streaming"
-                                                                        >
-                                                                            ✕
-                                                                        </Button>
-                                                                    )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </ListGroup.Item>
-                                            );
-                                        })}
-                                    </ListGroup>
-                                    {loading && (
-                                        <TypingIndicator
-                                            modelName={selectedModel}
-                                        />
-                                    )}
-                                    <div ref={messagesEndRef} />
-                                </div>
-                            </div>
-                            <div className="input-area-fixed">
-                                <ChatInput
-                                    input={input}
-                                    setInput={setInput}
-                                    sendMessage={sendMessage}
-                                    loading={loading}
-                                    searchOptions={searchOptions}
-                                    onSearchOptionsChange={handleSearchOptionsChange}
-                                    searchSuggestions={searchSuggestions}
-                                    onSuggestionSelect={handleSuggestionSelect}
-                                    recentSearches={recentSearches}
-                                    onRecentSearchSelect={handleRecentSearchSelect}
-                                />
-                            </div>
-                        </Col>
-                    </Row>
-                </Container>
+                                                                ✕
+                                                            </Button>
+                                                        )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </ListGroup.Item>
+                                );
+                            })}
+                        </ListGroup>
+                        {loading && (
+                            <TypingIndicator
+                                modelName={selectedModel}
+                            />
+                        )}
+                        <div ref={messagesEndRef} />
+                    </div>
+                </div>
+                <div className="chat-input-area">
+                    <ChatInput
+                        input={input}
+                        setInput={setInput}
+                        sendMessage={sendMessage}
+                        loading={loading}
+                        searchOptions={searchOptions}
+                        onSearchOptionsChange={handleSearchOptionsChange}
+                        searchSuggestions={searchSuggestions}
+                        onSuggestionSelect={handleSuggestionSelect}
+                        recentSearches={recentSearches}
+                        onRecentSearchSelect={handleRecentSearchSelect}
+                    />
+                </div>
             </div>
+        </div>
     );
 };
 

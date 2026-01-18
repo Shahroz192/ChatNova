@@ -179,3 +179,31 @@
     background: linear-gradient(to bottom, #ffffff, #f8f9fa) !important;
     padding: 1.5rem !important;
 }
+
+.settings-page .card {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-page .card .card-header,
+.settings-page .card .card-header:first-child {
+  border-radius: calc(var(--radius-2xl) - 1px) calc(var(--radius-2xl) - 1px) 0 0 !important;
+  border: none;
+  border-bottom: 1px solid var(--border-light);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+[data-bs-theme="dark"] .settings-page .card {
+  border-color: #30363d;
+  background-color: #0d1117;
+}
+
+[data-bs-theme="dark"] .settings-page .card .card-header,
+[data-bs-theme="dark"] .settings-page .card .card-header:first-child {
+  background-color: #161b22 !important;
+  border-bottom: 1px solid #30363d;
+  color: #e0e0e0 !important;
+}

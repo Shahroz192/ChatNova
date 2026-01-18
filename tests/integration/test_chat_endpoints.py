@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
-from app.models.user import User
+from app.models.user import User  # type: ignore
+from unittest.mock import patch
 
 
 def test_create_chat_session(client: TestClient, test_user: User):
@@ -131,19 +132,19 @@ def test_create_chat_message(client: TestClient, test_user: User):
     response = client.post("/api/v1/auth/login", data=login_data)
     assert response.status_code == 200
 
-    # Create a message
-    message_data = {
-        "content": "Hello, this is a test message!",
-        "model": "gemini-2.5-flash",
-    }
-    response = client.post("/api/v1/chat", json=message_data)
+    # Mock the AI service to return a fake response
+    async def mock_simple_chat(*args, **kwargs):
+        yield "Hello! "
+        yield "This is a test response."
 
-    # Note: This will likely fail without proper AI model configuration,
-    # but we can test that authentication works and request validation works
-    assert response.status_code in [
-        200,
-        500,
-    ]  # 200 if successful, 500 if AI service fails
+    with patch("app.api.v1.chat.ai_service.simple_chat", new=mock_simple_chat):
+        # Create a message
+        message_data = {
+            "content": "Hello, this is a test message!",
+            "model": "gemini-2.5-flash",
+        }
+        response = client.post("/api/v1/chat", json=message_data)
+        assert response.status_code == 200
 
 
 def test_create_chat_message_with_session(client: TestClient, test_user: User):
@@ -159,19 +160,21 @@ def test_create_chat_message_with_session(client: TestClient, test_user: User):
     assert create_session_response.status_code == 200
     session_id = create_session_response.json()["id"]
 
-    # Create a message with session ID
-    message_data = {
-        "content": "Hello, this is a test message for a session!",
-        "model": "gemini-2.5-flash",
-    }
-    response = client.post(f"/api/v1/chat?session_id={session_id}", json=message_data)
+    # Mock the AI service to return a fake response
+    async def mock_simple_chat(*args, **kwargs):
+        yield "Hello! "
+        yield "This is a test response."
 
-    # Note: This will likely fail without proper AI model configuration,
-    # but we can test that authentication works and request validation works
-    assert response.status_code in [
-        200,
-        500,
-    ]  # 200 if successful, 500 if AI service fails
+    with patch("app.api.v1.chat.ai_service.simple_chat", new=mock_simple_chat):
+        # Create a message with session ID
+        message_data = {
+            "content": "Hello, this is a test message for a session!",
+            "model": "gemini-2.5-flash",
+        }
+        response = client.post(
+            f"/api/v1/chat?session_id={session_id}", json=message_data
+        )
+        assert response.status_code == 200
 
 
 def test_get_session_messages(client: TestClient, test_user: User):

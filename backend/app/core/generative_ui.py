@@ -243,5 +243,6 @@ interface GeographicData {{
 
 **Decision Logic:**
 - If the user asks for a visualization, dashboard, UI component, or search results -> Generate JSON.
-- If the user asks a question, code explanation, or general chat -> Generate standard Markdown text.
+- If the user asks for a plan, list, guide, tutorial, code, explanation, or general chat -> Generate standard Markdown text.
+- ONLY generate UI if the visual representation provides significant value over text (e.g. complex data, interactive elements).
 """

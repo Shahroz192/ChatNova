@@ -25,7 +25,7 @@ from app.services.web_search import web_search_service
 from sqlalchemy.orm import Session
 import json
 
-load_dotenv() 
+load_dotenv()
 
 
 def sanitize_user_input(user_input: str) -> str:
@@ -66,7 +66,7 @@ class AIChatService:
         self.provider_configs = {
             "Google": {"api_key_param": "google_api_key"},
             "Cerebras": {"api_key_param": "cerebras_api_key"},
-            "Groq": {"api_key_param": "groq_api_key"}
+            "Groq": {"api_key_param": "groq_api_key"},
         }
 
         self.llm_configs = {
@@ -117,27 +117,35 @@ class AIChatService:
             logging.error(f"Invalid MCP server configuration for user {user_id}")
             return {"mcpServers": {}}
 
-    def get_provider_key(self, provider: str, user_id: Optional[int] = None, db: Optional[Session] = None) -> Optional[str]:
+    def get_provider_key(
+        self, provider: str, user_id: Optional[int] = None, db: Optional[Session] = None
+    ) -> Optional[str]:
         """Get API key for a specific provider."""
         if provider not in self.provider_configs:
             return None
-        
-        if not user_id or not db:
-            return None
-            
-        user_key_obj = user_api_key.get_by_user_and_model(
-            db, user_id=user_id, model_name=provider
-        )
-        if user_key_obj:
-            try:
-                return decrypt_api_key(user_key_obj.encrypted_key)
-            except Exception as e:
-                logging.error(
-                    f"Error decrypting API key for user {user_id}, provider {provider}: {e}"
-                )
-                return None
-        
-        return None
+
+        # Check user DB key first (BYOK)
+        if user_id and db:
+            user_key_obj = user_api_key.get_by_user_and_model(
+                db, user_id=user_id, model_name=provider
+            )
+            if user_key_obj:
+                try:
+                    return decrypt_api_key(user_key_obj.encrypted_key)
+                except Exception as e:
+                    logging.error(
+                        f"Error decrypting API key for user {user_id}, provider {provider}: {e}"
+                    )
+
+        # Fallback to env vars
+        from app.core.config import settings
+
+        env_map = {
+            "Google": settings.GOOGLE_API_KEY,
+            "Cerebras": settings.CEREBRAS_API_KEY,
+            "Groq": settings.GROQ_API_KEY,
+        }
+        return env_map.get(provider)
 
     def get_llm(
         self,
@@ -155,16 +163,6 @@ class AIChatService:
         model = config["model"]
 
         api_key = self.get_provider_key(provider, user_id, db)
-        
-        if not api_key:
-            env_key_map = {
-                "Google": "GOOGLE_API_KEY",
-                "Cerebras": "CEREBRAS_API_KEY",
-                "Groq": "GROQ_API_KEY"
-            }
-            env_key_name = env_key_map.get(provider)
-            if env_key_name:
-                api_key = os.getenv(env_key_name)
 
         if not api_key:
             return None
@@ -185,24 +183,24 @@ class AIChatService:
         """Get LLM instance for a provider with a provided API key (for validation)."""
         if provider not in self.provider_configs:
             return None
-            
+
         config = self.provider_configs[provider]
         api_key_param = config["api_key_param"]
-        
+
         # Get the model name for this provider
         model_name = None
         for name, cfg in self.llm_configs.items():
             if cfg.get("provider") == provider:
                 model_name = name
                 break
-        
+
         if not model_name:
             return None
-            
+
         llm_config = self.llm_configs[model_name]
         llm_class = llm_config["class"]
         model = llm_config["model"]
-        
+
         kwargs = {api_key_param: api_key}
         return llm_class(model=model, **kwargs)
 
@@ -214,19 +212,11 @@ class AIChatService:
         available = []
         for model_name, config in self.llm_configs.items():
             provider = config["provider"]
-            
+
             if self.get_provider_key(provider, user_id, db):
                 available.append(model_name)
                 continue
-                
-            env_key_map = {
-                "Google": "GOOGLE_API_KEY",
-                "Cerebras": "CEREBRAS_API_KEY",
-                "Groq": "GROQ_API_KEY"
-            }
-            if os.getenv(env_key_map.get(provider, "")):
-                available.append(model_name)
-                
+
         return available
 
     def get_session_memory(self, session_id: int) -> ConversationBufferMemory:
@@ -243,9 +233,7 @@ class AIChatService:
             del self.session_memories[session_id]
 
     def load_session_history(
-        self,
-        session_id: int,
-        db: Session
+        self, session_id: int, db: Session
     ) -> ConversationBufferMemory:
         """Load conversation history into memory for a session"""
         memory = self.get_session_memory(session_id)
@@ -261,10 +249,7 @@ class AIChatService:
         return memory
 
     async def _optimize_search_query(
-        self,
-        message: str,
-        chat_history: List[Any],
-        llm: Any
+        self, message: str, chat_history: List[Any], llm: Any
     ) -> str:
         """Optimize the user's message into a search-engine friendly query."""
         opt_prompt = ChatPromptTemplate.from_messages(
@@ -286,11 +271,7 @@ class AIChatService:
         return optimized_query.strip().strip('"')
 
     async def get_relevant_memories(
-        self,
-        query: str,
-        user_id: int,
-        db: Session,
-        llm: Any
+        self, query: str, user_id: int, db: Session, llm: Any
     ) -> str:
         """Retrieve and filter relevant memories for the current query."""
         from app.crud.memory import memory as memory_crud
@@ -371,7 +352,9 @@ class AIChatService:
 
             with SessionLocal() as db:
                 # Get existing memories to avoid duplicates
-                existing_memories = memory_crud.get_by_user(db, user_id=user_id, limit=100)
+                existing_memories = memory_crud.get_by_user(
+                    db, user_id=user_id, limit=100
+                )
                 existing_contents = [m.content.lower() for m in existing_memories]
 
                 for fact in facts:
@@ -746,7 +729,7 @@ class AIChatService:
                             data = json.loads(item)
                             if data.get("type") == "content":
                                 full_response += data.get("content", "")
-                        except:
+                        except (json.JSONDecodeError, KeyError):
                             pass
 
                     except asyncio.TimeoutError:
@@ -824,7 +807,14 @@ class AIChatService:
             full_response += chunk
         return full_response
 
-    def transcribe_audio(self, audio_file: bytes, filename: str = "audio.wav", api_key: Optional[str] = None, user_id: Optional[int] = None, db: Optional[Session] = None) -> str:
+    def transcribe_audio(
+        self,
+        audio_file: bytes,
+        filename: str = "audio.wav",
+        api_key: Optional[str] = None,
+        user_id: Optional[int] = None,
+        db: Optional[Session] = None,
+    ) -> str:
         """
         Transcribe audio using Groq's Whisper model.
 
@@ -840,12 +830,11 @@ class AIChatService:
         """
         if not api_key and user_id and db:
             api_key = self.get_provider_key("Groq", user_id, db)
-            
+
         if not api_key:
-            api_key = os.getenv("GROQ_API_KEY")
-            
-        if not api_key:
-            raise ValueError("GROQ_API_KEY not configured. Please add your API key in settings.")
+            raise ValueError(
+                "Groq API key not found. Please add your API key in settings."
+            )
 
         try:
             client = groq.Groq(api_key=api_key)

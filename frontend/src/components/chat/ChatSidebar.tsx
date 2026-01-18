@@ -32,8 +32,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   return (
     <Col
       md={3}
-      className="sidebar border-end d-flex flex-column p-4 sidebar-fixed"
-      style={{ height: '100vh', position: 'sticky', top: 0 }}
+      className="sidebar d-flex flex-column p-4"
     >
       <div className="d-flex align-items-center mb-4">
         <h2 className="h4 font-weight-bold mb-0 chatnova-title">
@@ -68,6 +67,15 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
             </ul>
           )}
         </div>
+        {models.length === 0 && (
+          <div className="mt-2 text-danger small">
+             No models available. Please add API keys in <span 
+               className="text-primary text-decoration-underline cursor-pointer" 
+               onClick={() => navigate('/settings')}
+               style={{cursor: 'pointer'}}
+             >Settings</span>.
+          </div>
+        )}
       </div>
       <Form.Check
         type="checkbox"
