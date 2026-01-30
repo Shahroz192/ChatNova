@@ -19,11 +19,11 @@ if env_file.exists():
 
     load_dotenv(env_file)
 
-from app.main import app
-from app.database import Base, get_db
-from app.models.user import User
-from app.core.security import get_password_hash
-from app.schemas.user import UserCreate
+from app.main import app  # noqa: E402
+from app.database import Base, get_db  # noqa: E402
+from app.models.user import User  # noqa: E402
+from app.core.security import get_password_hash  # noqa: E402
+from app.schemas.user import UserCreate  # noqa: E402
 
 
 # Create an in-memory SQLite database for testing

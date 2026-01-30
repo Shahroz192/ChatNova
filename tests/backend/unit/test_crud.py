@@ -39,7 +39,7 @@ def test_get_user_by_email(db_session: Session):
     # First create a user
     user_data = {"email": "test3@example.com", "password": "TestPassword123"}
     user_in = UserCreate(**user_data)
-    created_user = user.create(db_session, obj_in=user_in)
+    user.create(db_session, obj_in=user_in)
 
     # Retrieve the user by email
     retrieved_user = user.get_by_email(db_session, email=user_data["email"])
@@ -266,7 +266,7 @@ def test_get_user_api_key_by_user_and_model(db_session: Session):
 
     # Create an API key for the user
     api_key_data = {"model_name": "gpt-4", "encrypted_key": "encrypted_test_key_456"}
-    created_api_key = user_api_key.create(
+    user_api_key.create(
         db_session, obj_in=UserAPIKeyCreate(**api_key_data), user_id=created_user.id
     )
 

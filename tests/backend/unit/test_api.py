@@ -46,7 +46,7 @@ def test_user_login(client: TestClient, db_session: Session):
         "username": "logintestuser",
     }
     user_in = UserCreate(**user_data)
-    created_user = user.create(db_session, obj_in=user_in)
+    user.create(db_session, obj_in=user_in)
 
     login_data = {"username": user_data["email"], "password": user_data["password"]}
 
@@ -69,7 +69,7 @@ def test_get_current_user(client: TestClient, db_session: Session):
         "username": "currentusertest",
     }
     user_in = UserCreate(**user_data)
-    created_user = user.create(db_session, obj_in=user_in)
+    user.create(db_session, obj_in=user_in)
 
     # Log in to set the cookie
     login_data = {"username": user_data["email"], "password": user_data["password"]}
@@ -93,7 +93,7 @@ def test_chat_endpoint(client: TestClient, db_session: Session):
         "username": "chattestuser",
     }
     user_in = UserCreate(**user_data)
-    created_user = user.create(db_session, obj_in=user_in)
+    user.create(db_session, obj_in=user_in)
 
     # Log in to set the cookie
     login_data = {"username": user_data["email"], "password": user_data["password"]}
@@ -113,12 +113,15 @@ def test_chat_endpoint(client: TestClient, db_session: Session):
         async def mock_simple_chat(*args, **kwargs):
             yield "Hello!"
             yield " How can I help?"
-        
+
         mock_chat.return_value = mock_simple_chat()
-        
+
         # Also need to ensure get_llm returns something or is bypassed
         # and get_available_models includes the model
-        with patch("app.api.v1.chat.ai_service.get_available_models", return_value=["gemini-2.5-flash"]):
+        with patch(
+            "app.api.v1.chat.ai_service.get_available_models",
+            return_value=["gemini-2.5-flash"],
+        ):
             response = client.post("/api/v1/chat", json=chat_data)
             assert response.status_code == 200
             assert "Hello!" in response.text
@@ -133,7 +136,7 @@ def test_get_chat_history(client: TestClient, db_session: Session):
         "username": "historytestuser",
     }
     user_in = UserCreate(**user_data)
-    created_user = user.create(db_session, obj_in=user_in)
+    user.create(db_session, obj_in=user_in)
 
     # Log in to set the cookie
     login_data = {"username": user_data["email"], "password": user_data["password"]}
@@ -160,7 +163,7 @@ def test_get_available_models(client: TestClient, db_session: Session):
         "username": "modelstestuser",
     }
     user_in = UserCreate(**user_data)
-    created_user = user.create(db_session, obj_in=user_in)
+    user.create(db_session, obj_in=user_in)
 
     # Log in to set the cookie
     login_data = {"username": user_data["email"], "password": user_data["password"]}
@@ -186,7 +189,7 @@ def test_logout(client: TestClient, db_session: Session):
         "username": "logouttestuser",
     }
     user_in = UserCreate(**user_data)
-    created_user = user.create(db_session, obj_in=user_in)
+    user.create(db_session, obj_in=user_in)
 
     # Log in to set the cookie
     login_data = {"username": user_data["email"], "password": user_data["password"]}

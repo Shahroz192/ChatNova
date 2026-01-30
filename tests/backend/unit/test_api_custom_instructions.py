@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.schemas.user import UserCreate
 from app import crud
 
+
 def test_update_custom_instructions(client: TestClient, db_session: Session):
     """Test updating custom instructions via API."""
     # Create user
@@ -21,10 +22,9 @@ def test_update_custom_instructions(client: TestClient, db_session: Session):
     # Update instructions
     instructions = "Always speak like a pirate."
     response = client.patch(
-        "/api/v1/users/me/instructions",
-        json={"custom_instructions": instructions}
+        "/api/v1/users/me/instructions", json={"custom_instructions": instructions}
     )
-    
+
     assert response.status_code == 200
     data = response.json()
     assert data["custom_instructions"] == instructions
