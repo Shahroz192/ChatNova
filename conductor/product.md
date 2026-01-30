@@ -7,6 +7,7 @@ To be the premier open-source AI interaction platform that bridges the gap betwe
 # Target Audience
 - **Developers & AI Enthusiasts**: Users who need to compare and utilize multiple LLM providers (Google, Groq, Cerebras) through a single interface.
 - **Data Analysts**: Users who benefit from the Generative UI's ability to transform textual data into interactive charts and visualizations.
+- **Research & Knowledge Workers**: Users who need to chat with their documents and images for analysis and information retrieval.
 - **Enterprise Users**: Organizations looking for a secure, scalable AI assistance tool with persistent history and "Bring Your Own Key" (BYOK) capabilities.
 - **General Users**: Anyone seeking a modern, responsive chat interface for daily AI productivity.
 
@@ -15,6 +16,7 @@ To be the premier open-source AI interaction platform that bridges the gap betwe
 - **Generative UI (Interactive Visuals)**: Real-time generation of interactive charts (Bar, Line, Pie) and image galleries based on AI intent.
 - **Persistent Session Management**: Robust history tracking and session-based conversations powered by PostgreSQL.
 - **Themable UI (Dark Mode Support)**: Full support for Light and Dark modes with automatic system preference detection.
+- **Multi-Modal RAG (Chat with Files)**: Session-bound document indexing (PDF, DOCX, TXT) and image analysis via vector search and multi-modal models.
 - **Personalization (Custom Instructions & Memory)**: Implementation of global custom instructions and a long-term memory system that selectively retrieves relevant facts to personalize AI responses.
 - **BYOK & Model Management**: User-level API key encryption and management for various LLM providers.
 - **High-Performance Streaming**: SSE-based real-time response delivery with optimized backend profiling.

@@ -16,6 +16,7 @@
 
 # Database
 - **Primary Database**: PostgreSQL
+- **Vector Search**: pgvector (for RAG and document indexing)
 
 # Infrastructure & Tooling
 - **Containerization**: Docker & Docker Compose

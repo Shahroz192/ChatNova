@@ -1,0 +1,8 @@
+{
+  "track_id": "multi_modal_rag_20260129",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-01-29T16:50:00Z",
+  "updated_at": "2026-01-29T16:50:00Z",
+  "description": "Implement Multi-Modal RAG support allowing users to upload documents and images. Restrict images to Gemini and use pgvector for session-specific context indexing and retrieval with citations."
+}
