@@ -20,3 +20,9 @@ httpx
 pydantic
 pydantic-settings
 duckduckgo-search
+pgvector
+langchain-postgres
+pymupdf
+python-docx
+bleach
+sentence-transformers
