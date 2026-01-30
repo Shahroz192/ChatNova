@@ -13,8 +13,8 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), "..")))
-from app.database import Base
-from app.core.config import settings
+from app.database import Base  # noqa: E402
+from app.core.config import settings  # noqa: E402
 
 target_metadata = Base.metadata
 

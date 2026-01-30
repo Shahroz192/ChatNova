@@ -21,5 +21,10 @@ class ChatSession(Base):
         "Message", back_populates="session", cascade="all, delete-orphan"
     )
 
+    # Relationship to documents
+    documents = relationship(
+        "SessionDocument", back_populates="session", cascade="all, delete-orphan"
+    )
+
     # Additional indexes for performance
     __table_args__ = {"mysql_engine": "InnoDB"}

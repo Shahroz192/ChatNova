@@ -1,6 +1,11 @@
 from .user import User, UserCreate, UserUpdate
 from .message import Message, MessageCreate, MessageUpdate, MessagePagination
-from .session import ChatSession, ChatSessionCreate, ChatSessionUpdate
+from .session import (
+    ChatSession,
+    ChatSessionCreate,
+    ChatSessionUpdate,
+    ChatSessionPagination,
+)
 from .token_blacklist import (
     TokenBlacklistResponse as TokenBlacklist,
     TokenBlacklistCreate,
@@ -13,8 +18,15 @@ __all__ = [
     "UserUpdate",
     "Message",
     "MessageCreate",
+    "MessageUpdate",
+    "MessagePagination",
     "ChatSession",
     "ChatSessionCreate",
     "ChatSessionUpdate",
     "ChatSessionPagination",
+    "TokenBlacklist",
+    "TokenBlacklistCreate",
+    "Memory",
+    "MemoryCreate",
+    "MemoryUpdate",
 ]
