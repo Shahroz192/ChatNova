@@ -26,6 +26,7 @@ import "../../styles/ChatMessages.css";
 import "../../styles/ChatInput.css";
 import "../../styles/ChatUtils.css";
 import GenerativeUIRenderer from "./GenerativeUIRenderer";
+import SourceList from "./SourceList";
 import type { UIContainer } from "../../types/generative-ui";
 
 interface ChatProps { }
@@ -207,7 +208,7 @@ const Chat: React.FC<ChatProps> = () => {
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages]);
+    }, [messages, streamingResponse]);
 
     const loadHistory = async (sessionId: number) => {
         try {
@@ -283,8 +284,9 @@ const Chat: React.FC<ChatProps> = () => {
         }
     };
 
-    const sendMessage = async () => {
-        if (!input.trim()) return;
+    const sendMessage = async (images?: string[]) => {
+        if (!input.trim() && (!images || images.length === 0)) return;
+        if (isStreaming) return;
 
         setLoading(true);
 
@@ -315,6 +317,7 @@ const Chat: React.FC<ChatProps> = () => {
                 response: "",
                 created_at: new Date().toISOString(),
                 status: "sending",
+                // We could also show the attached images in the message bubble if we want
             };
             setMessages((prev) => [...prev, tempMessage]);
 
@@ -327,12 +330,13 @@ const Chat: React.FC<ChatProps> = () => {
             setStreamingAbortController(controller);
 
 
-            streamChat(
+            await streamChat(
                 messageContent,
                 selectedModel,
                 sessionId,
                 searchOptions,
                 useTools,
+                images,
                 (chunk) => {
                     streamingResponseRef.current += chunk;
                     setStreamingResponse(streamingResponseRef.current);
@@ -361,9 +365,8 @@ const Chat: React.FC<ChatProps> = () => {
                 },
                 (error) => {
                     setMessages((prev) =>
-                        prev.map((msg, index) =>
-                            index === prev.length - 1 &&
-                                msg.status === "sending"
+                        prev.map((msg) =>
+                            msg.id === tempMessage.id
                                 ? { ...msg, status: "failed" as const }
                                 : msg,
                         ),
@@ -455,6 +458,24 @@ const Chat: React.FC<ChatProps> = () => {
     };
 
 
+    const handleFileUpload = async (file: File) => {
+        try {
+            let sessionId = currentSessionId;
+            if (!sessionId) {
+                sessionId = await createSession();
+            }
+            
+            if (sessionId) {
+                const { uploadFile } = await import("../../utils/api");
+                await uploadFile(file, sessionId);
+            }
+        } catch (error) {
+            console.error("Upload Error", error);
+            showError("Upload Error", "Failed to upload file");
+        }
+    };
+
+
     return (
         <div className="chat-layout">
             <ChatSidebar
@@ -506,6 +527,14 @@ const Chat: React.FC<ChatProps> = () => {
                                     } catch (e) {
                                     }
                                 }
+
+                                const responseText = msg.id === streamingMessageId && isStreaming ? streamingResponse : (msg.response || "");
+                                const sourcesMatch = responseText.match(/\n\nSources:\n([\s\S]*)$/);
+                                const displayResponse = sourcesMatch ? responseText.substring(0, sourcesMatch.index) : responseText;
+                                const sources = sourcesMatch ? sourcesMatch[1].trim().split('\n').map(line => {
+                                    const m = line.match(/^\[(\d+)\] (.*)$/);
+                                    return m ? { id: parseInt(m[1]), filename: m[2] } : null;
+                                }).filter((s): s is { id: number; filename: string } => s !== null) : [];
 
                                 return (
                                     <ListGroup.Item
@@ -610,7 +639,7 @@ const Chat: React.FC<ChatProps> = () => {
                                                             
                                                             {msg.id === streamingMessageId && isStreaming ? (
                                                                 <div className="streaming-response">
-                                                                    <MarkdownRenderer content={streamingResponse + " ▋"} />
+                                                                    <MarkdownRenderer content={displayResponse + " ▋"} />
                                                                 </div>
                                                             ) : (
                                                                 <div className="flex-grow-1 w-100">
@@ -620,11 +649,12 @@ const Chat: React.FC<ChatProps> = () => {
                                                                         </div>
                                                                     ) : (
                                                                         <MarkdownRenderer
-                                                                            content={msg.response || ""}
+                                                                            content={displayResponse}
                                                                         />
                                                                     )}
                                                                 </div>
                                                             )}
+                                                            <SourceList sources={sources} />
                                                         </div>
                                                     </div>
                                                 </div>
@@ -669,7 +699,7 @@ const Chat: React.FC<ChatProps> = () => {
                                 );
                             })}
                         </ListGroup>
-                        {loading && (
+                        {loading && !streamingResponse && (
                             <TypingIndicator
                                 modelName={selectedModel}
                             />
@@ -689,6 +719,8 @@ const Chat: React.FC<ChatProps> = () => {
                         onSuggestionSelect={handleSuggestionSelect}
                         recentSearches={recentSearches}
                         onRecentSearchSelect={handleRecentSearchSelect}
+                        selectedModel={selectedModel}
+                        onFileUpload={handleFileUpload}
                     />
                 </div>
             </div>

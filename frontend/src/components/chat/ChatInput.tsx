@@ -6,7 +6,11 @@ import {
   Loader,
   Clock,
   Mic,
-  Square
+  Square,
+  Paperclip,
+  Image as ImageIcon,
+  X,
+  FileText
 } from 'lucide-react';
 import type { WebSearchOptions } from '../../types/search';
 import { transcribeAudio } from '../../utils/api';
@@ -14,7 +18,7 @@ import { transcribeAudio } from '../../utils/api';
 interface ChatInputProps {
   input: string;
   setInput: (value: string) => void;
-  sendMessage: () => void;
+  sendMessage: (images?: string[]) => void;
   loading: boolean;
   searchOptions?: WebSearchOptions;
   onSearchOptionsChange?: (options: WebSearchOptions) => void;
@@ -22,6 +26,8 @@ interface ChatInputProps {
   onSuggestionSelect?: (suggestion: string) => void;
   recentSearches?: string[];
   onRecentSearchSelect?: (query: string) => void;
+  selectedModel: string;
+  onFileUpload: (file: File) => void;
 }
 
 type RecordingState = 'idle' | 'recording' | 'processing';
@@ -36,16 +42,30 @@ const ChatInput: React.FC<ChatInputProps> = ({
   searchSuggestions = [],
   onSuggestionSelect,
   recentSearches = [],
-  onRecentSearchSelect
+  onRecentSearchSelect,
+  selectedModel,
+  onFileUpload
 }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [recordingTime, setRecordingTime] = useState(0);
+  const [pendingImages, setPendingImages] = useState<{name: string, data: string}[]>([]);
+  const [pendingDocs, setPendingDocs] = useState<{name: string}[]>([]);
+  
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const isGemini = selectedModel.toLowerCase().includes('gemini');
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -54,118 +74,153 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }
   }, [input]);
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
-  }, []);
-
-  const handleWebSearchToggle = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const newOptions = {
-      ...searchOptions,
-      search_web: !searchOptions.search_web
-    };
-    onSearchOptionsChange?.(newOptions);
-  };
-
-  const handleSuggestionClick = (suggestion: string) => {
-    setInput(suggestion);
-    setShowSuggestions(false);
-    onSuggestionSelect?.(suggestion);
-  };
-
-  const handleRecentSearchClick = (query: string) => {
-    setInput(query);
-    onRecentSearchSelect?.(query);
-  };
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        } 
-      });
-      
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm'
-      });
-      
-      mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
-      
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          chunksRef.current.push(e.data);
-        }
-      };
-      
-      mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach(track => track.stop());
-        await transcribeRecording();
-      };
-      
-      mediaRecorder.start();
-      setRecordingState('recording');
-      setRecordingTime(0);
-      
-      timerRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
-      
-    } catch (err) {
-      console.error('Error accessing microphone:', err);
-      alert('Could not access microphone. Please check permissions.');
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-  };
-
-  const transcribeRecording = async () => {
-    setRecordingState('processing');
-    
-    try {
-      const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
-      const text = await transcribeAudio(audioBlob);
-      setInput(input + (input ? ' ' : '') + text);
-    } catch (err) {
-      console.error('Transcription error:', err);
-      alert('Transcription failed. Please try again.');
-    } finally {
-      setRecordingState('idle');
-      setRecordingTime(0);
-    }
-  };
-
-  const toggleRecording = () => {
-    if (recordingState === 'idle') {
-      startRecording();
-    } else if (recordingState === 'recording') {
-      stopRecording();
-    }
-  };
-
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleWebSearchToggle = () => {
+    if (onSearchOptionsChange) {
+      onSearchOptionsChange({
+        ...searchOptions,
+        search_web: !searchOptions.search_web
+      });
+    }
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    if (onSuggestionSelect) {
+      onSuggestionSelect(suggestion);
+    }
+    setShowSuggestions(false);
+  };
+
+  const handleRecentSearchClick = (query: string) => {
+    if (onRecentSearchSelect) {
+      onRecentSearchSelect(query);
+    }
+    setShowSuggestions(false);
+  };
+
+  const toggleRecording = async () => {
+    if (recordingState === 'idle') {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        chunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (e) => {
+          if (e.data.size > 0) {
+            chunksRef.current.push(e.data);
+          }
+        };
+
+        mediaRecorder.onstop = async () => {
+          setRecordingState('processing');
+          const audioBlob = new Blob(chunksRef.current, { type: 'audio/wav' });
+          try {
+            const text = await transcribeAudio(audioBlob);
+            setInput(prev => prev ? `${prev} ${text}` : text);
+          } catch (error) {
+            console.error('Transcription error:', error);
+          } finally {
+            setRecordingState('idle');
+            setRecordingTime(0);
+          }
+        };
+
+        mediaRecorder.start();
+        setRecordingState('recording');
+        timerRef.current = setInterval(() => {
+          setRecordingTime(prev => prev + 1);
+        }, 1000);
+      } catch (error) {
+        console.error('Error accessing microphone:', error);
+      }
+    } else if (recordingState === 'recording') {
+      mediaRecorderRef.current?.stop();
+      if (timerRef.current) clearInterval(timerRef.current);
+      mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
+    }
+  };
+
+  const handleFileClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const isImage = file.type.startsWith('image/');
+
+      if (isImage) {
+        if (!isGemini) {
+          alert("Images are only supported for Gemini models. Please switch model to upload images.");
+          continue;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64 = e.target?.result as string;
+          setPendingImages(prev => [...prev, { name: file.name, data: base64 }]);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // Document
+        setPendingDocs(prev => [...prev, { name: file.name }]);
+        onFileUpload(file);
+      }
+    }
+    
+    // Reset input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeImage = (index: number) => {
+    setPendingImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeDoc = (index: number) => {
+    setPendingDocs(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSendMessage = () => {
+    const images = pendingImages.map(img => img.data);
+    sendMessage(images);
+    setPendingImages([]);
+    setPendingDocs([]);
+  };
+
   return (
     <div className="chat-input-wrapper">
+      {/* Attachment Preview */}
+      {(pendingImages.length > 0 || pendingDocs.length > 0) && (
+        <div className="attachment-preview-container">
+          {pendingImages.map((img, index) => (
+            <div key={`img-${index}`} className="attachment-preview-item">
+              <img src={img.data} alt={img.name} className="attachment-thumbnail" />
+              <button className="remove-attachment" onClick={() => removeImage(index)}>
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+          {pendingDocs.map((doc, index) => (
+            <div key={`doc-${index}`} className="attachment-preview-item doc-item">
+              <FileText size={20} className="icon-muted" />
+              <span className="doc-name">{doc.name}</span>
+              <button className="remove-attachment" onClick={() => removeDoc(index)}>
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {recordingState !== 'idle' && (
         <div className="recording-indicator">
           <div className="recording-pulse"></div>
@@ -176,7 +231,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
       )}
       
       <div className="chat-input-container-modern">
-        {/* Suggestions dropdown */}
+        {/* ... Suggestions dropdown remains the same ... */}
         {showSuggestions && (searchSuggestions.length > 0 || recentSearches.length > 0) && (
           <div
             ref={suggestionsRef}
@@ -229,6 +284,25 @@ const ChatInput: React.FC<ChatInputProps> = ({
             >
               {searchOptions.search_web ? <Globe size={18} /> : <Search size={18} />}
             </button>
+            
+            {/* File Upload Button */}
+            <button
+              className="action-icon-btn"
+              onClick={handleFileClick}
+              title="Upload files"
+              type="button"
+            >
+              <Paperclip size={18} />
+            </button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              style={{ display: 'none' }} 
+              multiple 
+              onChange={handleFileChange}
+              accept=".pdf,.docx,.doc,.txt,.md,.png,.jpg,.jpeg,.webp"
+            />
+
             <button
               className={`action-icon-btn mic-btn ${recordingState === 'recording' ? 'recording' : ''}`}
               onClick={toggleRecording}
@@ -256,7 +330,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                sendMessage();
+                handleSendMessage();
               }
               if (e.key === 'Escape') {
                 setShowSuggestions(false);
@@ -274,8 +348,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
           <div className="input-suffix">
             <button
-              onClick={sendMessage}
-              disabled={loading || !input.trim() || recordingState === 'processing'}
+              onClick={handleSendMessage}
+              disabled={loading || (!input.trim() && pendingImages.length === 0) || recordingState === 'processing'}
               className="send-icon-btn"
               title="Send message"
             >

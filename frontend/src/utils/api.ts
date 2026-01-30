@@ -47,6 +47,7 @@ export const streamChat = async (
   sessionId?: number,
   searchOptions?: WebSearchOptions,
   useTools?: boolean,
+  images?: string[],
   onChunk?: (chunk: string) => void,
   onComplete?: () => void,
   onError?: (error: string) => void,
@@ -59,6 +60,7 @@ export const streamChat = async (
     const requestBody: any = {
       content,
       model,
+      images,
     };
 
     if (searchOptions) {
@@ -197,6 +199,24 @@ export const transcribeAudio = async (audioBlob: Blob): Promise<string> => {
 
   const data = await response.json();
   return data.text;
+};
+
+export const uploadFile = async (file: File, sessionId: number): Promise<any> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`/api/v1/chat/upload?session_id=${sessionId}`, {
+    method: 'POST',
+    body: formData,
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Upload failed: ${response.status} - ${errorText}`);
+  }
+
+  return response.json();
 };
 
 export default api;

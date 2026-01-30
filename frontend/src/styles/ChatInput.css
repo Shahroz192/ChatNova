@@ -258,3 +258,78 @@
   border-color: var(--error);
   box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1), var(--shadow-lg);
 }
+
+/* Attachment Preview Styles */
+.attachment-preview-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  max-width: 860px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.attachment-preview-item {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-lg);
+  overflow: visible;
+  border: 1px solid var(--border-light);
+  background-color: var(--bg-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.attachment-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+}
+
+.attachment-preview-item.doc-item {
+  width: auto;
+  min-width: 120px;
+  height: 40px;
+  padding: 0 var(--space-3);
+  display: flex;
+  gap: var(--space-2);
+  justify-content: flex-start;
+  border-radius: var(--radius-full);
+}
+
+.doc-name {
+  font-size: 11px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+.remove-attachment {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 18px;
+  height: 18px;
+  background-color: var(--error);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  z-index: 10;
+  transition: transform var(--transition-fast);
+}
+
+.remove-attachment:hover {
+  transform: scale(1.1);
+  background-color: var(--error-hover);
+}
