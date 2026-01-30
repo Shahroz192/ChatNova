@@ -8,6 +8,7 @@ class MessageBase(BaseModel):
     content: str
     model: str
     search_web: Optional[bool] = False
+    images: Optional[List[str]] = None  # List of base64 strings or URLs
 
 
 class MessageCreate(MessageBase):

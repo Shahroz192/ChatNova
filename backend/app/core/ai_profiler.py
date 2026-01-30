@@ -259,7 +259,7 @@ def profile_ai_service(ai_service_class):
     original_simple_chat = ai_service_class.simple_chat
     original_agent_chat = ai_service_class.agent_chat
 
-    def new_simple_chat(
+    async def new_simple_chat(
         self,
         message: str,
         model_name: str,
@@ -267,12 +267,14 @@ def profile_ai_service(ai_service_class):
         db: Optional[object] = None,
         session_id: Optional[int] = None,
         search_web: bool = False,
-    ) -> str:
+        images: Optional[List[str]] = None,
+    ):
         # Profile the simple chat method
         with ai_profiler.profile_context(model_name, message):
-            return original_simple_chat(
-                self, message, model_name, user_id, db, session_id, search_web
-            )
+            async for chunk in original_simple_chat(
+                self, message, model_name, user_id, db, session_id, search_web, images
+            ):
+                yield chunk
 
     async def new_agent_chat(
         self,

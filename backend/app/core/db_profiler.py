@@ -93,8 +93,6 @@ class DatabaseProfiler:
 
     def pool_connect(self, dbapi_connection, connection_record):
         """Event handler for new connections"""
-        # The connection_record does not have a pool attribute directly
-        # Instead, we can access the pool info from the engine if needed
         if self.engine:
             self.connection_metrics["pool_size"] = self.engine.pool.size()
 

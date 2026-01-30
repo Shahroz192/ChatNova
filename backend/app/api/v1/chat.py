@@ -1,6 +1,14 @@
 import asyncio
 from typing import Optional, Dict, Any
-from fastapi import APIRouter, Depends, Query, HTTPException, BackgroundTasks, UploadFile, File
+from fastapi import (
+    APIRouter,
+    Depends,
+    Query,
+    HTTPException,
+    BackgroundTasks,
+    UploadFile,
+    File,
+)
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app import crud
@@ -14,11 +22,22 @@ from app.schemas.session import (
 from app.api.deps import get_db, get_current_active_user
 from app.services.ai_chat import ai_service
 from app.services.session_service import session_service
+from app.services.document_processor import DocumentProcessor
+from app.services.embedding_service import EmbeddingService
+from app.crud.document import document as document_crud
+from app.crud.document import chunk as chunk_crud
+from app.schemas.document import Document as DocumentSchema
 from app.models.user import User
 from app.core.profiler import request_profiler
 import gzip
+import os
 import json
 import logging
+import tempfile
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 router = APIRouter()
 
@@ -238,6 +257,7 @@ async def chat(
         db,
         session_id,
         message_in.search_web,
+        images=message_in.images,
     ):
         response += chunk
     msg = crud.message.create(
@@ -375,6 +395,7 @@ def chat_stream(
                 db,
                 session_id,
                 message_in.search_web,
+                images=message_in.images,
             ):
                 full_response += chunk
 
@@ -428,7 +449,6 @@ def chat_agent_stream(
 
     async def stream_response():
         try:
-            # Create message record first
             msg = crud.message.create(
                 db,
                 obj_in=message_in,
@@ -437,7 +457,6 @@ def chat_agent_stream(
                 session_id=session_id,
             )
 
-            # If this is a new session or the session has "New Chat" as title, update it with the first message
             if session_id:
                 session_obj = crud.session.get(db, id=session_id)
                 if session_obj and (
@@ -445,7 +464,6 @@ def chat_agent_stream(
                     or not session_obj.title
                     or session_obj.title.strip() == ""
                 ):
-                    # Truncate title to 60 characters to match frontend
                     new_title = message_in.content[:60]
                     if len(message_in.content) > 60:
                         new_title += "..."
@@ -455,7 +473,6 @@ def chat_agent_stream(
                         obj_in=ChatSessionUpdate(title=new_title),
                     )
 
-            # Stream the AI response
             full_response = ""
             async for chunk in ai_service.agent_chat_stream(
                 message_in.content,
@@ -464,21 +481,17 @@ def chat_agent_stream(
                 db,
                 session_id,
             ):
-                # chunk is already a JSON string provided by agent_chat_stream
                 yield f"data: {chunk}\n\n"
 
-                # Accumulate content for DB update
                 try:
                     data = json.loads(chunk)
                     if data.get("type") == "content":
                         full_response += data.get("content", "")
-                except:
+                except (json.JSONDecodeError, Exception):
                     pass
 
-            # Update the message with the complete response
             crud.message.update(db, db_obj=msg, obj_in={"response": full_response})
 
-            # Extract memories in background
             background_tasks.add_task(
                 ai_service.extract_and_save_memories,
                 message_in.content,
@@ -487,7 +500,6 @@ def chat_agent_stream(
                 message_in.model,
             )
 
-            # Send completion signal
             yield "data: [DONE]\n\n"
 
         except Exception as e:
@@ -723,27 +735,29 @@ async def test_provider_key(
     api_key = request.get("api_key")
     if not api_key:
         raise HTTPException(status_code=400, detail="API key is required")
-    
+
     # Get a model for this provider
     provider_models = {
         "Google": "gemini-2.5-flash",
         "Cerebras": "qwen-3-235b-a22b-instruct-2507",
         "Groq": "moonshotai/kimi-k2-instruct-0905",
     }
-    
+
     model_name = provider_models.get(provider)
     if not model_name:
         raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
-    
-    # Create a temporary LLM instance to test the key
+
     llm = ai_service.get_llm_by_provider(provider, api_key)
     if not llm:
-        raise HTTPException(status_code=400, detail=f"Failed to initialize {provider} client")
-    
+        raise HTTPException(
+            status_code=400, detail=f"Failed to initialize {provider} client"
+        )
+
     # Make a simple test call
     from langchain_core.messages import HumanMessage
+
     try:
-        response = llm.invoke([HumanMessage(content="Hi")])
+        llm.invoke([HumanMessage(content="Hi")])
         return {"status": "success", "message": f"{provider} API key is valid!"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"API call failed: {str(e)}")
@@ -766,6 +780,87 @@ def get_available_models(
     }
 
 
+async def process_document_task(
+    file_path: str, document_id: int, user_id: int, db_session_factory: Any
+):
+    """Background task to process, chunk, and index a document."""
+    db = db_session_factory()
+    try:
+        doc_record = document_crud.get(db, id=document_id)
+        if not doc_record:
+            return
+
+        text = DocumentProcessor.extract_text(file_path, doc_record.file_type)
+        if not text:
+            logging.warning(f"No text extracted from {file_path}")
+            return
+
+        chunks = DocumentProcessor.chunk_text(text)
+
+        from app.models.document import has_vector
+
+        embeddings = None
+        if has_vector:
+            embedding_service = EmbeddingService(user_id, db)
+            embeddings = await embedding_service.embed_chunks(chunks)
+
+        for i, content in enumerate(chunks):
+            chunk_data = {
+                "document_id": document_id,
+                "content": content,
+            }
+            if embeddings and i < len(embeddings):
+                chunk_data["embedding"] = embeddings[i]
+
+            chunk_crud.create(
+                db,
+                obj_in=chunk_data,
+            )
+        logging.info(f"Processed document {document_id}: {len(chunks)} chunks indexed.")
+    except Exception as e:
+        logging.error(f"Error processing document {document_id}: {e}")
+    finally:
+        db.close()
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+
+@router.post("/chat/upload", response_model=DocumentSchema)
+@request_profiler.profile_endpoint("/chat/upload", "POST")
+async def upload_file(
+    background_tasks: BackgroundTasks,
+    session_id: int = Query(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Upload a document to a chat session.
+    Processes the document in the background for RAG.
+    """
+    file_type = file.filename.split(".")[-1] if "." in file.filename else "txt"
+    doc_in = {
+        "filename": file.filename,
+        "file_type": file_type,
+        "session_id": session_id,
+        "user_id": current_user.id,
+    }
+    doc_record = document_crud.create(db, obj_in=doc_in)
+
+    temp_dir = tempfile.gettempdir()
+    temp_path = os.path.join(temp_dir, f"{doc_record.id}_{file.filename}")
+    with open(temp_path, "wb") as f:
+        f.write(await file.read())
+
+    from app.database import SessionLocal
+
+    background_tasks.add_task(
+        process_document_task, temp_path, doc_record.id, current_user.id, SessionLocal
+    )
+
+    return doc_record
+
+
 @router.post("/chat/transcribe")
 @request_profiler.profile_endpoint("/chat/transcribe", "POST")
 def transcribe_audio(
@@ -780,10 +875,7 @@ def transcribe_audio(
     try:
         audio_content = audio.file.read()
         transcription = ai_service.transcribe_audio(
-            audio_content, 
-            audio.filename or "audio.wav", 
-            user_id=current_user.id,
-            db=db
+            audio_content, audio.filename or "audio.wav", user_id=current_user.id, db=db
         )
         return {"text": transcription}
     except Exception as e:

@@ -1,8 +1,6 @@
-import os
 import asyncio
 import logging
 import re
-import tempfile
 from io import BytesIO
 from dotenv import load_dotenv
 from app.core.generative_ui import GENERATIVE_UI_INSTRUCTION
@@ -11,10 +9,12 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain.memory import ConversationBufferMemory
 from mcp_use import MCPClient, MCPAgent
 from typing import Dict, Any, Optional, AsyncGenerator, List
+from langchain_core.messages import HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_cerebras import ChatCerebras
 from langchain_groq import ChatGroq
 import groq
+import sqlalchemy as sa
 from app.core.config import mcp_path
 from app.core.ai_profiler import profile_ai_service
 from app.core.cache import cache_manager
@@ -22,6 +22,7 @@ from app.core.security import decrypt_api_key
 from app.crud.user import user_api_key, user_mcp_server
 from app.crud.message import message as message_crud
 from app.services.web_search import web_search_service
+from app.models.document import SessionDocument, DocumentChunk
 from sqlalchemy.orm import Session
 import json
 
@@ -276,17 +277,14 @@ class AIChatService:
         """Retrieve and filter relevant memories for the current query."""
         from app.crud.memory import memory as memory_crud
 
-        # 1. Fetch all memories for the user
         memories = memory_crud.get_by_user(db, user_id=user_id, limit=100)
         if not memories:
             return ""
 
-        # 2. Optimization: If few memories, provide them all directly to save an LLM call latency
         memory_list = [f"- {m.content}" for m in memories]
         if len(memories) <= 5:
             return "\n\n### User Context (Memories)\n" + "\n".join(memory_list)
 
-        # 3. If many memories, use LLM to filter them
         memory_text = "\n".join(memory_list)
 
         filter_prompt = ChatPromptTemplate.from_messages(
@@ -367,6 +365,90 @@ class AIChatService:
         except Exception as e:
             logging.error(f"Error extracting memories: {e}")
 
+    async def get_relevant_chunks(
+        self, query: str, session_id: int, user_id: int, db: Session, limit: int = 5
+    ) -> Dict[str, Any]:
+        """Retrieve relevant document chunks for the current query and session."""
+        try:
+            from app.models.document import has_vector
+
+            # Extract key terms for keyword matching (used in both paths)
+            search_terms = [t for t in re.findall(r"\w+", query) if len(t) > 3]
+            if not search_terms:
+                search_terms = [query[:50]]
+            query_filter = sa.or_(
+                *[DocumentChunk.content.ilike(f"%{term}%") for term in search_terms]
+            )
+
+            if has_vector:
+                from app.services.embedding_service import EmbeddingService
+
+                embedding_service = EmbeddingService(user_id, db)
+                query_embedding = await embedding_service.embed_query(query)
+
+                # Vector search
+                vector_chunks = (
+                    db.query(DocumentChunk)
+                    .join(SessionDocument)
+                    .filter(SessionDocument.session_id == session_id)
+                    .order_by(DocumentChunk.embedding.cosine_distance(query_embedding))
+                    .limit(limit)
+                    .all()
+                )
+
+                # Keyword search (as a supplement to vector search)
+                keyword_chunks = (
+                    db.query(DocumentChunk)
+                    .join(SessionDocument)
+                    .filter(SessionDocument.session_id == session_id)
+                    .filter(query_filter)
+                    .limit(limit // 2)
+                    .all()
+                )
+
+                # Merge and deduplicate
+                seen_ids = set()
+                chunks = []
+                for c in vector_chunks + keyword_chunks:
+                    if c.id not in seen_ids:
+                        chunks.append(c)
+                        seen_ids.add(c.id)
+                chunks = chunks[:limit]
+            else:
+                # Fallback to simple keyword search if pgvector is missing
+                chunks = (
+                    db.query(DocumentChunk)
+                    .join(SessionDocument)
+                    .filter(SessionDocument.session_id == session_id)
+                    .filter(query_filter)
+                    .limit(limit)
+                    .all()
+                )
+
+            if not chunks:
+                return {"text": "", "sources": []}
+
+            context_parts = []
+            sources = []
+            seen_docs = set()
+
+            for i, chunk in enumerate(chunks, 1):
+                filename = chunk.document.filename
+                context_parts.append(
+                    f"[{i}] Source: {filename}\nContent: {chunk.content}"
+                )
+                if chunk.document_id not in seen_docs:
+                    sources.append({"id": i, "filename": filename})
+                    seen_docs.add(chunk.document_id)
+
+            return {
+                "text": "\n\n### Document Context\n" + "\n---\n".join(context_parts),
+                "sources": sources,
+            }
+        except Exception as e:
+            logging.error(f"Error retrieving relevant chunks: {e}")
+            return {"text": "", "sources": []}
+
     async def simple_chat(
         self,
         message: str,
@@ -375,6 +457,7 @@ class AIChatService:
         db: Optional[Session] = None,
         session_id: Optional[int] = None,
         search_web: bool = False,
+        images: Optional[List[str]] = None,  # List of base64 encoded images or URLs
     ) -> AsyncGenerator[str, None]:
         sanitized_message = sanitize_user_input(message)
 
@@ -387,7 +470,7 @@ class AIChatService:
 
         cached_response = None
         if user_id:
-            if session_id:
+            if session_id or images:
                 pass
             else:
                 cache_key = f"{sanitized_message}:search:{search_web}"
@@ -426,6 +509,37 @@ class AIChatService:
                 sanitized_message, user_id, db, llm
             )
 
+        # Get relevant document chunks (RAG)
+        document_context_data = {"text": "", "sources": []}
+        if session_id and db:
+            document_context_data = await self.get_relevant_chunks(
+                sanitized_message, session_id, user_id, db
+            )
+        document_context = document_context_data["text"]
+        sources = document_context_data["sources"]
+
+        # Handle multi-modal input (images) - ONLY for Gemini
+        is_multimodal = "gemini" in model_name.lower()
+        human_content = []
+
+        if is_multimodal and images:
+            human_content.append({"type": "text", "text": sanitized_message})
+            for img_data in images:
+                # Ensure base64 string has the correct prefix for LangChain/Gemini
+                image_url = img_data
+                if isinstance(img_data, str) and not img_data.startswith("data:"):
+                    # Default to jpeg if prefix is missing
+                    image_url = f"data:image/jpeg;base64,{img_data}"
+
+                if isinstance(img_data, str):
+                    human_content.append(
+                        {"type": "image_url", "image_url": {"url": image_url}}
+                    )
+                else:
+                    human_content.append(img_data)
+        else:
+            human_content = sanitized_message
+
         if search_web:
             try:
                 logging.info(f"Performing web search for: {sanitized_message[:50]}...")
@@ -439,11 +553,12 @@ class AIChatService:
                 system_prompt = (
                     f"You are a sophisticated AI assistant with real-time web access.\n\n"
                     f"{GENERATIVE_UI_INSTRUCTION}\n\n"
-                    "Citations: When using information from search results, cite them clearly using [Source Name/Number].\n"
+                    "Citations: When using information from search results or documents, cite them clearly using [Source Name/Number].\n"
                     "Tone: Professional, helpful, and concise.\n"
                     "Formatting: Use rich markdown. If multiple search results are relevant, you may use 'search_results' or 'news_card' UI components where appropriate, alongside your textual response."
                     f"{custom_instructions}"
                     f"{relevant_memories}"
+                    f"{document_context}"
                 )
 
                 prompt = ChatPromptTemplate.from_messages(
@@ -452,16 +567,20 @@ class AIChatService:
                         MessagesPlaceholder(variable_name="chat_history"),
                         (
                             "human",
-                            "Current Search Results:\n{search_results}\n\nUser Question: {input}",
+                            "Current Search Results:\n{search_results}\n\nUser Question:",
                         ),
+                        MessagesPlaceholder(variable_name="input"),
                     ]
                 )
 
                 chain = prompt | llm | StrOutputParser()
 
+                # If human_content is a list (multi-modal), we wrap it in a HumanMessage
+                input_msg = [HumanMessage(content=human_content)]
+
                 async for chunk in chain.astream(
                     {
-                        "input": sanitized_message,
+                        "input": input_msg,
                         "chat_history": chat_history,
                         "search_results": search_results,
                     }
@@ -474,27 +593,44 @@ class AIChatService:
                     f"Web search flow failed: {e}. Falling back to standard chat."
                 )
                 search_web = False
+
         if not search_web or (not full_response and not search_web):
             system_prompt = (
                 f"You are a helpful AI assistant.\n\n{GENERATIVE_UI_INSTRUCTION}"
+                f"Citations: When using information from documents, cite them clearly using [Source Name/Number].\n"
                 f"{custom_instructions}"
                 f"{relevant_memories}"
+                f"{document_context}"
             )
 
             prompt = ChatPromptTemplate.from_messages(
                 [
                     ("system", system_prompt),
                     MessagesPlaceholder(variable_name="chat_history"),
-                    ("human", "{input}"),
+                    MessagesPlaceholder(variable_name="input"),
                 ]
             )
             chain = prompt | llm | StrOutputParser()
 
+            input_msg = [HumanMessage(content=human_content)]
+
             async for chunk in chain.astream(
-                {"input": sanitized_message, "chat_history": chat_history}
+                {"input": input_msg, "chat_history": chat_history}
             ):
                 full_response += chunk
                 yield chunk
+
+        # Append sources metadata if any
+        if sources:
+            sources_text = "\n\nSources:\n" + "\n".join(
+                [f"[{s['id']}] {s['filename']}" for s in sources]
+            )
+            # We don't necessarily want to yield this to the user as raw text if we want a nice UI,
+            # but for now, it's the easiest way to get it to the frontend.
+            # Alternatively, we could yield a special marker.
+            # yield f"\n\nSOURCES_JSON:{json.dumps(sources)}"
+            full_response += sources_text
+            yield sources_text
 
         if full_response:
             if session_id:
