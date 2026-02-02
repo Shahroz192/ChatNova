@@ -58,6 +58,40 @@ class InputSanitizer:
     MAX_TITLE_LENGTH = 255
     MAX_DESCRIPTION_LENGTH = 1000
 
+    # PII patterns to detect and mask
+    PII_PATTERNS = {
+        "EMAIL": r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
+        "PHONE": r"(\+\d{1,2}\s?)?1?\-?\.?\s?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}",
+        "SSN": r"\b\d{3}-\d{2}-\d{4}\b",
+        "CREDIT_CARD": r"\b(?:\d[ -]*?){13,16}\b",
+        "IPV4": r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
+        "PASSWORD": r"(?i)(password|passwd|pwd)\s*[:=]\s*[^\s]+",
+        "SECRET_KEY": r"(?i)(secret|api_key|token)\s*[:=]\s*[^\s]{10,}",
+    }
+
+    # Prompt injection patterns
+    PROMPT_INJECTION_PATTERNS = [
+        r"(?i)ignore\s+(all\s+)?(previous\s+)?instructions",
+        r"(?i)system\s+override",
+        r"(?i)you\s+are\s+now\s+(a|an)\b",
+        r"(?i)disregard\s+(all\s+)?(previous\s+)?prompts",
+        r"(?i)output\s+the\s+entire\s+system\s+prompt",
+        r"(?i)leak\s+(the\s+)?(internal\s+)?instructions",
+        r"(?i)new\s+role:\b",
+    ]
+
+    @classmethod
+    def mask_pii(cls, text: str) -> str:
+        """Mask PII in text with placeholders."""
+        if not text:
+            return ""
+
+        masked_text = text
+        for pii_type, pattern in cls.PII_PATTERNS.items():
+            masked_text = re.sub(pattern, f"[REDACTED_{pii_type}]", masked_text)
+
+        return masked_text
+
     @classmethod
     def sanitize_html(cls, text: str, allow_basic_html: bool = False) -> str:
         """Sanitize HTML content to prevent XSS attacks.
@@ -92,11 +126,32 @@ class InputSanitizer:
         return sanitized.strip()
 
     @classmethod
-    def validate_message_content(cls, content: str) -> tuple[bool, str, str]:
+    def detect_prompt_injection(cls, text: str) -> bool:
+        """Detect potential prompt injection attempts.
+
+        Args:
+            text: Input text to analyze
+
+        Returns:
+            bool: True if potential injection detected, False otherwise
+        """
+        if not text:
+            return False
+
+        for pattern in cls.PROMPT_INJECTION_PATTERNS:
+            if re.search(pattern, text, re.IGNORECASE):
+                return True
+        return False
+
+    @classmethod
+    def validate_message_content(
+        cls, content: str, redact_pii: bool = False
+    ) -> tuple[bool, str, str]:
         """Validate and sanitize chat message content.
 
         Args:
             content: Raw message content
+            redact_pii: If True, redact PII from the content
 
         Returns:
             tuple: (is_valid, sanitized_content, error_message)
@@ -112,18 +167,26 @@ class InputSanitizer:
                 f"Message content exceeds maximum length of {cls.MAX_MESSAGE_LENGTH} characters",
             )
 
-        # Sanitize the content
+        # Sanitize the content (XSS protection)
         sanitized = cls.sanitize_html(content, allow_basic_html=False)
+
+        # Redact PII if requested
+        if redact_pii:
+            sanitized = cls.mask_pii(sanitized)
 
         # Check for suspicious patterns that might indicate injection attempts
         suspicious_patterns = []
 
+        # Check for prompt injection
+        if cls.detect_prompt_injection(content):
+            suspicious_patterns.append("Prompt injection pattern detected")
+
         # Check for SQL injection patterns (context-aware to reduce false positives)
         sql_patterns = [
             r"(?i)\b(union\s+select|select\s+\*\s+from|insert\s+into|update\s+\w+\s+set|drop\s+table|drop\s+database|create\s+table|create\s+database|alter\s+table|exec\s*\(|execute\s*\()\b",  # SQL commands with context
-            r'["\']\\s*;\\s*--',  # SQL comment
-            r"\\bor\\b\\s+['\"]?1['\"]?\\s*=\\s*['\"]?1['\"]?\\b",  # SQL injection 1=1
-            r"\\band\\b\\s+['\"]?1['\"]?\\s*=\\s*['\"]?1['\"]?\\b",  # SQL injection 1=1
+            r'["\']\s*;\s*--',  # SQL comment
+            r"\bor\b\s+['\"]?1['\"]?\s*=\s*['\"]?1['\"]?\b",  # SQL injection 1=1
+            r"\band\b\s+['\"]?1['\"]?\s*=\s*['\"]?1['\"]?\b",  # SQL injection 1=1
         ]
 
         for pattern in sql_patterns:
@@ -335,6 +398,16 @@ class InputSanitizer:
                     }
                 )
                 break
+
+        # Check for prompt injection
+        if cls.detect_prompt_injection(text):
+            threats.append(
+                {
+                    "type": "PROMPT_INJECTION",
+                    "description": "Potential LLM prompt injection attempt detected",
+                    "severity": "high",
+                }
+            )
 
         # Check for sensitive information patterns
         sensitive_patterns = [

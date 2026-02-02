@@ -74,10 +74,10 @@ class CacheEntry:
     def _calculate_size(self) -> int:
         """Calculate approximate size of the entry in bytes."""
         try:
-            import pickle
+            import json
 
-            # Estimate size using pickle
-            return len(pickle.dumps(self.value))
+            # Estimate size using JSON serialization (safer than pickle)
+            return len(json.dumps(self.value, default=str).encode("utf-8"))
         except Exception:
             # Fallback to basic estimation
             return len(str(self.value).encode("utf-8")) + 200  # Add overhead

@@ -67,12 +67,16 @@ def client(db_session):
     app.dependency_overrides.clear()
 
 
+# Constants for testing
+TEST_PASSWORD = os.getenv("TEST_USER_PASSWORD", "TestPassword123")
+
+
 @pytest.fixture
 def test_user(db_session):
     """Create a test user."""
     unique_id = str(uuid.uuid4())[:8]  # Use first 8 chars of uuid for uniqueness
     user_data = UserCreate(
-        email=f"test_{unique_id}@example.com", password="TestPassword123"
+        email=f"test_{unique_id}@example.com", password=TEST_PASSWORD
     )
     hashed_password = get_password_hash(user_data.password)
     user = User(email=user_data.email, hashed_password=hashed_password)
@@ -88,7 +92,7 @@ def authenticated_client(client, test_user):
     # Login to get the cookie
     response = client.post(
         "/api/v1/auth/login",
-        data={"username": test_user.email, "password": "TestPassword123"},
+        data={"username": test_user.email, "password": TEST_PASSWORD},
     )
     assert response.status_code == 200
     # Return the client with authentication

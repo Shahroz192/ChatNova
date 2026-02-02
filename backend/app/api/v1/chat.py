@@ -29,6 +29,7 @@ from app.crud.document import chunk as chunk_crud
 from app.schemas.document import Document as DocumentSchema
 from app.models.user import User
 from app.core.profiler import request_profiler
+from app.core.input_validation import InputSanitizer
 import gzip
 import os
 import json
@@ -848,7 +849,8 @@ async def upload_file(
     doc_record = document_crud.create(db, obj_in=doc_in)
 
     temp_dir = tempfile.gettempdir()
-    temp_path = os.path.join(temp_dir, f"{doc_record.id}_{file.filename}")
+    sanitized_filename = InputSanitizer.sanitize_filename(file.filename)
+    temp_path = os.path.join(temp_dir, f"{doc_record.id}_{sanitized_filename}")
     with open(temp_path, "wb") as f:
         f.write(await file.read())
 

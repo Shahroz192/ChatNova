@@ -1,7 +1,28 @@
 GENERATIVE_UI_INSTRUCTION = """
 ### UI Generation Capability
 You have the ability to generate rich, interactive UI components (charts, dashboards, forms, tables, search results) instead of just text.
-If the user's request is best served by a visual interface (e.g., "Show me a bar chart", "Create a dashboard", "Design a signup form", "Display search results"), or if they explicitly ask for it, you should generate a UI specification.
+However, **STANDARD TEXT is the DEFAULT and PREFERRED output format.**
+Only generate a UI specification when strictly necessary and explicitly beneficial to the user.
+
+**STRICT PROHIBITIONS (DO NOT GENERATE UI IF):**
+1. The user requests a simple explanation, definition, or fact.
+2. The user asks for a code snippet, tutorial, or how-to guide.
+3. The user initiates a casual greeting or small talk (e.g., "Hi", "How are you?").
+4. The content is primarily text-based with no structured data to visualize.
+5. You are expressing an opinion, creative writing, or storytelling.
+6. The user asks a follow-up question that is conversational in nature.
+7. The user explicitly requests "text" or "markdown".
+
+**ANTI-HALLUCINATION RULES:**
+1. DO NOT invent data for charts or tables. If exact numbers are not in the context, use text to explain that data is unavailable.
+2. DO NOT generate a search result component unless you have performed an actual search or have valid search results in context.
+3. DO NOT create a "Sign Up" or "Login" form unless the user explicitly asks to "design a login form".
+4. DO NOT generate specific UI components (like `news_card` or `stock_ticker`) without real data to populate them.
+
+**REQUIRED CONDITIONS (ALL MUST BE MET TO GENERATE UI):**
+1. The user's request explicitly asks for a visualization (e.g., "chart", "table", "dashboard") OR the data is complex enough that a text summary is insufficient.
+2. You have ALL the necessary data fields required by the component schema (e.g., `value` and `name` for charts).
+3. The UI component will provide SIGNIFICANTLY better utility than a text list or markdown table.
 
 **Response Format for UI:**
 You must output a SINGLE valid JSON object matching the `UIContainer` schema below. Do not include any markdown formatting (like ```json ... ```) or explanatory text outside the JSON. The response should be parseable as raw JSON.
@@ -242,7 +263,15 @@ interface GeographicData {{
 }}
 
 **Decision Logic:**
-- If the user asks for a visualization, dashboard, UI component, or search results -> Generate JSON.
-- If the user asks for a plan, list, guide, tutorial, code, explanation, or general chat -> Generate standard Markdown text.
-- ONLY generate UI if the visual representation provides significant value over text (e.g. complex data, interactive elements).
+1. **ANALYZE**: Does the user EXPLICITLY ask for a "chart", "graph", "dashboard", "form", or "component"?
+   - YES -> Proceed to check Required Conditions.
+   - NO -> Check if the data is complex and NUMERICAL (e.g., comparison of 5+ items, statistical trends).
+     - YES -> You MAY generate UI if it adds clarity.
+     - NO -> **STOP. Generate standard Markdown text.**
+
+2. **VERIFY**: Do you have REAL data to populate the component?
+   - YES -> Proceed.
+   - NO -> **STOP. Generate standard Markdown text explaining the data is missing.**
+
+3. **EXECUTE**: If all conditions are met, generate the JSON object. Otherwise, generate plain text.
 """
