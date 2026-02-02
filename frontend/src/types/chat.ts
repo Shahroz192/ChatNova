@@ -14,4 +14,5 @@ export interface Message {
   tool_calls?: ToolCall[];
   sources?: { id: number; filename: string }[];
   images?: string[];
+  documents?: { id: number; filename: string; file_type: string }[];
 }

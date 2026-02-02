@@ -11,6 +11,8 @@ describe('ChatInput Component', () => {
         setInput={setInput}
         sendMessage={vi.fn()}
         loading={false}
+        selectedModel="gemini-2.0-flash"
+        onFileUpload={vi.fn()}
       />
     );
 
@@ -25,6 +27,8 @@ describe('ChatInput Component', () => {
         setInput={setInput}
         sendMessage={vi.fn()}
         loading={false}
+        selectedModel="gemini-2.0-flash"
+        onFileUpload={vi.fn()}
       />
     );
 
@@ -42,6 +46,8 @@ describe('ChatInput Component', () => {
         setInput={vi.fn()}
         sendMessage={sendMessage}
         loading={false}
+        selectedModel="gemini-2.0-flash"
+        onFileUpload={vi.fn()}
       />
     );
 
@@ -59,6 +65,8 @@ describe('ChatInput Component', () => {
         setInput={vi.fn()}
         sendMessage={sendMessage}
         loading={false}
+        selectedModel="gemini-2.0-flash"
+        onFileUpload={vi.fn()}
       />
     );
 
@@ -76,6 +84,8 @@ describe('ChatInput Component', () => {
         setInput={vi.fn()}
         sendMessage={sendMessage}
         loading={false}
+        selectedModel="gemini-2.0-flash"
+        onFileUpload={vi.fn()}
       />
     );
 
@@ -95,6 +105,8 @@ describe('ChatInput Component', () => {
         loading={false}
         searchOptions={{ search_web: false }}
         onSearchOptionsChange={onSearchOptionsChange}
+        selectedModel="gemini-2.0-flash"
+        onFileUpload={vi.fn()}
       />
     );
 
@@ -111,6 +123,8 @@ describe('ChatInput Component', () => {
         setInput={vi.fn()}
         sendMessage={vi.fn()}
         loading={true}
+        selectedModel="gemini-2.0-flash"
+        onFileUpload={vi.fn()}
       />
     );
 

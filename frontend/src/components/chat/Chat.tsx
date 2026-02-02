@@ -1,22 +1,12 @@
-import React, { useState, useEffect, useRef } from "react";
-import {
-    Button,
-    Card,
-    ListGroup,
-} from "react-bootstrap";
-import {
-    User,
-} from "lucide-react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { ListGroup } from "react-bootstrap";
 import api, { streamChat } from "../../utils/api";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "../../contexts/ToastContext";
 import TypingIndicator from "./TypingIndicator";
-import Timestamp from "./Timestamp";
-import MessageStatus from "./MessageStatus";
-import MarkdownRenderer from "./MarkdownRenderer";
 import ChatInput from "./ChatInput";
 import ChatSidebar from "./ChatSidebar";
-import MessageContextMenu from "./MessageContextMenu";
+import ChatMessageItem from "./ChatMessageItem";
 import type { Message } from "../../types/chat";
 import type { WebSearchOptions } from "../../types/search";
 import "../../styles/ChatVariables.css";
@@ -25,9 +15,6 @@ import "../../styles/ChatSidebar.css";
 import "../../styles/ChatMessages.css";
 import "../../styles/ChatInput.css";
 import "../../styles/ChatUtils.css";
-import GenerativeUIRenderer from "./GenerativeUIRenderer";
-import SourceList from "./SourceList";
-import type { UIContainer } from "../../types/generative-ui";
 
 interface ChatProps { }
 
@@ -44,9 +31,6 @@ const Chat: React.FC<ChatProps> = () => {
         const saved = localStorage.getItem("useTools");
         return saved === "true";
     });
-    const [selectedMessageId, setSelectedMessageId] = useState<number | null>(
-        null,
-    );
     const [currentSessionId, setCurrentSessionId] = useState<number | null>(
         null,
     );
@@ -61,21 +45,11 @@ const Chat: React.FC<ChatProps> = () => {
         null,
     );
     const [streamingResponse, setStreamingResponse] = useState("");
+    const [pendingDocumentIds, setPendingDocumentIds] = useState<number[]>([]);
 
     const streamingResponseRef = useRef("");
     const [streamingAbortController, setStreamingAbortController] =
         useState<AbortController | null>(null);
-
-    const cancelStreaming = () => {
-        if (streamingAbortController) {
-            streamingAbortController.abort();
-        }
-        setIsStreaming(false);
-        setStreamingMessageId(null);
-        setStreamingResponse("");
-        setStreamingAbortController(null);
-        streamingResponseRef.current = "";
-    };
 
     const [searchOptions, setSearchOptions] = useState<WebSearchOptions>(() => {
         const saved = localStorage.getItem("searchOptions");
@@ -99,175 +73,66 @@ const Chat: React.FC<ChatProps> = () => {
         return saved ? JSON.parse(saved) : [];
     });
     const [searchSuggestions] = useState<string[]>([]);
-
     const [activeContextMenu, setActiveContextMenu] = useState<{ id: number, type: 'user' | 'assistant' } | null>(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
+    // Use a ref to store the latest input for sendMessage to avoid re-creating it on every keystroke
+    const inputRef = useRef(input);
     useEffect(() => {
-        // Initial data loading
-    }, []);
+        inputRef.current = input;
+    }, [input]);
 
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (
-                isDropdownOpen &&
-                !(event.target as Element).closest(".custom-dropdown")
-            ) {
-                setIsDropdownOpen(false);
-            }
-        };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () =>
-            document.removeEventListener("mousedown", handleClickOutside);
-    }, [isDropdownOpen]);
-
-
-    const handleSearchOptionsChange = (newOptions: WebSearchOptions) => {
-        setSearchOptions(newOptions);
-    };
-
-    const handleSuggestionSelect = (suggestion: string) => {
-        setInput(suggestion);
-    };
-
-    const handleRecentSearchSelect = (query: string) => {
-        setInput(query);
-        setRecentSearches(prev => {
-            const filtered = prev.filter(q => q !== query);
-            return [query, ...filtered].slice(0, 10); 
-        });
-    };
-
-    const handleCopyMessage = (message: Message) => {
-        const textToCopy = message.response || message.content;
-        copyToClipboard(textToCopy);
-        setActiveContextMenu(null);
-    };
-
-    const handleRegenerateResponse = (message: Message) => {
-        setInput(message.content);
-        setSelectedMessageId(null);
-        setActiveContextMenu(null);
-        sendMessage();
-    };
-
-    const handleEditMessage = (message: Message) => {
-        setInput(message.content);
-        setSelectedMessageId(null);
-        setActiveContextMenu(null);
-    };
-
-
-    const handleDeleteMessage = async (messageId: number) => {
-        try {
-            await api.delete(`/chat/history/${messageId}`);
-            setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
-            setActiveContextMenu(null);
-        } catch (error) {
-            showError("Delete Error", "Failed to delete message");
+    const cancelStreaming = useCallback(() => {
+        if (streamingAbortController) {
+            streamingAbortController.abort();
         }
-    };
+        setIsStreaming(false);
+        setStreamingMessageId(null);
+        setStreamingResponse("");
+        setStreamingAbortController(null);
+        streamingResponseRef.current = "";
+    }, [streamingAbortController]);
 
-    useEffect(() => {
-        const handleClickOutside = () => {
-            setActiveContextMenu(null);
-        };
-
-        document.addEventListener("click", handleClickOutside);
-        return () => document.removeEventListener("click", handleClickOutside);
-    }, []);
-
-    useEffect(() => {
-        const init = async () => {
-            await loadModels();
-        };
-        init();
-    }, []);
-
-    useEffect(() => {
-        const handleSessionFromUrl = async () => {
-            if (sessionIdFromUrl) {
-                const sessionId = parseInt(sessionIdFromUrl);
-                if (!isNaN(sessionId) && sessionId !== currentSessionId) {
-                    const success = await loadSessionById(sessionId);
-                    if (!success) {
-                        showError(
-                            "Session Error",
-                            `Session ${sessionId} not found or access denied.`,
-                        );
-                        // Clear the invalid session parameter - don't auto-create session
-                        navigate("/chat", { replace: true });
-                    }
+    const loadModels = useCallback(async () => {
+        try {
+            // Fetch both models and active API keys to filter the list
+            const [modelsRes, keysRes] = await Promise.all([
+                api.get("/chat/models"),
+                api.get("/users/me/api-keys")
+            ]);
+            
+            const availableModels = modelsRes.data.models;
+            const activeProviders = keysRes.data.map((k: any) => k.model_name.toLowerCase());
+            
+            // Filter models: only show if the provider has an API key
+            const filteredModels = availableModels.filter((model: string) => {
+                const lowerModel = model.toLowerCase();
+                // Google/Gemini
+                if (lowerModel.includes('gemini') || lowerModel.includes('google')) {
+                    return activeProviders.includes('google');
                 }
-            }
-        };
-        const timer = setTimeout(handleSessionFromUrl, 100);
-        return () => clearTimeout(timer);
-    }, [sessionIdFromUrl, currentSessionId, navigate, showError]);
+                // Cerebras (Qwen models on Cerebras)
+                if (lowerModel.includes('qwen') || lowerModel.includes('cerebras')) {
+                    return activeProviders.includes('cerebras');
+                }
+                // Groq (Kimi and other models on Groq)
+                if (lowerModel.includes('groq') || lowerModel.includes('llama') || lowerModel.includes('mixtral') || lowerModel.includes('kimi')) {
+                    return activeProviders.includes('groq');
+                }
+                return true; // Default to showing other models if any
+            });
 
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, streamingResponse]);
-
-    const loadHistory = async (sessionId: number) => {
-        try {
-            const response = await api.get(
-                `/chat/history?session_id=${sessionId}&newest_first=false`,
-            );
-            setMessages(response.data.data);
-        } catch (error) {
-            showError("Loading Error", "Failed to load chat history.");
-            console.error("Failed to load history", error);
-        }
-    };
-
-    const loadSessionById = async (sessionId: number) => {
-        try {
-            const response = await api.get(`/sessions/${sessionId}`);
-            if (response.data) {
-                setCurrentSessionId(sessionId);
-                await loadHistory(sessionId);
-                return true;
-            }
-        } catch (error) {
-            console.error("Failed to load session", error);
-            return false;
-        }
-        return false;
-    };
-
-    useEffect(() => {
-        localStorage.setItem("selectedModel", selectedModel);
-    }, [selectedModel]);
-
-    useEffect(() => {
-        localStorage.setItem("useTools", useTools.toString());
-    }, [useTools]);
-
-    useEffect(() => {
-        localStorage.setItem("searchOptions", JSON.stringify(searchOptions));
-    }, [searchOptions]);
-
-    useEffect(() => {
-        localStorage.setItem("recentSearches", JSON.stringify(recentSearches));
-    }, [recentSearches]);
-
-    const loadModels = async () => {
-        try {
-            const response = await api.get("/chat/models");
-            const availableModels = response.data.models;
-            setModels(availableModels);
-            if (availableModels.length > 0 && !availableModels.includes(selectedModel)) {
-                setSelectedModel(availableModels[0]);
+            setModels(filteredModels);
+            if (filteredModels.length > 0 && !filteredModels.includes(selectedModel)) {
+                setSelectedModel(filteredModels[0]);
             }
         } catch (error) {
             showError("Loading Error", "Failed to load AI models.");
             console.error("Failed to load models", error);
         }
-    };
+    }, [selectedModel, showError]);
 
-    const createSession = async (title: string = "New Chat") => {
+    const createSession = useCallback(async (title: string = "New Chat") => {
         try {
             const response = await api.post("/sessions", {
                 title,
@@ -282,19 +147,34 @@ const Chat: React.FC<ChatProps> = () => {
             console.error("Failed to create session", error);
             throw error;
         }
-    };
+    }, [navigate, showError]);
 
-    const sendMessage = async (images?: string[]) => {
-        if (!input.trim() && (!images || images.length === 0)) return;
+    const copyToClipboard = useCallback(async (text: string) => {
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch (err) {
+            console.error("Failed to copy text: ", err);
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand("copy");
+            document.body.removeChild(textArea);
+        }
+    }, []);
+
+    const sendMessage = useCallback(async (images?: string[], overrideContent?: string) => {
+        const messageContent = overrideContent ?? inputRef.current;
+        if (!messageContent.trim() && (!images || images.length === 0)) return;
         if (isStreaming) return;
 
         setLoading(true);
 
         // Add to recent searches if web search is enabled
-        if (searchOptions.search_web && input.trim()) {
+        if (searchOptions.search_web && messageContent.trim()) {
             setRecentSearches(prev => {
-                const filtered = prev.filter(q => q !== input.trim());
-                return [input.trim(), ...filtered].slice(0, 10);
+                const filtered = prev.filter(q => q !== messageContent.trim());
+                return [messageContent.trim(), ...filtered].slice(0, 10);
             });
         }
 
@@ -308,8 +188,12 @@ const Chat: React.FC<ChatProps> = () => {
                 }
             }
 
-            const messageContent = input;
-            setInput("");
+            if (!overrideContent) {
+                setInput("");
+            }
+
+            const currentDocIds = [...pendingDocumentIds];
+            setPendingDocumentIds([]);
 
             const tempMessage: Message = {
                 id: Date.now(),
@@ -317,7 +201,7 @@ const Chat: React.FC<ChatProps> = () => {
                 response: "",
                 created_at: new Date().toISOString(),
                 status: "sending",
-                // We could also show the attached images in the message bubble if we want
+                images: images,
             };
             setMessages((prev) => [...prev, tempMessage]);
 
@@ -334,7 +218,7 @@ const Chat: React.FC<ChatProps> = () => {
                 messageContent,
                 selectedModel,
                 sessionId,
-                searchOptions,
+                { ...searchOptions, document_ids: currentDocIds } as any,
                 useTools,
                 images,
                 (chunk) => {
@@ -434,31 +318,136 @@ const Chat: React.FC<ChatProps> = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [isStreaming, searchOptions, currentSessionId, selectedModel, useTools, showError, createSession]);
+
+    const handleSearchOptionsChange = useCallback((newOptions: WebSearchOptions) => {
+        setSearchOptions(newOptions);
+    }, []);
+
+    const handleSuggestionSelect = useCallback((suggestion: string) => {
+        setInput(suggestion);
+    }, []);
+
+    const handleRecentSearchSelect = useCallback((query: string) => {
+        setInput(query);
+        setRecentSearches(prev => {
+            const filtered = prev.filter(q => q !== query);
+            return [query, ...filtered].slice(0, 10); 
+        });
+    }, []);
+
+    const handleCopyMessage = useCallback((message: Message) => {
+        const textToCopy = message.response || message.content;
+        copyToClipboard(textToCopy);
+        setActiveContextMenu(null);
+    }, []);
+
+    const handleRegenerateResponse = useCallback((message: Message) => {
+        setActiveContextMenu(null);
+        sendMessage([], message.content);
+    }, [sendMessage]);
+
+    const handleEditMessage = useCallback((message: Message) => {
+        setInput(message.content);
+        setActiveContextMenu(null);
+    }, []);
 
 
-    const handleMessageClick = (messageId: number) => {
-        setSelectedMessageId(
-            selectedMessageId === messageId ? null : messageId,
-        );
-    };
-
-    const copyToClipboard = async (text: string) => {
+    const handleDeleteMessage = useCallback(async (messageId: number) => {
         try {
-            await navigator.clipboard.writeText(text);
-        } catch (err) {
-            console.error("Failed to copy text: ", err);
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand("copy");
-            document.body.removeChild(textArea);
+            await api.delete(`/chat/history/${messageId}`);
+            setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+            setActiveContextMenu(null);
+        } catch (error) {
+            showError("Delete Error", "Failed to delete message");
+        }
+    }, [showError]);
+
+    useEffect(() => {
+        const handleClickOutside = () => {
+            setActiveContextMenu(null);
+        };
+
+        document.addEventListener("click", handleClickOutside);
+        return () => document.removeEventListener("click", handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        const init = async () => {
+            await loadModels();
+        };
+        init();
+    }, []);
+
+    useEffect(() => {
+        const handleSessionFromUrl = async () => {
+            if (sessionIdFromUrl) {
+                const sessionId = parseInt(sessionIdFromUrl);
+                if (!isNaN(sessionId) && sessionId !== currentSessionId) {
+                    const success = await loadSessionById(sessionId);
+                    if (!success) {
+                        showError(
+                            "Session Error",
+                            `Session ${sessionId} not found or access denied.`,
+                        );
+                        // Clear the invalid session parameter - don't auto-create session
+                        navigate("/chat", { replace: true });
+                    }
+                }
+            }
+        };
+        const timer = setTimeout(handleSessionFromUrl, 100);
+        return () => clearTimeout(timer);
+    }, [sessionIdFromUrl, currentSessionId, navigate, showError]);
+
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages, streamingResponse]);
+
+    const loadHistory = async (sessionId: number) => {
+        try {
+            const response = await api.get(
+                `/chat/history?session_id=${sessionId}&newest_first=false`,
+            );
+            setMessages(response.data.data);
+        } catch (error) {
+            showError("Loading Error", "Failed to load chat history.");
+            console.error("Failed to load history", error);
         }
     };
 
+    const loadSessionById = async (sessionId: number) => {
+        try {
+            const response = await api.get(`/sessions/${sessionId}`);
+            if (response.data) {
+                setCurrentSessionId(sessionId);
+                await loadHistory(sessionId);
+                return true;
+            }
+        } catch (error) {
+            console.error("Failed to load session", error);
+            return false;
+        }
+        return false;
+    };
 
-    const handleFileUpload = async (file: File) => {
+    useEffect(() => {
+        localStorage.setItem("selectedModel", selectedModel);
+    }, [selectedModel]);
+
+    useEffect(() => {
+        localStorage.setItem("useTools", useTools.toString());
+    }, [useTools]);
+
+    useEffect(() => {
+        localStorage.setItem("searchOptions", JSON.stringify(searchOptions));
+    }, [searchOptions]);
+
+    useEffect(() => {
+        localStorage.setItem("recentSearches", JSON.stringify(recentSearches));
+    }, [recentSearches]);
+
+    const handleFileUpload = useCallback(async (file: File) => {
         try {
             let sessionId = currentSessionId;
             if (!sessionId) {
@@ -467,13 +456,16 @@ const Chat: React.FC<ChatProps> = () => {
             
             if (sessionId) {
                 const { uploadFile } = await import("../../utils/api");
-                await uploadFile(file, sessionId);
+                const docRecord = await uploadFile(file, sessionId);
+                if (docRecord && docRecord.id) {
+                    setPendingDocumentIds(prev => [...prev, docRecord.id]);
+                }
             }
         } catch (error) {
             console.error("Upload Error", error);
             showError("Upload Error", "Failed to upload file");
         }
-    };
+    }, [currentSessionId, showError, createSession]);
 
 
     return (
@@ -491,219 +483,39 @@ const Chat: React.FC<ChatProps> = () => {
             />
 
             <div className="chat-main-content">
-                {messages.length === 0 && (
+                {messages.length === 0 ? (
                     <div className="welcome-overlay">
                         <h2 className="h3 fw-bold welcome-title">
                             Chat Smarter,
                             Innovate Faster
                         </h2>
                     </div>
-                )}
+                ) : null}
                 <div className="chat-messages-area">
                     <div className="p-4">
                         <ListGroup variant="flush">
-                            {messages.map((msg) => {
-
-                                let uiData: UIContainer | null = null;
-                                if (msg.response) {
-                                    try {
-                                        let jsonString = msg.response.trim();
-
-                                        const jsonBlockMatch = jsonString.match(/```json\n([\s\S]*?)\n```/);
-                                        if (jsonBlockMatch) {
-                                            jsonString = jsonBlockMatch[1];
-                                        } else {
-                                            const firstOpenBrace = jsonString.indexOf('{');
-                                            const lastCloseBrace = jsonString.lastIndexOf('}');
-                                            if (firstOpenBrace !== -1 && lastCloseBrace !== -1 && lastCloseBrace > firstOpenBrace) {
-                                                jsonString = jsonString.substring(firstOpenBrace, lastCloseBrace + 1);
-                                            }
-                                        }
-
-                                        const parsed = JSON.parse(jsonString);
-                                        if (parsed.type === 'container' && Array.isArray(parsed.children)) {
-                                            uiData = parsed;
-                                        }
-                                    } catch (e) {
-                                    }
-                                }
-
-                                const responseText = msg.id === streamingMessageId && isStreaming ? streamingResponse : (msg.response || "");
-                                const sourcesMatch = responseText.match(/\n\nSources:\n([\s\S]*)$/);
-                                const displayResponse = sourcesMatch ? responseText.substring(0, sourcesMatch.index) : responseText;
-                                const sources = sourcesMatch ? sourcesMatch[1].trim().split('\n').map(line => {
-                                    const m = line.match(/^\[(\d+)\] (.*)$/);
-                                    return m ? { id: parseInt(m[1]), filename: m[2] } : null;
-                                }).filter((s): s is { id: number; filename: string } => s !== null) : [];
-
-                                return (
-                                    <ListGroup.Item
-                                        key={msg.id}
-                                        className="border-0 message-item"
-                                    >
-                                        <div className="d-flex justify-content-end mb-2">
-                                            <div className="d-flex flex-column align-items-end position-relative">
-                                                <Card
-                                                    body
-                                                    className="message-bubble-user"
-                                                    style={{
-                                                        width: "fit-content",
-                                                        maxWidth:
-                                                            "95%",
-                                                    }}
-                                                    onClick={() =>
-                                                        handleMessageClick(
-                                                            msg.id,
-                                                        )
-                                                    }
-                                                    onContextMenu={(e) => {
-                                                        e.preventDefault();
-                                                        setActiveContextMenu({ id: msg.id, type: 'user' });
-                                                    }}
-                                                    onDoubleClick={(e) => {
-                                                        e.preventDefault();
-                                                        setActiveContextMenu({ id: msg.id, type: 'user' });
-                                                    }}
-                                                >
-                                                    <div className="d-flex align-items-center">
-                                                        <User className="me-2" />
-                                                        {msg.content}
-                                                    </div>
-                                                </Card>
-                                                {activeContextMenu?.id === msg.id && activeContextMenu?.type === 'user' && (
-                                                    <MessageContextMenu
-                                                        message={msg}
-                                                        isActive={true}
-                                                        onClose={() => setActiveContextMenu(null)}
-                                                        handleCopyMessage={handleCopyMessage}
-                                                        handleRegenerateResponse={handleRegenerateResponse}
-                                                        handleEditMessage={handleEditMessage}
-                                                        handleDeleteMessage={handleDeleteMessage}
-                                                        messageType="user"
-                                                    />
-                                                )}
-                                                <div className="d-flex align-items-center mt-1 me-2 gap-2">
-                                                    <Timestamp
-                                                        dateString={
-                                                            msg.created_at
-                                                        }
-                                                    />
-                                                    <MessageStatus
-                                                        status={
-                                                            msg.status ||
-                                                            "sent"
-                                                        }
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="d-flex justify-content-start">
-                                            <div
-                                                className="d-flex flex-column align-items-start position-relative"
-                                                style={{
-                                                    maxWidth:
-                                                        "100%",
-                                                }}
-                                            >
-                                                <div
-                                                    className="message-content-assistant"
-                                                    onClick={() =>
-                                                        handleMessageClick(
-                                                            msg.id,
-                                                        )
-                                                    }
-                                                    onContextMenu={(e) => {
-                                                        e.preventDefault();
-                                                        setActiveContextMenu({ id: msg.id, type: 'assistant' });
-                                                    }}
-                                                    onDoubleClick={(e) => {
-                                                        e.preventDefault();
-                                                        setActiveContextMenu({ id: msg.id, type: 'assistant' });
-                                                    }}
-                                                >
-                                                    <div className="d-flex w-100">
-                                                        <div style={{ flex: 1 }}>
-                                                            {msg.tool_calls && msg.tool_calls.length > 0 && (
-                                                                <div className="tool-calls mb-3">
-                                                                    {msg.tool_calls.map((tool, idx) => (
-                                                                        <div key={idx} className="tool-call-item text-muted small mb-1">
-                                                                            <span className="fw-bold">🛠️ {tool.tool}</span>
-                                                                            {tool.status === 'running' && <span className="ms-2 spinner-border spinner-border-sm" role="status" />}
-                                                                            {tool.status === 'completed' && <span className="ms-2 text-success">✓</span>}
-                                                                            <div className="tool-input ps-3 text-truncate" style={{maxWidth: '300px', opacity: 0.8}}>Input: {tool.input}</div>
-                                                                            {tool.output && <div className="tool-output ps-3 text-truncate" style={{maxWidth: '300px', opacity: 0.8}}>Output: {tool.output}</div>}
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-                                                            
-                                                            {msg.id === streamingMessageId && isStreaming ? (
-                                                                <div className="streaming-response">
-                                                                    <MarkdownRenderer content={displayResponse + " ▋"} />
-                                                                </div>
-                                                            ) : (
-                                                                <div className="flex-grow-1 w-100">
-                                                                    {uiData ? (
-                                                                        <div className="generative-ui-container mt-2 mb-2 w-100">
-                                                                            <GenerativeUIRenderer data={uiData} />
-                                                                        </div>
-                                                                    ) : (
-                                                                        <MarkdownRenderer
-                                                                            content={displayResponse}
-                                                                        />
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                            <SourceList sources={sources} />
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                {activeContextMenu?.id === msg.id && activeContextMenu?.type === 'assistant' && (
-                                                    <MessageContextMenu
-                                                        message={msg}
-                                                        isActive={true}
-                                                        onClose={() => setActiveContextMenu(null)}
-                                                        handleCopyMessage={handleCopyMessage}
-                                                        handleRegenerateResponse={handleRegenerateResponse}
-                                                        handleEditMessage={handleEditMessage}
-                                                        handleDeleteMessage={handleDeleteMessage}
-                                                        messageType="assistant"
-                                                    />
-                                                )}
-                                                <div className="d-flex align-items-center justify-content-between mt-1 ms-2">
-                                                    <Timestamp
-                                                        dateString={
-                                                            msg.created_at
-                                                        }
-                                                        className="me-2"
-                                                    />
-                                                    {msg.id ===
-                                                        streamingMessageId &&
-                                                        isStreaming && (
-                                                            <Button
-                                                                variant="outline-danger"
-                                                                size="sm"
-                                                                onClick={
-                                                                    cancelStreaming
-                                                                }
-                                                                className="cancel-streaming-btn"
-                                                                title="Cancel streaming"
-                                                            >
-                                                                ✕
-                                                            </Button>
-                                                        )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </ListGroup.Item>
-                                );
-                            })}
+                            {messages.map((msg) => (
+                                <ChatMessageItem
+                                    key={msg.id}
+                                    msg={msg}
+                                    streamingMessageId={streamingMessageId}
+                                    isStreaming={isStreaming}
+                                    streamingResponse={msg.id === streamingMessageId ? streamingResponse : ""}
+                                    activeContextMenu={activeContextMenu}
+                                    setActiveContextMenu={setActiveContextMenu}
+                                    handleCopyMessage={handleCopyMessage}
+                                    handleRegenerateResponse={handleRegenerateResponse}
+                                    handleEditMessage={handleEditMessage}
+                                    handleDeleteMessage={handleDeleteMessage}
+                                    cancelStreaming={cancelStreaming}
+                                />
+                            ))}
                         </ListGroup>
-                        {loading && !streamingResponse && (
+                        {loading && !streamingResponse ? (
                             <TypingIndicator
                                 modelName={selectedModel}
                             />
-                        )}
+                        ) : null}
                         <div ref={messagesEndRef} />
                     </div>
                 </div>

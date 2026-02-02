@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Send,
   Search,
@@ -8,7 +8,6 @@ import {
   Mic,
   Square,
   Paperclip,
-  Image as ImageIcon,
   X,
   FileText
 } from 'lucide-react';
@@ -53,13 +52,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [pendingDocs, setPendingDocs] = useState<{name: string}[]>([]);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const suggestionsRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const isGemini = selectedModel.toLowerCase().includes('gemini');
+  const isGemini = useMemo(() => selectedModel.toLowerCase().includes('gemini'), [selectedModel]);
 
   useEffect(() => {
     return () => {
@@ -74,36 +72,36 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }
   }, [input]);
 
-  const formatTime = (seconds: number) => {
+  const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+  }, []);
 
-  const handleWebSearchToggle = () => {
+  const handleWebSearchToggle = useCallback(() => {
     if (onSearchOptionsChange) {
       onSearchOptionsChange({
         ...searchOptions,
         search_web: !searchOptions.search_web
       });
     }
-  };
+  }, [onSearchOptionsChange, searchOptions]);
 
-  const handleSuggestionClick = (suggestion: string) => {
+  const handleSuggestionClick = useCallback((suggestion: string) => {
     if (onSuggestionSelect) {
       onSuggestionSelect(suggestion);
     }
     setShowSuggestions(false);
-  };
+  }, [onSuggestionSelect]);
 
-  const handleRecentSearchClick = (query: string) => {
+  const handleRecentSearchClick = useCallback((query: string) => {
     if (onRecentSearchSelect) {
       onRecentSearchSelect(query);
     }
     setShowSuggestions(false);
-  };
+  }, [onRecentSearchSelect]);
 
-  const toggleRecording = async () => {
+  const toggleRecording = useCallback(async () => {
     if (recordingState === 'idle') {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -144,13 +142,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
       if (timerRef.current) clearInterval(timerRef.current);
       mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
     }
-  };
+  }, [recordingState, setInput]);
 
-  const handleFileClick = () => {
+  const handleFileClick = useCallback(() => {
     fileInputRef.current?.click();
-  };
+  }, []);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -179,27 +177,51 @@ const ChatInput: React.FC<ChatInputProps> = ({
     
     // Reset input
     if (fileInputRef.current) fileInputRef.current.value = '';
-  };
+  }, [isGemini, onFileUpload]);
 
-  const removeImage = (index: number) => {
+  const removeImage = useCallback((index: number) => {
     setPendingImages(prev => prev.filter((_, i) => i !== index));
-  };
+  }, []);
 
-  const removeDoc = (index: number) => {
+  const removeDoc = useCallback((index: number) => {
     setPendingDocs(prev => prev.filter((_, i) => i !== index));
-  };
+  }, []);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = useCallback(() => {
     const images = pendingImages.map(img => img.data);
     sendMessage(images);
     setPendingImages([]);
     setPendingDocs([]);
-  };
+  }, [pendingImages, sendMessage]);
+
+  const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setInput(value);
+    setShowSuggestions(value.length > 0);
+  }, [setInput]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+    if (e.key === 'Escape') {
+      setShowSuggestions(false);
+    }
+  }, [handleSendMessage]);
+
+  const handleFocus = useCallback(() => {
+    setShowSuggestions(true);
+  }, []);
+
+  const handleBlur = useCallback(() => {
+    setTimeout(() => setShowSuggestions(false), 200);
+  }, []);
 
   return (
     <div className="chat-input-wrapper">
       {/* Attachment Preview */}
-      {(pendingImages.length > 0 || pendingDocs.length > 0) && (
+      {(pendingImages.length > 0 || pendingDocs.length > 0) ? (
         <div className="attachment-preview-container">
           {pendingImages.map((img, index) => (
             <div key={`img-${index}`} className="attachment-preview-item">
@@ -219,26 +241,24 @@ const ChatInput: React.FC<ChatInputProps> = ({
             </div>
           ))}
         </div>
-      )}
+      ) : null}
 
-      {recordingState !== 'idle' && (
+      {recordingState !== 'idle' ? (
         <div className="recording-indicator">
           <div className="recording-pulse"></div>
           <span className="recording-text">
             {recordingState === 'processing' ? 'Transcribing...' : `Recording ${formatTime(recordingTime)}`}
           </span>
         </div>
-      )}
+      ) : null}
       
       <div className="chat-input-container-modern">
-        {/* ... Suggestions dropdown remains the same ... */}
-        {showSuggestions && (searchSuggestions.length > 0 || recentSearches.length > 0) && (
+        {showSuggestions && (searchSuggestions.length > 0 || recentSearches.length > 0) ? (
           <div
-            ref={suggestionsRef}
             className="search-suggestions-container"
           >
             {/* Search suggestions */}
-            {searchSuggestions.length > 0 && (
+            {searchSuggestions.length > 0 ? (
               <div className="suggestions-group">
                 <div className="suggestions-group-label">Suggestions</div>
                 {searchSuggestions.map((suggestion, index) => (
@@ -252,10 +272,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   </button>
                 ))}
               </div>
-            )}
+            ) : null}
 
             {/* Recent searches */}
-            {recentSearches.length > 0 && (
+            {recentSearches.length > 0 ? (
               <div className="suggestions-group">
                 <div className="suggestions-group-label">Recent Searches</div>
                 {recentSearches.slice(0, 5).map((query, index) => (
@@ -269,9 +289,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   </button>
                 ))}
               </div>
-            )}
+            ) : null}
           </div>
-        )}
+        ) : null}
 
         {/* Unified Input Area */}
         <div className={`modern-input-box ${searchOptions.search_web ? 'search-mode' : ''} ${recordingState === 'recording' ? 'recording-active' : ''}`}>
@@ -323,25 +343,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
             className="modern-textarea"
             rows={1}
             value={input}
-            onChange={(e) => {
-              setInput(e.target.value);
-              setShowSuggestions(e.target.value.length > 0);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage();
-              }
-              if (e.key === 'Escape') {
-                setShowSuggestions(false);
-              }
-            }}
-            onFocus={() => {
-              setShowSuggestions(true);
-            }}
-            onBlur={() => {
-              setTimeout(() => setShowSuggestions(false), 200);
-            }}
+            onChange={handleTextareaChange}
+            onKeyDown={handleKeyDown}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
             placeholder={recordingState === 'processing' ? 'Transcribing...' : 'Ask anything...'}
             disabled={recordingState === 'processing'}
           />
@@ -367,4 +372,4 @@ const ChatInput: React.FC<ChatInputProps> = ({
   );
 };
 
-export default ChatInput;
+export default React.memo(ChatInput);

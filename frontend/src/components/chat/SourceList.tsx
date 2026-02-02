@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, ExternalLink } from 'lucide-react';
+import { FileText } from 'lucide-react';
 
 interface Source {
   id: number;
