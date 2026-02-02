@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import api from "../../utils/api";
 import Notification from "../common/Notification";
 import "../../styles/BYOKForm.css";
@@ -12,30 +12,30 @@ const BYOKForm: React.FC = () => {
     message: string;
   } | null>(null);
 
-  const providers = [
+  const providers = useMemo(() => [
     "Google",
     "Cerebras",
     "Groq",
-  ];
+  ], []);
 
-  useEffect(() => {
-    fetchAvailableProviders();
-  }, []);
-
-  const fetchAvailableProviders = async () => {
+  const fetchAvailableProviders = useCallback(async () => {
     try {
       const response = await api.get("/users/me/api-keys");
       setAvailableProviders(response.data.map((key: { model_name: string }) => key.model_name));
     } catch (error) {
       console.error("Failed to fetch saved API keys", error);
     }
-  };
+  }, []);
 
-  const handleKeyChange = (provider: string, key: string) => {
+  useEffect(() => {
+    fetchAvailableProviders();
+  }, [fetchAvailableProviders]);
+
+  const handleKeyChange = useCallback((provider: string, key: string) => {
     setApiKeys((prev) => ({ ...prev, [provider]: key }));
-  };
+  }, []);
 
-  const handleTestKey = async (provider: string) => {
+  const handleTestKey = useCallback(async (provider: string) => {
     const key = apiKeys[provider];
     if (!key) return;
     setIsTesting((prev) => ({ ...prev, [provider]: true }));
@@ -56,9 +56,9 @@ const BYOKForm: React.FC = () => {
     } finally {
       setIsTesting((prev) => ({ ...prev, [provider]: false }));
     }
-  };
+  }, [apiKeys]);
 
-  const handleSaveKey = async (provider: string) => {
+  const handleSaveKey = useCallback(async (provider: string) => {
     const key = apiKeys[provider];
     if (!key) return;
     try {
@@ -78,9 +78,9 @@ const BYOKForm: React.FC = () => {
         message: `Failed to save key for ${provider}. Please try again.`,
       });
     }
-  };
+  }, [apiKeys, fetchAvailableProviders]);
 
-  const handleDeleteKey = async (provider: string) => {
+  const handleDeleteKey = useCallback(async (provider: string) => {
     if (!window.confirm(`Are you sure you want to delete the ${provider} API key?`)) {
       return;
     }
@@ -97,7 +97,9 @@ const BYOKForm: React.FC = () => {
         message: `Failed to delete key for ${provider}. Please try again.`,
       });
     }
-  };
+  }, [fetchAvailableProviders]);
+
+  const handleCloseNotification = useCallback(() => setNotification(null), []);
 
   return (
     <div className="byok-form space-y-4">
@@ -138,17 +140,17 @@ const BYOKForm: React.FC = () => {
                     >
                       {provider}
                     </span>
-                    {availableProviders.includes(provider) && (
+                    {availableProviders.includes(provider) ? (
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium byok-badge-active">
                         Active
                       </span>
-                    )}
+                    ) : null}
                   </div>
-                  {!availableProviders.includes(provider) && (
+                  {!availableProviders.includes(provider) ? (
                     <span className="text-xs byok-model-required block mt-1">
                       Key required
                     </span>
-                  )}
+                  ) : null}
                 </td>
                 <td className="py-3 px-4">
                   <input
@@ -204,15 +206,15 @@ const BYOKForm: React.FC = () => {
         </table>
       </div>
 
-      {notification && (
+      {notification ? (
         <Notification
           type={notification.type}
           message={notification.message}
-          onClose={() => setNotification(null)}
+          onClose={handleCloseNotification}
         />
-      )}
+      ) : null}
     </div>
   );
 };
 
-export default BYOKForm;
+export default React.memo(BYOKForm);

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { Form, Button, Container, Row, Col } from "react-bootstrap";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../../utils/api";
@@ -11,7 +11,7 @@ const Register: React.FC = () => {
     const [error, setError] = useState("");
     const navigate = useNavigate();
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
         try {
@@ -23,7 +23,7 @@ const Register: React.FC = () => {
         } catch (err) {
             setError("Failed to create an account");
         }
-    };
+    }, [email, password, navigate]);
 
     return (
         <Container fluid
@@ -40,7 +40,7 @@ const Register: React.FC = () => {
                             <h2 className="register-title">Join ChatNova</h2>
                             <p className="register-subtitle">Create your account to get started</p>
                         </div>
-                        {error && <div className="register-error">{error}</div>}
+                        {error ? <div className="register-error">{error}</div> : null}
                         <Form onSubmit={handleSubmit} className="register-form">
                             <Form.Group id="email">
                                 <Form.Label className="register-label">Email</Form.Label>

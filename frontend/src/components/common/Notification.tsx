@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { CheckCircle, XCircle, X } from 'lucide-react';
 
 interface NotificationProps {
@@ -7,30 +7,35 @@ interface NotificationProps {
   onClose: () => void;
 }
 
-const Notification: React.FC<NotificationProps> = ({ type, message, onClose }) => {
+const Notification: React.FC<NotificationProps> = React.memo(({ type, message, onClose }) => {
   const [isVisible, setIsVisible] = useState(false);
+
+  const handleClose = useCallback(() => {
+    setIsVisible(false);
+    setTimeout(onClose, 300);
+  }, [onClose]);
 
   useEffect(() => {
     // Trigger animation on mount
-    setTimeout(() => setIsVisible(true), 10);
+    const entryTimer = setTimeout(() => setIsVisible(true), 10);
     
-    const timer = setTimeout(() => {
-      setIsVisible(false);
-      setTimeout(onClose, 300); // Wait for fade out animation
-    }, 5000);
+    const autoCloseTimer = setTimeout(handleClose, 5000);
     
-    return () => clearTimeout(timer);
-  }, [onClose]);
+    return () => {
+      clearTimeout(entryTimer);
+      clearTimeout(autoCloseTimer);
+    };
+  }, [handleClose]);
 
-  const bgColor = type === 'success' 
+  const bgColor = useMemo(() => type === 'success' 
     ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
-    : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800';
+    : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800', [type]);
   
-  const textColor = type === 'success'
+  const textColor = useMemo(() => type === 'success'
     ? 'text-green-800 dark:text-green-300'
-    : 'text-red-800 dark:text-red-300';
+    : 'text-red-800 dark:text-red-300', [type]);
 
-  const Icon = type === 'success' ? CheckCircle : XCircle;
+  const Icon = useMemo(() => type === 'success' ? CheckCircle : XCircle, [type]);
 
   return (
     <div 
@@ -43,10 +48,7 @@ const Notification: React.FC<NotificationProps> = ({ type, message, onClose }) =
         <Icon size={20} className="flex-shrink-0 mt-0.5" />
         <span className="flex-1 text-sm font-medium">{message}</span>
         <button 
-          onClick={() => {
-            setIsVisible(false);
-            setTimeout(onClose, 300);
-          }}
+          onClick={handleClose}
           className="flex-shrink-0 hover:opacity-70 transition-opacity"
           aria-label="Close notification"
         >
@@ -55,6 +57,6 @@ const Notification: React.FC<NotificationProps> = ({ type, message, onClose }) =
       </div>
     </div>
   );
-};
+});
 
 export default Notification;

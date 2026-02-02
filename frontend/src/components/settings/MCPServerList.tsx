@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Edit2, Trash2, Save, X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import api from '../../utils/api';
 import Notification from '../common/Notification';
@@ -21,11 +21,7 @@ const MCPServerList: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [validationError, setValidationError] = useState<string>('');
 
-  useEffect(() => {
-    fetchServers();
-  }, []);
-
-  const fetchServers = async () => {
+  const fetchServers = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await api.get('/users/me/mcp-servers');
@@ -43,9 +39,13 @@ const MCPServerList: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const validateConfig = (config: string): boolean => {
+  useEffect(() => {
+    fetchServers();
+  }, [fetchServers]);
+
+  const validateConfig = useCallback((config: string): boolean => {
     setValidationError('');
     
     if (!config.trim()) {
@@ -71,22 +71,22 @@ const MCPServerList: React.FC = () => {
       setValidationError('Invalid JSON format');
       return false;
     }
-  };
+  }, []);
 
-  const handleEdit = (server: MCPServer) => {
+  const handleEdit = useCallback((server: MCPServer) => {
     setEditingServer(server.id);
     setEditConfig(server.mcp_servers_config);
     setValidationError('');
-  };
+  }, []);
 
-  const handleConfigChange = (value: string) => {
+  const handleConfigChange = useCallback((value: string) => {
     setEditConfig(value);
     if (validationError && value.trim()) {
       validateConfig(value);
     }
-  };
+  }, [validationError, validateConfig]);
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = useCallback(async () => {
     if (!validateConfig(editConfig)) {
       return;
     }
@@ -106,9 +106,9 @@ const MCPServerList: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [editConfig, validateConfig, fetchServers]);
 
-  const handleRemove = async () => {
+  const handleRemove = useCallback(async () => {
     const confirmed = window.confirm('Are you sure you want to remove all MCP servers? This action cannot be undone.');
     if (!confirmed) return;
     
@@ -123,13 +123,15 @@ const MCPServerList: React.FC = () => {
     } finally {
       setIsDeleting(false);
     }
-  };
+  }, [fetchServers]);
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = useCallback(() => {
     setEditingServer(null);
     setEditConfig('');
     setValidationError('');
-  };
+  }, []);
+
+  const handleCloseNotification = useCallback(() => setNotification(null), []);
 
   return (
     <div className="space-y-4">
@@ -167,19 +169,19 @@ const MCPServerList: React.FC = () => {
                   />
                   
                   {/* Validation feedback */}
-                  {validationError && (
+                  {validationError ? (
                     <div className="flex items-center text-error-600 mcp-server-validation-error text-sm">
                       <AlertCircle size={16} className="mr-1.5" />
                       {validationError}
                     </div>
-                  )}
+                  ) : null}
                   
-                  {!validationError && editConfig.trim() && (
+                  {!validationError && editConfig.trim() ? (
                     <div className="flex items-center text-success-600 mcp-server-validation-success text-sm">
                       <CheckCircle size={16} className="mr-1.5" />
                       Valid configuration
                     </div>
-                  )}
+                  ) : null}
                   
                   <div className="flex justify-end space-x-3 pt-2">
                     <button
@@ -225,7 +227,7 @@ const MCPServerList: React.FC = () => {
                         <pre className="mt-4 p-5 bg-gray-50 mcp-server-config-pre border border-gray-200 rounded-lg text-xs overflow-auto max-h-48 font-mono leading-relaxed">{server.mcp_servers_config}</pre>
                       </details>
                       
-                      {server.servers && Object.keys(server.servers).length > 0 && (
+                      {server.servers && Object.keys(server.servers).length > 0 ? (
                         <div className="mt-4 p-3 bg-blue-50 mcp-server-configured-section border border-blue-200 rounded-lg">
                           <p className="text-sm font-semibold text-blue-900 mcp-server-configured-title mb-2">Configured Servers ({Object.keys(server.servers).length})</p>
                           <ul className="space-y-1.5">
@@ -237,7 +239,7 @@ const MCPServerList: React.FC = () => {
                             ))}
                           </ul>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                     
                     <div className="flex flex-col items-end space-y-3 ml-6">
@@ -248,8 +250,8 @@ const MCPServerList: React.FC = () => {
                           ? 'bg-yellow-100 text-yellow-800 mcp-server-status-loading border border-yellow-200' 
                           : 'bg-red-100 text-red-800 mcp-server-status-error border border-red-200'
                       }`}>
-                        {server.status === 'connected' && <CheckCircle size={14} className="mr-1" />}
-                        {server.status === 'error' && <AlertCircle size={14} className="mr-1" />}
+                        {server.status === 'connected' ? <CheckCircle size={14} className="mr-1" /> : null}
+                        {server.status === 'error' ? <AlertCircle size={14} className="mr-1" /> : null}
                         {server.status.charAt(0).toUpperCase() + server.status.slice(1)}
                       </span>
                       
@@ -288,15 +290,15 @@ const MCPServerList: React.FC = () => {
          ))
        )}
       
-      {notification && (
+      {notification ? (
         <Notification
           type={notification.type}
           message={notification.message}
-          onClose={() => setNotification(null)}
+          onClose={handleCloseNotification}
         />
-      )}
+      ) : null}
     </div>
   );
 };
 
-export default MCPServerList;
+export default React.memo(MCPServerList);

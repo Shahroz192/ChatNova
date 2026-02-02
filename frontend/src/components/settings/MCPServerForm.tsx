@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { Plus, Server, CheckCircle, AlertCircle } from "lucide-react";
 import api from "../../utils/api";
 import Notification from "../common/Notification";
@@ -16,7 +16,7 @@ const MCPServerForm: React.FC<MCPServerFormProps> = ({ onServerAdded }) => {
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [validationError, setValidationError] = useState<string>('');
 
-  const validateConfig = (config: string): boolean => {
+  const validateConfig = useCallback((config: string): boolean => {
     setValidationError('');
     
     if (!config.trim()) {
@@ -42,9 +42,9 @@ const MCPServerForm: React.FC<MCPServerFormProps> = ({ onServerAdded }) => {
       setValidationError('Invalid JSON format');
       return false;
     }
-  };
+  }, []);
 
-  const handleAddServer = async () => {
+  const handleAddServer = useCallback(async () => {
     if (!validateConfig(mcpServersConfig)) {
       return;
     }
@@ -65,24 +65,27 @@ const MCPServerForm: React.FC<MCPServerFormProps> = ({ onServerAdded }) => {
     } finally {
       setIsAdding(false);
     }
-  };
+  }, [mcpServersConfig, validateConfig, onServerAdded]);
 
-  const handleConfigChange = (value: string) => {
+  const handleConfigChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
     setMcpServersConfig(value);
     if (validationError && value.trim()) {
       validateConfig(value);
     }
-  };
+  }, [validationError, validateConfig]);
 
-  const handleOpenModal = () => {
+  const handleOpenModal = useCallback(() => {
     setShowModal(true);
     setMcpServersConfig('');
-  };
+  }, []);
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
     setShowModal(false);
     setMcpServersConfig('');
-  };
+  }, []);
+
+  const handleCloseNotification = useCallback(() => setNotification(null), []);
 
   return (
     <div className="mcp-server-form">
@@ -119,7 +122,7 @@ const MCPServerForm: React.FC<MCPServerFormProps> = ({ onServerAdded }) => {
             </label>
             <textarea
               value={mcpServersConfig}
-              onChange={(e) => handleConfigChange(e.target.value)}
+              onChange={handleConfigChange}
               className={`form-control font-mono resize-y min-h-[180px] ${
                 validationError
                   ? 'border-error-500 focus:ring-error-500 focus:border-error-500'
@@ -130,19 +133,19 @@ const MCPServerForm: React.FC<MCPServerFormProps> = ({ onServerAdded }) => {
             />
             
             {/* Validation feedback */}
-            {validationError && (
+            {validationError ? (
               <div className="flex items-center text-error-600 mcp-server-validation-error text-sm">
                 <AlertCircle size={16} className="mr-1.5" />
                 {validationError}
               </div>
-            )}
+            ) : null}
             
-            {!validationError && mcpServersConfig.trim() && (
+            {!validationError && mcpServersConfig.trim() ? (
               <div className="flex items-center text-success-600 mcp-server-validation-success text-sm">
                 <CheckCircle size={16} className="mr-1.5" />
                 Valid configuration
               </div>
-            )}
+            ) : null}
           </div>
 
           {/* Action buttons */}
@@ -178,15 +181,15 @@ const MCPServerForm: React.FC<MCPServerFormProps> = ({ onServerAdded }) => {
         </div>
       </FloatingUI>
       
-      {notification && (
+      {notification ? (
         <Notification
           type={notification.type}
           message={notification.message}
-          onClose={() => setNotification(null)}
+          onClose={handleCloseNotification}
         />
-      )}
+      ) : null}
     </div>
   );
 };
 
-export default MCPServerForm;
+export default React.memo(MCPServerForm);

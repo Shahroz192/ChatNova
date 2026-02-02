@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
     Container,
     Row,
@@ -60,35 +60,58 @@ const HistoryManagement: React.FC = () => {
         new Set(),
     );
 
-    useEffect(() => {
-        loadHistory();
-        loadPinnedSessions();
-    }, [skip, limit, search, searchFilter, dateFilter]);
+    const loadHistory = useCallback(async () => {
+        setLoading(true);
+        setError("");
+        try {
+            const params = new URLSearchParams({
+                skip: skip.toString(),
+                limit: limit.toString(),
+                newest_first: "true",
+            });
+            if (search) params.append("search", search);
+            const response = await api.get(`/sessions?${params}`);
+            setSessions(response.data.data);
+            setMeta(response.data.meta);
+        } catch (error) {
+            setError("Failed to load sessions.");
+            console.error("Failed to load sessions", error);
+        } finally {
+            setLoading(false);
+        }
+    }, [skip, limit, search]);
 
-    const loadPinnedSessions = () => {
+    const loadPinnedSessions = useCallback(() => {
         const saved = localStorage.getItem("pinnedSessions");
         if (saved) {
             setPinnedSessions(new Set(JSON.parse(saved)));
         }
-    };
+    }, []);
 
-    const togglePinSession = (sessionId: number, e: React.MouseEvent) => {
+    useEffect(() => {
+        loadHistory();
+        loadPinnedSessions();
+    }, [loadHistory, loadPinnedSessions]);
+
+    const togglePinSession = useCallback((sessionId: number, e: React.MouseEvent) => {
         e.stopPropagation();
-        const newPinned = new Set(pinnedSessions);
-        if (newPinned.has(sessionId)) {
-            newPinned.delete(sessionId);
-        } else {
-            newPinned.add(sessionId);
-        }
-        setPinnedSessions(newPinned);
-        localStorage.setItem(
-            "pinnedSessions",
-            JSON.stringify(Array.from(newPinned)),
-        );
-    };
+        setPinnedSessions(prev => {
+            const newPinned = new Set(prev);
+            if (newPinned.has(sessionId)) {
+                newPinned.delete(sessionId);
+            } else {
+                newPinned.add(sessionId);
+            }
+            localStorage.setItem(
+                "pinnedSessions",
+                JSON.stringify(Array.from(newPinned)),
+            );
+            return newPinned;
+        });
+    }, []);
 
     // Filter and sort sessions based on search criteria
-    const filteredSessions = sessions
+    const filteredSessions = useMemo(() => sessions
         .filter((session) => {
             // Date filter
             if (dateFilter) {
@@ -117,35 +140,14 @@ const HistoryManagement: React.FC = () => {
             if (aPinned && !bPinned) return -1;
             if (!aPinned && bPinned) return 1;
             return 0;
-        });
+        }), [sessions, dateFilter, search, searchFilter, pinnedSessions]);
 
-    const loadHistory = async () => {
-        setLoading(true);
-        setError("");
-        try {
-            const params = new URLSearchParams({
-                skip: skip.toString(),
-                limit: limit.toString(),
-                newest_first: "true",
-            });
-            if (search) params.append("search", search);
-            const response = await api.get(`/sessions?${params}`);
-            setSessions(response.data.data);
-            setMeta(response.data.meta);
-        } catch (error) {
-            setError("Failed to load sessions.");
-            console.error("Failed to load sessions", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleSearch = () => {
+    const handleSearch = useCallback(() => {
         setSkip(0);
         loadHistory();
-    };
+    }, [loadHistory]);
 
-    const handleDelete = async () => {
+    const handleDelete = useCallback(async () => {
         try {
             await api.delete(
                 `/sessions${deleteBeforeDate ? `?before_date=${deleteBeforeDate}` : ""}`,
@@ -157,9 +159,9 @@ const HistoryManagement: React.FC = () => {
             setError("Failed to delete sessions.");
             console.error("Failed to delete sessions", error);
         }
-    };
+    }, [deleteBeforeDate, loadHistory]);
 
-    const handleStream = async () => {
+    const handleStream = useCallback(async () => {
         setStreaming(true);
         try {
             const params = new URLSearchParams({
@@ -181,13 +183,13 @@ const HistoryManagement: React.FC = () => {
         } finally {
             setStreaming(false);
         }
-    };
+    }, [skip, limit]);
 
-    const handleSessionClick = (sessionId: number) => {
+    const handleSessionClick = useCallback((sessionId: number) => {
         navigate(`/chat?session=${sessionId}`);
-    };
+    }, [navigate]);
 
-    const handleSessionDelete = async (
+    const handleSessionDelete = useCallback(async (
         sessionId: number,
         e: React.MouseEvent,
     ) => {
@@ -206,9 +208,9 @@ const HistoryManagement: React.FC = () => {
                 console.error("Failed to delete session", error);
             }
         }
-    };
+    }, [loadHistory]);
 
-    const exportSession = async (
+    const exportSession = useCallback(async (
         sessionId: number,
         format: "json" | "markdown" | "pdf",
         e: React.MouseEvent,
@@ -253,7 +255,10 @@ const HistoryManagement: React.FC = () => {
             setError("Failed to export session.");
             console.error("Failed to export session", error);
         }
-    };
+    }, []);
+
+    const handleSkipPrev = useCallback(() => setSkip(prev => Math.max(0, prev - limit)), [limit]);
+    const handleSkipNext = useCallback(() => setSkip(prev => prev + limit), [limit]);
 
     return (
         <Container fluid className="vh-100 d-flex flex-column">
@@ -318,7 +323,7 @@ const HistoryManagement: React.FC = () => {
                             </Col>
                         </Row>
                     </div>
-                    {error && <Alert variant="danger">{error}</Alert>}
+                    {error ? <Alert variant="danger">{error}</Alert> : null}
                     <div
                         className="flex-grow-1 mb-4"
                         style={{
@@ -329,131 +334,129 @@ const HistoryManagement: React.FC = () => {
                     >
                         <ListGroup>
                             {filteredSessions.map((session) => (
-                                <>
-                                    <ListGroup.Item
-                                        key={`session-${session.id}`}
-                                        className={`d-flex align-items-center justify-content-between session-list-item ${pinnedSessions.has(session.id) ? "pinned-session" : ""}`}
-                                        onClick={() =>
-                                            handleSessionClick(session.id)
-                                        }
-                                        style={{ cursor: "pointer" }}
-                                    >
-                                        {/* Left side: Title and Metadata */}
-                                        <div className="d-flex align-items-center flex-grow-1">
-                                            <div className="flex-grow-1">
-                                                {loading ? (
+                                <ListGroup.Item
+                                    key={`session-${session.id}`}
+                                    className={`d-flex align-items-center justify-content-between session-list-item ${pinnedSessions.has(session.id) ? "pinned-session" : ""}`}
+                                    onClick={() =>
+                                        handleSessionClick(session.id)
+                                    }
+                                    style={{ cursor: "pointer" }}
+                                >
+                                    {/* Left side: Title and Metadata */}
+                                    <div className="d-flex align-items-center flex-grow-1">
+                                        <div className="flex-grow-1">
+                                            {loading ? (
+                                                <div
+                                                    className="skeleton-text"
+                                                    style={{
+                                                        height: "1.2em",
+                                                        width: "60%",
+                                                        backgroundColor:
+                                                            "#e9ecef",
+                                                        borderRadius: "4px",
+                                                    }}
+                                                />
+                                            ) : (
+                                                <>
                                                     <div
-                                                        className="skeleton-text"
-                                                        style={{
-                                                            height: "1.2em",
-                                                            width: "60%",
-                                                            backgroundColor:
-                                                                "#e9ecef",
-                                                            borderRadius: "4px",
-                                                        }}
-                                                    />
-                                                ) : (
-                                                    <>
-                                                        <div
-                                                            className="fw-medium text-truncate"
-                                                            title={
-                                                                session.title
-                                                            }
-                                                        >
-                                                            {session.title}
-                                                        </div>
-                                                        <div className="small text-muted">
-                                                            {new Date(
-                                                                session.created_at,
-                                                            ).toLocaleDateString()}{" "}
-                                                            •{" "}
-                                                            {
-                                                                session.message_count
-                                                            }{" "}
-                                                            messages
-                                                            {pinnedSessions.has(
-                                                                session.id,
-                                                            ) && (
-                                                                <span className="ms-2 badge bg-warning">
-                                                                    Pinned
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </>
-                                                )}
-                                            </div>
+                                                        className="fw-medium text-truncate"
+                                                        title={
+                                                            session.title
+                                                        }
+                                                    >
+                                                        {session.title}
+                                                    </div>
+                                                    <div className="small text-muted">
+                                                        {new Date(
+                                                            session.created_at,
+                                                        ).toLocaleDateString()}{" "}
+                                                        •{" "}
+                                                        {
+                                                            session.message_count
+                                                        }{" "}
+                                                        messages
+                                                        {pinnedSessions.has(
+                                                            session.id,
+                                                        ) ? (
+                                                            <span className="ms-2 badge bg-warning">
+                                                                Pinned
+                                                            </span>
+                                                        ) : null}
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
+                                    </div>
 
-                                        {/* Right side: Actions */}
-                                        <div className="d-flex gap-2">
-                                            <Button
-                                                variant="link"
-                                                size="sm"
-                                                className="p-1"
-                                                onClick={(e) =>
-                                                    togglePinSession(
-                                                        session.id,
-                                                        e,
-                                                    )
-                                                }
-                                                title={
-                                                    pinnedSessions.has(
-                                                        session.id,
-                                                    )
-                                                        ? "Unpin session"
-                                                        : "Pin session"
-                                                }
-                                            >
-                                                {pinnedSessions.has(
+                                    {/* Right side: Actions */}
+                                    <div className="d-flex gap-2">
+                                        <Button
+                                            variant="link"
+                                            size="sm"
+                                            className="p-1"
+                                            onClick={(e) =>
+                                                togglePinSession(
                                                     session.id,
-                                                ) ? (
-                                                    <PinOff
-                                                        size={16}
-                                                        className="text-primary"
-                                                    />
-                                                ) : (
-                                                    <Pin
-                                                        size={16}
-                                                        className="text-muted"
-                                                    />
-                                                )}
-                                            </Button>
-                                            <Button
-                                                variant="link"
-                                                size="sm"
-                                                className="p-1 text-danger"
-                                                onClick={(e) =>
-                                                    handleSessionDelete(
-                                                        session.id,
-                                                        e,
-                                                    )
-                                                }
-                                                title="Delete session"
-                                            >
-                                                <Trash size={16} />
-                                            </Button>
-                                            <Button
-                                                variant="link"
-                                                size="sm"
-                                                className="p-1"
-                                                onClick={(e) =>
-                                                    exportSession(
-                                                        session.id,
-                                                        "markdown",
-                                                        e,
-                                                    )
-                                                }
-                                                title="Export as Markdown"
-                                            >
-                                                <FileDown size={16} />
-                                            </Button>
-                                        </div>
-                                    </ListGroup.Item>
-                                </>
+                                                    e,
+                                                )
+                                            }
+                                            title={
+                                                pinnedSessions.has(
+                                                    session.id,
+                                                )
+                                                    ? "Unpin session"
+                                                    : "Pin session"
+                                            }
+                                        >
+                                            {pinnedSessions.has(
+                                                session.id,
+                                            ) ? (
+                                                <PinOff
+                                                    size={16}
+                                                    className="text-primary"
+                                                />
+                                            ) : (
+                                                <Pin
+                                                    size={16}
+                                                    className="text-muted"
+                                                />
+                                            )}
+                                        </Button>
+                                        <Button
+                                            variant="link"
+                                            size="sm"
+                                            className="p-1 text-danger"
+                                            onClick={(e) =>
+                                                handleSessionDelete(
+                                                    session.id,
+                                                    e,
+                                                )
+                                            }
+                                            title="Delete session"
+                                        >
+                                            <Trash size={16} />
+                                        </Button>
+                                        <Button
+                                            variant="link"
+                                            size="sm"
+                                            className="p-1"
+                                            onClick={(e) =>
+                                                exportSession(
+                                                    session.id,
+                                                    "markdown",
+                                                    e,
+                                                )
+                                            }
+                                            title="Export as Markdown"
+                                        >
+                                            <FileDown size={16} />
+                                        </Button>
+                                    </div>
+                                </ListGroup.Item>
                             ))}
                         </ListGroup>
                     </div>
-                    {meta && (
+                    {meta ? (
                         <div className="d-flex justify-content-between">
                             <div>
                                 Page {meta.page} of {meta.total_pages} (Total:{" "}
@@ -463,9 +466,7 @@ const HistoryManagement: React.FC = () => {
                                 <Button
                                     variant="outline-secondary"
                                     disabled={skip === 0}
-                                    onClick={() =>
-                                        setSkip(Math.max(0, skip - limit))
-                                    }
+                                    onClick={handleSkipPrev}
                                 >
                                     Previous
                                 </Button>
@@ -473,13 +474,13 @@ const HistoryManagement: React.FC = () => {
                                     variant="outline-secondary"
                                     className="ml-2"
                                     disabled={!meta.has_more}
-                                    onClick={() => setSkip(skip + limit)}
+                                    onClick={handleSkipNext}
                                 >
                                     Next
                                 </Button>
                             </div>
                         </div>
-                    )}
+                    ) : null}
                     <div className="mt-4">
                         <Button
                             variant="outline-info"
@@ -545,4 +546,4 @@ const HistoryManagement: React.FC = () => {
     );
 };
 
-export default HistoryManagement;
+export default React.memo(HistoryManagement);

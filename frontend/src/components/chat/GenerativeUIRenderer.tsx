@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import type { UIContainer, UIComponent, ChartData } from '../../types/generative-ui';
 import type { ImageGalleryData } from '../../types/search';
 import ChartRenderer from './ChartRenderer';
@@ -11,14 +11,18 @@ interface RendererProps {
     data: UIContainer | null;
 }
 
-const SlidesWrapper = ({ children }: { children?: React.ReactNode }) => {
+const SlidesWrapper = React.memo(({ children }: { children?: React.ReactNode }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const kids = React.Children.toArray(children);
 
     if (kids.length === 0) return null;
 
-    const nextSlide = () => setCurrentIndex((prev) => (prev + 1) % kids.length);
-    const prevSlide = () => setCurrentIndex((prev) => (prev - 1 + kids.length) % kids.length);
+    const nextSlide = useCallback(() => setCurrentIndex((prev) => (prev + 1) % kids.length), [kids.length]);
+    const prevSlide = useCallback(() => setCurrentIndex((prev) => (prev - 1 + kids.length) % kids.length), [kids.length]);
+
+    const goToSlide = useCallback((idx: number) => {
+        setCurrentIndex(idx);
+    }, []);
 
     return (
         <div className="gen-ui-slides-container">
@@ -40,7 +44,7 @@ const SlidesWrapper = ({ children }: { children?: React.ReactNode }) => {
                 {kids.map((_, idx) => (
                     <button
                         key={idx}
-                        onClick={() => setCurrentIndex(idx)}
+                        onClick={() => goToSlide(idx)}
                         className={`w-2 h-2 rounded-full transition-all ${idx === currentIndex ? 'bg-primary w-4' : 'bg-secondary'}`}
                         style={{ height: '8px', width: idx === currentIndex ? '16px' : '8px', borderRadius: '4px', border: 'none', backgroundColor: idx === currentIndex ? 'var(--accent)' : 'var(--border-dark)' }}
                         aria-label={`Go to slide ${idx + 1}`}
@@ -49,7 +53,7 @@ const SlidesWrapper = ({ children }: { children?: React.ReactNode }) => {
             </div>
         </div>
     );
-};
+});
 
 const widthClasses: Record<string, string> = {
     'full': 'gen-ui-wrapper-full',
@@ -66,14 +70,14 @@ interface WrapperProps {
     width?: string;
 }
 
-const ComponentWrapper: React.FC<WrapperProps> = ({ children, width }) => {
+const ComponentWrapper: React.FC<WrapperProps> = React.memo(({ children, width }) => {
     const widthClass = width ? widthClasses[width] || 'gen-ui-wrapper-full' : 'gen-ui-wrapper-full';
     return (
         <div className={widthClass}>
             {children}
         </div>
     );
-};
+});
 
 const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
     if (!data) return null;
@@ -248,7 +252,7 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                 <div className="flex-1">
                     <h3 style={{fontWeight: 'bold', marginBottom: '4px'}}>{label || 'Error'}</h3>
                     <p style={{fontSize: '0.9em'}}>{text}</p>
-                    {actions && actions.length > 0 && (
+                    {actions && actions.length > 0 ? (
                         <div className="flex gap-2 mt-3">
                             {actions.map((action: string, index: number) => (
                                 <button key={index} className="gen-ui-btn gen-ui-btn-secondary" style={{width: 'auto', padding: '4px 12px', fontSize: '0.8em'}}>
@@ -256,7 +260,7 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                                 </button>
                             ))}
                         </div>
-                    )}
+                    ) : null}
                 </div>
             </div>
         );
@@ -290,11 +294,11 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                     return (
                         <ComponentWrapper width={props.width} key={key}>
                             <div className="gen-ui-card">
-                                {props.label && (
+                                {props.label ? (
                                     <div className="gen-ui-card-header">
                                         {props.label}
                                     </div>
-                                )}
+                                ) : null}
                                 <div className="gen-ui-card-body">
                                     {children.map((child, childIdx) => renderComponent(child, childIdx, true))}
                                 </div>
@@ -327,7 +331,7 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                                         Image Error
                                     </div>
                                 </div>
-                                {props.label && <span className="gen-ui-label" style={{ marginTop: '8px' }}>{props.label}</span>}
+                                {props.label ? <span className="gen-ui-label" style={{ marginTop: '8px' }}>{props.label}</span> : null}
                             </div>
                         </ComponentWrapper>
                     );
@@ -429,11 +433,11 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                     return (
                         <ComponentWrapper width={props.width} key={key}>
                             <div className="gen-ui-table-container">
-                                {props.label && (
+                                {props.label ? (
                                     <div className="gen-ui-card-header">
                                         {props.label}
                                     </div>
-                                )}
+                                ) : null}
                                 <div style={{ overflowX: 'auto' }}>
                                     <table className="gen-ui-table">
                                         <thead>
@@ -451,9 +455,9 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                                                     ))}
                                                 </tr>
                                             ))}
-                                            {rows.length === 0 && (
+                                            {rows.length === 0 ? (
                                                 <tr><td colSpan={props.headers?.length || 1} style={{ textAlign: 'center', padding: '20px', fontStyle: 'italic', color: 'var(--text-tertiary)' }}>No data generated</td></tr>
-                                            )}
+                                            ) : null}
                                         </tbody>
                                     </table>
                                 </div>
@@ -512,11 +516,11 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                      return (
                          <ComponentWrapper width={props.width} key={key}>
                              <fieldset className="space-y-3">
-                                 {props.label && (
+                                 {props.label ? (
                                      <legend className="gen-ui-label">
                                          {props.label}
                                      </legend>
-                                 )}
+                                 ) : null}
                                  <div className="space-y-2">
                                      {Array.isArray(props.options) && props.options.map((option: any, idx: number) => (
                                          <div key={idx} className="flex items-center gap-3">
@@ -568,16 +572,16 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                      return (
                          <ComponentWrapper width={props.width} key={key}>
                              <div className={props.variant === 'card' ? 'gen-ui-card' : ''} style={props.variant === 'card' ? { padding: '16px' } : {}}>
-                                 {props.label && (
+                                 {props.label ? (
                                      <h3 className="gen-ui-text-label" style={{ fontWeight: 'bold', marginBottom: '16px' }}>
                                          {props.label}
                                      </h3>
-                                 )}
-                                 {Array.isArray(props.children) && (
+                                 ) : null}
+                                 {Array.isArray(props.children) ? (
                                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                          {props.children.map((child: any, idx: number) => renderComponent(child, idx))}
                                      </div>
-                                 )}
+                                 ) : null}
                              </div>
                          </ComponentWrapper>
                      );
@@ -589,7 +593,7 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                                  Source: <a href={props.source_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
                                      {props.source_name || props.source_url}
                                  </a>
-                                 {props.timestamp && <span style={{ marginLeft: '8px', opacity: 0.7 }}>{new Date(props.timestamp).toLocaleDateString()}</span>}
+                                 {props.timestamp ? <span style={{ marginLeft: '8px', opacity: 0.7 }}>{new Date(props.timestamp).toLocaleDateString()}</span> : null}
                              </div>
                          </ComponentWrapper>
                      );
@@ -602,7 +606,7 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                                      <p style={{ margin: 0, fontSize: '0.9em' }}>
                                          <span style={{ fontWeight: 'bold' }}>{props.total_results || 0}</span> results found in <span style={{ fontWeight: 'bold' }}>{props.search_time_ms || 0}ms</span>
                                      </p>
-                                     {props.summary && <p style={{ margin: '4px 0 0 0', fontSize: '0.85em', opacity: 0.8 }}>{props.summary}</p>}
+                                     {props.summary ? <p style={{ margin: '4px 0 0 0', fontSize: '0.85em', opacity: 0.8 }}>{props.summary}</p> : null}
                                  </div>
                              </div>
                          </ComponentWrapper>
@@ -612,11 +616,11 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                      return (
                          <ComponentWrapper width={props.width} key={key}>
                              <div className="space-y-2">
-                                 {props.label && (
+                                 {props.label ? (
                                      <h4 className="gen-ui-label">
                                          {props.label}
                                      </h4>
-                                 )}
+                                 ) : null}
                                  <div className="flex flex-wrap gap-2">
                                      {Array.isArray(props.searches) && props.searches.map((search: any, idx: number) => (
                                          <button
@@ -635,11 +639,11 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                      return (
                          <ComponentWrapper width={props.width} key={key}>
                              <div className="gen-ui-card" style={{ padding: '16px' }}>
-                                 {props.label && (
+                                 {props.label ? (
                                      <h4 className="gen-ui-label">
                                          {props.label}
                                      </h4>
-                                 )}
+                                 ) : null}
                                  <div className="space-y-3">
                                      {Array.isArray(props.filters) && props.filters.map((filter: any, fIdx: number) => (
                                          <div key={fIdx}>
@@ -665,11 +669,11 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                      return (
                          <ComponentWrapper width={props.width} key={key}>
                              <div className="space-y-3">
-                                 {props.label && (
+                                 {props.label ? (
                                      <h4 className="gen-ui-label">
                                          {props.label}
                                      </h4>
-                                 )}
+                                 ) : null}
                                  <div className="flex flex-wrap gap-2">
                                      {Array.isArray(props.tags) && props.tags.map((tag: any, idx: number) => {
                                          const opacityClass = tag.trending ? 'gen-ui-tag-trending' : '';
@@ -691,31 +695,31 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                      return (
                          <ComponentWrapper width={props.width} key={key}>
                              <div className="space-y-4">
-                                 {props.label && (
+                                 {props.label ? (
                                      <h4 className="gen-ui-label">
                                          {props.label}
                                      </h4>
-                                 )}
+                                 ) : null}
                                  <div style={{ position: 'relative' }}>
                                      {Array.isArray(props.timeline) && props.timeline.map((item: any, idx: number) => (
                                          <div key={idx} className="flex gap-4 pb-6 relative">
                                              <div className="flex flex-col items-center">
                                                  <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--accent)', marginTop: '6px', position: 'relative', zIndex: 10 }}></div>
-                                                 {idx !== props.timeline.length - 1 && (
+                                                 {idx !== props.timeline.length - 1 ? (
                                                      <div style={{ width: '2px', height: '100%', background: 'var(--border-light)', position: 'absolute', top: '18px', left: '5px' }}></div>
-                                                 )}
+                                                 ) : null}
                                              </div>
                                              <div className="flex-1 pt-0.5">
                                                  <p style={{ fontSize: '0.75em', fontFamily: 'monospace', color: 'var(--text-tertiary)', margin: 0 }}>{item.date}</p>
                                                  <h5 style={{ fontWeight: 'bold', margin: '4px 0', color: 'var(--text-primary)' }}>{item.title}</h5>
-                                                 {item.description && (
+                                                 {item.description ? (
                                                      <p style={{ fontSize: '0.9em', color: 'var(--text-secondary)', margin: 0 }}>{item.description}</p>
-                                                 )}
-                                                 {item.category && (
+                                                 ) : null}
+                                                 {item.category ? (
                                                      <span className="gen-ui-tag" style={{ fontSize: '0.7em', padding: '2px 6px', marginTop: '4px', display: 'inline-block' }}>
                                                          {item.category}
                                                      </span>
-                                                 )}
+                                                 ) : null}
                                              </div>
                                          </div>
                                      ))}
@@ -728,11 +732,11 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                      return (
                          <ComponentWrapper width={props.width} key={key}>
                              <div className="space-y-4">
-                                 {props.label && (
+                                 {props.label ? (
                                      <h4 className="gen-ui-label">
                                          {props.label}
                                      </h4>
-                                 )}
+                                 ) : null}
                                  <div className="space-y-2">
                                      {Array.isArray(props.locations) && props.locations.map((loc: any, idx: number) => {
                                          const maxValue = Math.max(...props.locations.map((l: any) => l.value || 0));
@@ -783,9 +787,9 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                 ) : (
                     <div className="gen-ui-alert gen-ui-alert-error">Error: Root must be a container</div>
                 )}
-                {rootChildren.length === 0 && (
+                {rootChildren.length === 0 ? (
                     <div style={{ textAlign: 'center', fontStyle: 'italic', color: 'var(--text-tertiary)' }}>Empty container generated.</div>
-                )}
+                ) : null}
             </div>
         );
     } catch (err) {
@@ -794,4 +798,4 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
     }
 };
 
-export default GenerativeUIRenderer;
+export default React.memo(GenerativeUIRenderer);

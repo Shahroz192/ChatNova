@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { Form, Button, Container, Row, Col } from "react-bootstrap";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../../utils/api";
@@ -12,7 +12,7 @@ const Login: React.FC = () => {
     const [error, setError] = useState("");
     const navigate = useNavigate();
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
         try {
@@ -28,7 +28,7 @@ const Login: React.FC = () => {
         } catch (err) {
             setError("Invalid email or password");
         }
-    };
+    }, [email, password, navigate]);
 
     return (
         <Container fluid
@@ -45,7 +45,7 @@ const Login: React.FC = () => {
                             <h2 className="register-title">Welcome Back</h2>
                             <p className="register-subtitle">Sign in to ChatNova</p>
                         </div>
-                        {error && <div className="register-error">{error}</div>}
+                        {error ? <div className="register-error">{error}</div> : null}
                         <Form onSubmit={handleSubmit} className="register-form">
                             <Form.Group id="email">
                                 <Form.Label className="register-label">Email</Form.Label>

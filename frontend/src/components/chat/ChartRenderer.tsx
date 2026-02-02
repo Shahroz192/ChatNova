@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -37,11 +37,11 @@ interface ChartProps {
 const ChartRenderer: React.FC<ChartProps> = ({ type, data, label }) => {
   const { isDark } = useTheme();
   
-  // Emphasize hierarchy: sort by value so the most important category is first (at the "top" of the circle for pie charts)
-  const sortedData = [...data].sort((a, b) => b.value - a.value);
+  // Memoize sorted data to avoid re-sorting on every render
+  const sortedData = useMemo(() => [...data].sort((a, b) => b.value - a.value), [data]);
 
-  const labels = sortedData.map(item => item.name || item.label || '');
-  const values = sortedData.map(item => item.value);
+  const labels = useMemo(() => sortedData.map(item => item.name || item.label || ''), [sortedData]);
+  const values = useMemo(() => sortedData.map(item => item.value), [sortedData]);
 
   const isPie = type === 'pie';
 
@@ -49,7 +49,7 @@ const ChartRenderer: React.FC<ChartProps> = ({ type, data, label }) => {
   const textColor = isDark ? '#94a3b8' : '#64748b'; // slate-400 : slate-500
   const gridColor = isDark ? 'rgba(148, 163, 184, 0.1)' : 'rgba(100, 116, 139, 0.1)';
 
-  const chartData = {
+  const chartData = useMemo(() => ({
     labels: labels,
     datasets: [
       {
@@ -79,9 +79,9 @@ const ChartRenderer: React.FC<ChartProps> = ({ type, data, label }) => {
         borderWidth: isPie ? 2 : 1,
       },
     ],
-  };
+  }), [labels, label, values, isPie]);
 
-  const options = {
+  const options = useMemo(() => ({
     responsive: true,
     plugins: {
       legend: {
@@ -121,7 +121,7 @@ const ChartRenderer: React.FC<ChartProps> = ({ type, data, label }) => {
           }
         : {},
     maintainAspectRatio: false, // This will help with responsive sizing
-  };
+  }), [isPie, textColor, label, gridColor]);
 
   const renderChart = () => {
     switch (type) {
@@ -149,4 +149,4 @@ const ChartRenderer: React.FC<ChartProps> = ({ type, data, label }) => {
   );
 };
 
-export default ChartRenderer;
+export default React.memo(ChartRenderer);

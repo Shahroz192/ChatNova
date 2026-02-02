@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Bot, Brain, Sparkles, Zap } from 'lucide-react';
 
 interface TypingIndicatorProps {
@@ -22,7 +22,7 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   const animationRef = useRef<number | null>(null);
 
   // Model-specific styling and icons
-  const getModelStyle = (modelName: string) => {
+  const modelStyle = useMemo(() => {
     const name = modelName.toLowerCase();
     
     if (name.includes('gemini') || name.includes('google')) {
@@ -51,9 +51,8 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
       icon: Bot,
       iconColor: '#0ea5e9'
     };
-  };
+  }, [modelName]);
 
-  const modelStyle = getModelStyle(modelName);
   const ModelIcon = modelStyle.icon;
 
   // Animation effects
@@ -92,7 +91,7 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   }, [animationStyle, reducedMotion]);
 
   // Status-based messages
-  const getStatusMessage = (status: string, modelName: string) => {
+  const statusMessage = useMemo(() => {
     switch (status) {
       case 'processing':
         return `${modelName} is processing`;
@@ -101,7 +100,7 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
       default:
         return `${modelName} is thinking`;
     }
-  };
+  }, [status, modelName]);
 
   // Render animation content based on style
   const renderAnimation = () => {
@@ -200,9 +199,9 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
                 style={{ color: 'white' }}
               />
             </div>
-            {animationStyle === 'cognitive' && (
+            {animationStyle === 'cognitive' ? (
               <div className="cognitive-avatar-indicator" />
-            )}
+            ) : null}
           </div>
           
           {/* Enhanced Typing Bubble */}
@@ -212,7 +211,7 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
               <div className="typing-status">
                 <div className="status-indicator" />
                 <span className="status-text">
-                  {getStatusMessage(status, modelName)}
+                  {statusMessage}
                 </span>
               </div>
 
@@ -222,12 +221,12 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
               </div>
 
               {/* Model indicator */}
-              {showModel && (
+              {showModel ? (
                 <div className="model-indicator" style={{ color: modelStyle.iconColor }}>
                   <ModelIcon size={14} />
                   <span>{modelName}</span>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
@@ -245,4 +244,4 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   );
 };
 
-export default TypingIndicator;
+export default React.memo(TypingIndicator);

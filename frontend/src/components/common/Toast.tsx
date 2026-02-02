@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react';
 
 export interface ToastMessage {
@@ -14,7 +14,7 @@ interface ToastProps {
   onClose: (id: string) => void;
 }
 
-const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
+const Toast: React.FC<ToastProps> = React.memo(({ toast, onClose }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
 
@@ -33,10 +33,10 @@ const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
     }
   }, [toast.duration]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsLeaving(true);
     setTimeout(() => onClose(toast.id), 300); // Match animation duration
-  };
+  }, [onClose, toast.id]);
 
   const getIcon = () => {
     switch (toast.type) {
@@ -78,7 +78,7 @@ const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
       </div>
       <div className="flex-grow-1">
         <div className="fw-semibold small">{toast.title}</div>
-        {toast.message && <div className="small opacity-75 mt-1">{toast.message}</div>}
+        {toast.message ? <div className="small opacity-75 mt-1">{toast.message}</div> : null}
       </div>
       <button
         type="button"
@@ -90,6 +90,6 @@ const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
       </button>
     </div>
   );
-};
+});
 
 export default Toast;

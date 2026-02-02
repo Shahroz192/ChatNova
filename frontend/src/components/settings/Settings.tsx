@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Container, Row, Col, Nav, Card, Button, Form } from 'react-bootstrap';
 import { Key, Server, User, History, Sparkles, Brain } from 'lucide-react';
 import BYOKForm from './BYOKForm';
@@ -23,6 +23,10 @@ interface SettingsProps {}
 const Settings: React.FC<SettingsProps> = () => {
   const [activeTab, setActiveTab] = useState<'keys' | 'personalization' | 'memory' | 'servers' | 'account' | 'privacy' | 'appearance' | 'history'>('keys');
 
+  const handleTabChange = useCallback((tab: 'keys' | 'personalization' | 'memory' | 'servers' | 'account' | 'privacy' | 'appearance' | 'history') => {
+    setActiveTab(tab);
+  }, []);
+
   return (
     <div className="settings-page">
       <Container fluid className="vh-100 d-flex flex-column">
@@ -37,7 +41,7 @@ const Settings: React.FC<SettingsProps> = () => {
                 <Nav.Link
                   eventKey="keys"
                   active={activeTab === 'keys'}
-                  onClick={() => setActiveTab('keys')}
+                  onClick={() => handleTabChange('keys')}
                   className="d-flex align-items-center py-2 px-3 rounded-lg"
                   style={{ transition: 'all 0.2s ease' }}
                 >
@@ -49,7 +53,7 @@ const Settings: React.FC<SettingsProps> = () => {
                 <Nav.Link
                   eventKey="personalization"
                   active={activeTab === 'personalization'}
-                  onClick={() => setActiveTab('personalization')}
+                  onClick={() => handleTabChange('personalization')}
                   className="d-flex align-items-center py-2 px-3 rounded-lg"
                   style={{ transition: 'all 0.2s ease' }}
                 >
@@ -61,7 +65,7 @@ const Settings: React.FC<SettingsProps> = () => {
                 <Nav.Link
                   eventKey="memory"
                   active={activeTab === 'memory'}
-                  onClick={() => setActiveTab('memory')}
+                  onClick={() => handleTabChange('memory')}
                   className="d-flex align-items-center py-2 px-3 rounded-lg"
                   style={{ transition: 'all 0.2s ease' }}
                 >
@@ -73,7 +77,7 @@ const Settings: React.FC<SettingsProps> = () => {
                 <Nav.Link
                   eventKey="history"
                   active={activeTab === 'history'}
-                  onClick={() => setActiveTab('history')}
+                  onClick={() => handleTabChange('history')}
                   className="d-flex align-items-center py-2 px-3 rounded-lg"
                   style={{ transition: 'all 0.2s ease' }}
                 >
@@ -85,7 +89,7 @@ const Settings: React.FC<SettingsProps> = () => {
                 <Nav.Link
                   eventKey="servers"
                   active={activeTab === 'servers'}
-                  onClick={() => setActiveTab('servers')}
+                  onClick={() => handleTabChange('servers')}
                   className="d-flex align-items-center py-2 px-3 rounded-lg"
                   style={{ transition: 'all 0.2s ease' }}
                 >
@@ -97,7 +101,7 @@ const Settings: React.FC<SettingsProps> = () => {
                 <Nav.Link
                   eventKey="account"
                   active={activeTab === 'account'}
-                  onClick={() => setActiveTab('account')}
+                  onClick={() => handleTabChange('account')}
                   className="d-flex align-items-center py-2 px-3 rounded-lg"
                   style={{ transition: 'all 0.2s ease' }}
                 >
@@ -111,7 +115,7 @@ const Settings: React.FC<SettingsProps> = () => {
           <Col md={9} className="d-flex flex-column p-4">
             <div className="flex-grow-1">
               
-              {activeTab === 'history' && (
+              {activeTab === 'history' ? (
                 <Card>
                   <Card.Header>
                     <Card.Title>Chat History</Card.Title>
@@ -123,9 +127,9 @@ const Settings: React.FC<SettingsProps> = () => {
                     <HistoryManagement />
                   </Card.Body>
                 </Card>
-              )}
+              ) : null}
               
-              {activeTab === 'keys' && (
+              {activeTab === 'keys' ? (
                 <Card>
                   <Card.Header>
                     <Card.Title>API Keys</Card.Title>
@@ -137,9 +141,9 @@ const Settings: React.FC<SettingsProps> = () => {
                     <BYOKForm />
                   </Card.Body>
                 </Card>
-              )}
+              ) : null}
 
-              {activeTab === 'personalization' && (
+              {activeTab === 'personalization' ? (
                 <Card>
                   <Card.Header>
                     <Card.Title>Custom Instructions</Card.Title>
@@ -151,9 +155,9 @@ const Settings: React.FC<SettingsProps> = () => {
                     <PersonalizationForm />
                   </Card.Body>
                 </Card>
-              )}
+              ) : null}
 
-              {activeTab === 'memory' && (
+              {activeTab === 'memory' ? (
                 <Card>
                   <Card.Header>
                     <Card.Title>Long-term Memory</Card.Title>
@@ -165,9 +169,9 @@ const Settings: React.FC<SettingsProps> = () => {
                     <MemoryManagement />
                   </Card.Body>
                 </Card>
-              )}
+              ) : null}
               
-              {activeTab === 'servers' && (
+              {activeTab === 'servers' ? (
                 <Card>
                   <Card.Header>
                     <Card.Title>MCP Servers</Card.Title>
@@ -189,9 +193,9 @@ const Settings: React.FC<SettingsProps> = () => {
                     </div>
                   </Card.Body>
                 </Card>
-              )}
+              ) : null}
               
-              {activeTab === 'account' && (
+              {activeTab === 'account' ? (
                 <Card>
                   <Card.Header>
                     <Card.Title>Account Settings</Card.Title>
@@ -203,7 +207,7 @@ const Settings: React.FC<SettingsProps> = () => {
                     <AccountSettingsForm />
                   </Card.Body>
                 </Card>
-              )}
+              ) : null}
               
             </div>
           </Col>
@@ -214,7 +218,7 @@ const Settings: React.FC<SettingsProps> = () => {
 };
 
 // Account Settings Form Component
-const AccountSettingsForm: React.FC = () => {
+const AccountSettingsForm: React.FC = React.memo(() => {
   const [user, setUser] = useState<User | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -242,7 +246,7 @@ const AccountSettingsForm: React.FC = () => {
     fetchUser();
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Basic validation
@@ -276,18 +280,15 @@ const AccountSettingsForm: React.FC = () => {
     } catch (err) {
       setError('Failed to update account');
     }
-  };
+  }, [password, confirmPassword, email, user?.email]);
 
   if (loading) {
     return <div>Loading...</div>;
   }
 
-  if (error) {
-    return <div className="alert alert-danger">{error}</div>;
-  }
-
   return (
     <Form onSubmit={handleSubmit}>
+      {error ? <div className="alert alert-danger">{error}</div> : null}
       <Form.Group className="mb-3" controlId="formName">
         <Form.Label>Name</Form.Label>
         <Form.Control
@@ -332,14 +333,13 @@ const AccountSettingsForm: React.FC = () => {
         />
       </Form.Group>
 
-      {message && <div className="alert alert-success">{message}</div>}
-      {error && <div className="alert alert-danger">{error}</div>}
+      {message ? <div className="alert alert-success">{message}</div> : null}
 
       <Button variant="primary" type="submit">
         Update Account
       </Button>
     </Form>
   );
-};
+});
 
-export default Settings;
+export default React.memo(Settings);

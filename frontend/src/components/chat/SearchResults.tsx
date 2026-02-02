@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Card, Button, Pagination } from 'react-bootstrap';
 import {
   ExternalLink,
@@ -38,33 +38,37 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedResults, setSelectedResults] = useState<Set<number>>(new Set());
 
-  const handleSort = () => {
-    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-  };
+  const handleSort = useCallback(() => {
+    setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+  }, []);
 
-  const handleResultSelect = (index: number) => {
-    const newSelected = new Set(selectedResults);
-    if (newSelected.has(index)) {
-      newSelected.delete(index);
-    } else {
-      newSelected.add(index);
-    }
-    setSelectedResults(newSelected);
-  };
+  const handleResultSelect = useCallback((index: number) => {
+    setSelectedResults(prev => {
+      const newSelected = new Set(prev);
+      if (newSelected.has(index)) {
+        newSelected.delete(index);
+      } else {
+        newSelected.add(index);
+      }
+      return newSelected;
+    });
+  }, []);
 
-  const handleSelectAll = () => {
-    if (selectedResults.size === results.length) {
-      setSelectedResults(new Set());
-    } else {
-      setSelectedResults(new Set(results.map((_, i) => i)));
-    }
-  };
+  const handleSelectAll = useCallback(() => {
+    setSelectedResults(prev => {
+      if (prev.size === results.length) {
+        return new Set();
+      } else {
+        return new Set(results.map((_, i) => i));
+      }
+    });
+  }, [results]);
 
 
-  const formatTime = (ms: number) => {
+  const formatTime = useCallback((ms: number) => {
     if (ms < 1000) return `${ms}ms`;
     return `${(ms / 1000).toFixed(1)}s`;
-  };
+  }, []);
 
   return (
     <div className="search-results-container">
@@ -245,7 +249,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
             />
 
             {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-              let pageNum;
+              let pageNum: number;
               if (totalPages <= 5) {
                 pageNum = i + 1;
               } else if (currentPage <= 3) {
@@ -278,4 +282,4 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   );
 };
 
-export default SearchResults;
+export default React.memo(SearchResults);

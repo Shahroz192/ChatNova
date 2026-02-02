@@ -2,7 +2,7 @@ import React from "react";
 import { Navigate } from "react-router-dom";
 import { isAuthenticated } from "../../utils/auth";
 
-const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const RequireAuth: React.FC<{ children: React.ReactNode }> = React.memo(({ children }) => {
     const [isAuth, setIsAuth] = React.useState<boolean | null>(null);
 
     React.useEffect(() => {
@@ -22,6 +22,6 @@ const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     }
 
     return <>{children}</>;
-};
+});
 
 export default RequireAuth;
