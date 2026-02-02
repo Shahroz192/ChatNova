@@ -4,11 +4,15 @@ from datetime import datetime
 from app.core.input_validation import InputSanitizer
 
 
+from app.schemas.document import Document as DocumentSchema
+
+
 class MessageBase(BaseModel):
     content: str
     model: str
     search_web: Optional[bool] = False
     images: Optional[List[str]] = None  # List of base64 strings or URLs
+    document_ids: Optional[List[int]] = None  # List of document IDs to associate with this message
 
 
 class MessageCreate(MessageBase):
@@ -58,6 +62,7 @@ class Message(MessageBase):
     response: str
     user_id: int
     created_at: datetime
+    documents: Optional[List[DocumentSchema]] = None
 
     model_config = ConfigDict(from_attributes=True)
 
