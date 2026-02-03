@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import api, { getSearchHistory, addToSearchHistory, streamChat } from '../api';
+import { getSearchHistory, addToSearchHistory, streamChat } from '../api';
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -46,12 +46,12 @@ describe('api utility', () => {
         }
       });
 
-      global.fetch = vi.fn().mockResolvedValue({
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
         ok: true,
         body: mockStream,
-      });
+      }));
 
-      await streamChat('hello', 'model-id', undefined, {}, false, onChunk, onComplete);
+      await streamChat('hello', 'model-id', undefined, { search_web: false }, false, undefined, onChunk, onComplete);
 
       expect(onChunk).toHaveBeenCalledWith('Hello');
       expect(onChunk).toHaveBeenCalledWith('world');
@@ -61,13 +61,13 @@ describe('api utility', () => {
     it('handles errors in stream', async () => {
       const onError = vi.fn();
       
-      global.fetch = vi.fn().mockResolvedValue({
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
         ok: false,
         status: 500,
         text: () => Promise.resolve('Server Error'),
-      });
+      }));
 
-      await streamChat('hello', 'model-id', undefined, {}, false, vi.fn(), vi.fn(), onError);
+      await streamChat('hello', 'model-id', undefined, { search_web: false }, false, undefined, vi.fn(), vi.fn(), onError);
 
       expect(onError).toHaveBeenCalledWith(expect.stringContaining('500'));
     });
