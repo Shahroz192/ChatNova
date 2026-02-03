@@ -37,7 +37,12 @@ class CacheManager:
         else:
             cache_key = f"chat_history:{user_id}:{skip}:{limit}"
         try:
-            return self.cache.get(cache_key)
+            cached = self.cache.get(cache_key)
+            if cached:
+                # Backward-compat: older cached entries lacked documents.
+                if any("documents" not in msg for msg in cached):
+                    return None
+            return cached
         except Exception as e:
             logger.error(f"Error retrieving from cache: {e}")
         return None
@@ -59,8 +64,31 @@ class CacheManager:
         else:
             cache_key = f"chat_history:{user_id}:{skip}:{limit}"
         try:
-            # Convert messages to JSON serializable format
-            messages_json = [msg.__dict__ for msg in messages]
+            # Convert messages to JSON serializable format (including documents)
+            messages_json = []
+            for msg in messages:
+                msg_dict = {
+                    "id": msg.id,
+                    "user_id": msg.user_id,
+                    "session_id": msg.session_id,
+                    "content": msg.content,
+                    "model": msg.model,
+                    "response": msg.response,
+                    "created_at": msg.created_at,
+                    "images": msg.images,
+                }
+                docs = []
+                if hasattr(msg, "documents") and msg.documents:
+                    for doc in msg.documents:
+                        docs.append(
+                            {
+                                "id": doc.id,
+                                "filename": doc.filename,
+                                "file_type": doc.file_type,
+                            }
+                        )
+                msg_dict["documents"] = docs
+                messages_json.append(msg_dict)
             self.cache.set(cache_key, messages_json, ttl)
         except Exception as e:
             logger.error(f"Error setting cache: {e}")

@@ -93,7 +93,23 @@ class CRUDMessage(CRUDBase[Message, MessageCreate, MessageUpdate]):
                         model=msg_dict.get("model"),
                         response=msg_dict.get("response"),
                         created_at=msg_dict.get("created_at"),
+                        images=msg_dict.get("images"),
                     )
+                    # Rehydrate documents for display purposes
+                    docs = []
+                    for doc in msg_dict.get("documents", []) or []:
+                        docs.append(
+                            type(
+                                "DocStub",
+                                (),
+                                {
+                                    "id": doc.get("id"),
+                                    "filename": doc.get("filename"),
+                                    "file_type": doc.get("file_type"),
+                                },
+                            )()
+                        )
+                    msg_obj.documents = docs
                     messages.append(msg_obj)
                 return messages
 

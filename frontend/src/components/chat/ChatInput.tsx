@@ -19,6 +19,7 @@ interface ChatInputProps {
   setInput: (value: string) => void;
   sendMessage: (images?: string[]) => void;
   loading: boolean;
+  isUploadingDocs?: boolean;
   searchOptions?: WebSearchOptions;
   onSearchOptionsChange?: (options: WebSearchOptions) => void;
   searchSuggestions?: string[];
@@ -36,6 +37,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   setInput,
   sendMessage,
   loading,
+  isUploadingDocs = false,
   searchOptions = { search_web: false },
   onSearchOptionsChange,
   searchSuggestions = [],
@@ -188,11 +190,15 @@ const ChatInput: React.FC<ChatInputProps> = ({
   }, []);
 
   const handleSendMessage = useCallback(() => {
+    if (isUploadingDocs) {
+      alert("Documents are still uploading. Please wait a moment.");
+      return;
+    }
     const images = pendingImages.map(img => img.data);
     sendMessage(images);
     setPendingImages([]);
     setPendingDocs([]);
-  }, [pendingImages, sendMessage]);
+  }, [pendingImages, sendMessage, isUploadingDocs]);
 
   const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
@@ -241,6 +247,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
             </div>
           ))}
         </div>
+      ) : null}
+      {isUploadingDocs ? (
+        <div className="text-muted small mb-2">Uploading documents…</div>
       ) : null}
 
       {recordingState !== 'idle' ? (
@@ -354,7 +363,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           <div className="input-suffix">
             <button
               onClick={handleSendMessage}
-              disabled={loading || (!input.trim() && pendingImages.length === 0) || recordingState === 'processing'}
+              disabled={loading || isUploadingDocs || (!input.trim() && pendingImages.length === 0) || recordingState === 'processing'}
               className="send-icon-btn"
               title="Send message"
             >

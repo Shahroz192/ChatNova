@@ -433,37 +433,54 @@ class AIChatService:
             if has_vector:
                 from app.services.embedding_service import EmbeddingService
 
-                embedding_service = EmbeddingService(user_id, db)
-                query_embedding = await embedding_service.embed_query(query)
+                try:
+                    embedding_service = EmbeddingService(user_id, db)
+                    query_embedding = await embedding_service.embed_query(query)
 
-                # Vector search
-                vector_chunks = (
-                    db.query(DocumentChunk)
-                    .join(SessionDocument)
-                    .filter(SessionDocument.session_id == session_id)
-                    .order_by(DocumentChunk.embedding.cosine_distance(query_embedding))
-                    .limit(limit)
-                    .all()
-                )
+                    # Vector search
+                    vector_chunks = (
+                        db.query(DocumentChunk)
+                        .join(SessionDocument)
+                        .filter(SessionDocument.session_id == session_id)
+                        .order_by(
+                            DocumentChunk.embedding.cosine_distance(query_embedding)
+                        )
+                        .limit(limit)
+                        .all()
+                    )
 
-                # Keyword search (as a supplement to vector search)
-                keyword_chunks = (
-                    db.query(DocumentChunk)
-                    .join(SessionDocument)
-                    .filter(SessionDocument.session_id == session_id)
-                    .filter(query_filter)
-                    .limit(limit // 2)
-                    .all()
-                )
+                    # Keyword search (as a supplement to vector search)
+                    keyword_chunks = (
+                        db.query(DocumentChunk)
+                        .join(SessionDocument)
+                        .filter(SessionDocument.session_id == session_id)
+                        .filter(query_filter)
+                        .limit(limit // 2)
+                        .all()
+                    )
 
-                # Merge and deduplicate
-                seen_ids = set()
-                chunks = []
-                for c in vector_chunks + keyword_chunks:
-                    if c.id not in seen_ids:
-                        chunks.append(c)
-                        seen_ids.add(c.id)
-                chunks = chunks[:limit]
+                    # Merge and deduplicate
+                    seen_ids = set()
+                    chunks = []
+                    for c in vector_chunks + keyword_chunks:
+                        if c.id not in seen_ids:
+                            chunks.append(c)
+                            seen_ids.add(c.id)
+                    chunks = chunks[:limit]
+                except ValueError as e:
+                    # Missing embeddings credentials: fall back to keyword search.
+                    logging.warning(
+                        f"Embeddings unavailable for user {user_id}, "
+                        f"falling back to keyword search: {e}"
+                    )
+                    chunks = (
+                        db.query(DocumentChunk)
+                        .join(SessionDocument)
+                        .filter(SessionDocument.session_id == session_id)
+                        .filter(query_filter)
+                        .limit(limit)
+                        .all()
+                    )
             else:
                 # Fallback to simple keyword search if pgvector is missing
                 chunks = (
@@ -646,7 +663,7 @@ class AIChatService:
 
                 prompt = ChatPromptTemplate.from_messages(
                     [
-                        ("system", system_prompt),
+                        ("system", "{system_prompt}"),
                         MessagesPlaceholder(variable_name="chat_history"),
                         (
                             "human",
@@ -663,6 +680,7 @@ class AIChatService:
                         "input": sanitized_message,
                         "chat_history": chat_history,
                         "search_results": search_results,
+                        "system_prompt": system_prompt,
                     }
                 ):
                     full_response += chunk
@@ -694,7 +712,7 @@ class AIChatService:
 
             prompt = ChatPromptTemplate.from_messages(
                 [
-                    ("system", system_prompt),
+                    ("system", "{system_prompt}"),
                     MessagesPlaceholder(variable_name="chat_history"),
                     MessagesPlaceholder(variable_name="input"),
                 ]
@@ -704,7 +722,11 @@ class AIChatService:
             input_msg = [HumanMessage(content=human_content)]
 
             async for chunk in chain.astream(
-                {"input": input_msg, "chat_history": chat_history}
+                {
+                    "input": input_msg,
+                    "chat_history": chat_history,
+                    "system_prompt": system_prompt,
+                }
             ):
                 full_response += chunk
                 yield chunk

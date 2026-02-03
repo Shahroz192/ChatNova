@@ -28,6 +28,7 @@ class SessionDocument(Base):
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String, nullable=False)
     file_type = Column(String, nullable=False)  # pdf, image, docx, txt, etc.
+    file_path = Column(String, nullable=True)
     session_id = Column(
         Integer, ForeignKey("chat_sessions.id", ondelete="CASCADE"), nullable=False
     )

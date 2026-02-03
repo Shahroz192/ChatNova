@@ -42,6 +42,7 @@ def upgrade() -> None:
         sa.Column("file_type", sa.String(), nullable=False),
         sa.Column("session_id", sa.Integer(), nullable=False),
         sa.Column("user_id", sa.Integer(), nullable=False),
+        sa.Column("message_id", sa.Integer(), nullable=True),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -52,6 +53,9 @@ def upgrade() -> None:
             ["session_id"], ["chat_sessions.id"], ondelete="CASCADE"
         ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["message_id"], ["messages.id"], ondelete="SET NULL"
+        ),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(

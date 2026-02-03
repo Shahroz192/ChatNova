@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Card, ListGroup, Button } from 'react-bootstrap';
 import { User, FileText } from 'lucide-react';
 import Timestamp from './Timestamp';
@@ -37,10 +37,41 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
     handleDeleteMessage,
     cancelStreaming,
 }) => {
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [previewDoc, setPreviewDoc] = useState<{ id: number; filename: string } | null>(null);
+    const versions = useMemo(() => {
+        if (msg.response_versions && msg.response_versions.length > 0) return msg.response_versions;
+        if (msg.response) {
+            return [{
+                id: msg.id,
+                response: msg.response,
+                created_at: msg.created_at,
+                model: msg.model,
+            }];
+        }
+        return [];
+    }, [msg.response_versions, msg.response, msg.id, msg.created_at, msg.model]);
+
+    const [activeVersionIdx, setActiveVersionIdx] = useState(
+        versions.length ? versions.length - 1 : 0,
+    );
+
+    useEffect(() => {
+        if (versions.length) {
+            setActiveVersionIdx(versions.length - 1);
+        }
+    }, [versions.length, msg.id, msg.response]);
+
+    const selectedResponse = versions[activeVersionIdx]?.response || msg.response || "";
+
+    const responseText = (msg.id === streamingMessageId && isStreaming)
+        ? streamingResponse
+        : selectedResponse;
+
     const uiData = useMemo(() => {
-        if (!msg.response) return null;
+        if (!responseText) return null;
         try {
-            let jsonString = msg.response.trim();
+            let jsonString = responseText.trim();
             const jsonBlockMatch = jsonString.match(/```json\n([\s\S]*?)\n```/);
             if (jsonBlockMatch) {
                 jsonString = jsonBlockMatch[1];
@@ -56,9 +87,7 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
         } catch (e) {
             return null;
         }
-    }, [msg.response]);
-
-    const responseText = (msg.id === streamingMessageId && isStreaming) ? streamingResponse : (msg.response || "");
+    }, [responseText]);
     
     const { displayResponse, sources } = useMemo(() => {
         const sourcesMatch = responseText.match(/\n\nSources:\n([\s\S]*)$/);
@@ -75,6 +104,32 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
 
     return (
         <ListGroup.Item className="border-0 message-item">
+            {(previewImage || previewDoc) ? (
+                <div className="chat-preview-backdrop" onClick={() => { setPreviewImage(null); setPreviewDoc(null); }}>
+                    <div className="chat-preview-modal" onClick={(e) => e.stopPropagation()}>
+                        <button
+                            className="chat-preview-close"
+                            onClick={() => { setPreviewImage(null); setPreviewDoc(null); }}
+                            aria-label="Close preview"
+                        >
+                            ×
+                        </button>
+                        {previewImage ? (
+                            <img src={previewImage} alt="Preview" className="chat-preview-image" />
+                        ) : null}
+                        {previewDoc ? (
+                            <div className="chat-preview-doc">
+                                <div className="chat-preview-doc-title">{previewDoc.filename}</div>
+                                <iframe
+                                    src={`/api/v1/chat/documents/${previewDoc.id}/preview`}
+                                    title={previewDoc.filename}
+                                    className="chat-preview-iframe"
+                                />
+                            </div>
+                        ) : null}
+                    </div>
+                </div>
+            ) : null}
             <div className="d-flex justify-content-end mb-2">
                 <div className="d-flex flex-column align-items-end position-relative">
                     <Card
@@ -98,6 +153,8 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                                         key={idx} 
                                         src={img} 
                                         alt="Uploaded" 
+                                        onClick={() => setPreviewImage(img)}
+                                        className="message-image-clickable"
                                         style={{ maxWidth: '200px', maxHeight: '200px', borderRadius: '8px', objectFit: 'cover' }} 
                                     />
                                 ))}
@@ -106,10 +163,15 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                         {msg.documents && msg.documents.length > 0 ? (
                             <div className="message-documents mb-2 d-flex flex-column gap-1">
                                 {msg.documents.map((doc, idx) => (
-                                    <div key={idx} className="d-flex align-items-center gap-2 p-2 bg-light bg-opacity-10 rounded text-white" style={{ fontSize: '0.85rem' }}>
+                                    <button
+                                        key={idx}
+                                        className="message-doc-item d-flex align-items-center gap-2 p-2 bg-light bg-opacity-10 rounded text-white text-start"
+                                        style={{ fontSize: '0.85rem' }}
+                                        onClick={() => setPreviewDoc({ id: doc.id, filename: doc.filename })}
+                                    >
                                         <FileText size={16} />
                                         <span className="text-truncate" style={{ maxWidth: '200px' }}>{doc.filename}</span>
-                                    </div>
+                                    </button>
                                 ))}
                             </div>
                         ) : null}
@@ -123,7 +185,7 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                             message={msg}
                             isActive={true}
                             onClose={() => setActiveContextMenu(null)}
-                            handleCopyMessage={handleCopyMessage}
+                            handleCopyMessage={(message) => handleCopyMessage({ ...message, response: "" })}
                             handleRegenerateResponse={handleRegenerateResponse}
                             handleEditMessage={handleEditMessage}
                             handleDeleteMessage={handleDeleteMessage}
@@ -179,6 +241,27 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                                         ) : (
                                             <MarkdownRenderer content={displayResponse} />
                                         )}
+                                        {versions.length > 1 ? (
+                                            <div className="d-flex align-items-center gap-2 mt-2 text-muted small">
+                                                <Button
+                                                    variant="outline-secondary"
+                                                    size="sm"
+                                                    disabled={activeVersionIdx === 0}
+                                                    onClick={() => setActiveVersionIdx((idx) => Math.max(0, idx - 1))}
+                                                >
+                                                    &lt;
+                                                </Button>
+                                                <span>Version {activeVersionIdx + 1} of {versions.length}</span>
+                                                <Button
+                                                    variant="outline-secondary"
+                                                    size="sm"
+                                                    disabled={activeVersionIdx === versions.length - 1}
+                                                    onClick={() => setActiveVersionIdx((idx) => Math.min(versions.length - 1, idx + 1))}
+                                                >
+                                                    &gt;
+                                                </Button>
+                                            </div>
+                                        ) : null}
                                     </div>
                                 )}
                                 <SourceList sources={sources} />
@@ -190,7 +273,7 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                             message={msg}
                             isActive={true}
                             onClose={() => setActiveContextMenu(null)}
-                            handleCopyMessage={handleCopyMessage}
+                            handleCopyMessage={(message) => handleCopyMessage({ ...message, response: selectedResponse })}
                             handleRegenerateResponse={handleRegenerateResponse}
                             handleEditMessage={handleEditMessage}
                             handleDeleteMessage={handleDeleteMessage}

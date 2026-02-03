@@ -51,7 +51,8 @@ export const streamChat = async (
   onChunk?: (chunk: string) => void,
   onComplete?: () => void,
   onError?: (error: string) => void,
-  onToolUpdate?: (update: any) => void
+  onToolUpdate?: (update: any) => void,
+  signal?: AbortSignal
 ) => {
   try {
     const params = new URLSearchParams();
@@ -70,6 +71,7 @@ export const streamChat = async (
       if (searchOptions.language) requestBody.language = searchOptions.language;
       if (searchOptions.region) requestBody.region = searchOptions.region;
       if (searchOptions.modifiers) requestBody.search_modifiers = searchOptions.modifiers;
+      if (searchOptions.document_ids) requestBody.document_ids = searchOptions.document_ids;
     }
 
     let endpoint = '/api/v1/chat/stream';
@@ -84,6 +86,7 @@ export const streamChat = async (
       },
       credentials: 'include',
       body: JSON.stringify(requestBody),
+      signal,
     });
 
     if (!response.ok) {
@@ -99,6 +102,55 @@ export const streamChat = async (
     const decoder = new TextDecoder();
     let buffer = '';
     let hasSearchData = false;
+    let currentEventData = '';
+
+    const processEvent = (dataRaw: string) => {
+      const data = dataRaw;
+      const dataTrimmed = dataRaw.trim();
+
+      let parsedData = null;
+      try {
+        parsedData = JSON.parse(dataTrimmed);
+      } catch (e) {
+        // Not valid JSON, maybe just string content.
+      }
+
+      if (dataTrimmed === '[DONE]') {
+        if (hasSearchData && searchOptions?.search_web) {
+          addToSearchHistory(content, 0, 'general', true);
+        }
+        onComplete?.();
+        return 'done';
+      }
+
+      if (dataTrimmed.startsWith('ERROR:')) {
+        onError?.(dataTrimmed.slice(6));
+        return 'error';
+      }
+
+      if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData)) {
+        if (parsedData.type === 'tool_start' || parsedData.type === 'tool_end') {
+          onToolUpdate?.(parsedData);
+        } else if (parsedData.type === 'content') {
+          onChunk?.(parsedData.content);
+        } else if (parsedData.type === 'error') {
+          onError?.(parsedData.content);
+          return 'error';
+        } else {
+          // Fallback for generative UI in standard chat (legacy check)
+          const jsonString = JSON.stringify(parsedData);
+          if (jsonString.includes('"type":"container"') && jsonString.includes('search_results')) {
+            hasSearchData = true;
+            onChunk?.(jsonString);
+          }
+        }
+      } else {
+        // It's a string chunk (standard chat)
+        onChunk?.(data);
+      }
+
+      return 'continue';
+    };
 
     while (true) {
       const { done, value } = await reader.read();
@@ -109,73 +161,53 @@ export const streamChat = async (
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
 
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          let data = line.slice(6).trim();
+      for (let i = 0; i < lines.length; i += 1) {
+        const rawLine = lines[i];
+        const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
 
-          // Handle simple string data or JSON
-          if (data.startsWith('"') && data.endsWith('"')) {
-             // It might be a simple JSON string message
-              try {
-                // Double parse if it's a stringified JSON string? 
-                // In standard chat stream it sends plain text sometimes wrapped or raw chunks?
-                // The backend sends `data: {chunk}\n\n` or `data: JSON\n\n`
-                // Let's try to parse as JSON first if it looks like object
-              } catch(e) {}
-          }
-          
-          let parsedData = null;
-          try {
-              parsedData = JSON.parse(data);
-          } catch (e) {
-              // Not valid JSON, maybe just string content?
-              // In agent stream, everything is JSON. In normal chat, it might be raw string chunks if not handled carefully, 
-              // but looking at valid SSE, data usually is just the string. 
-              // However, Chat.tsx logic before was `chunk` being the string.
-          }
+        if (line === '') {
+          const nextRaw = lines[i + 1];
+          const nextLine = nextRaw
+            ? (nextRaw.endsWith('\r') ? nextRaw.slice(0, -1) : nextRaw)
+            : undefined;
 
-          if (data === '[DONE]') {
-            if (hasSearchData && searchOptions?.search_web) {
-              addToSearchHistory(content, 0, 'general', true);
+          const nextLooksLikeEvent =
+            nextLine === undefined ||
+            nextLine.startsWith('data:') ||
+            nextLine.startsWith(':') ||
+            nextLine.startsWith('id:') ||
+            nextLine.startsWith('event:') ||
+            nextLine.startsWith('retry:');
+
+          if (currentEventData !== '' && nextLooksLikeEvent) {
+            const status = processEvent(currentEventData);
+            currentEventData = '';
+            if (status === 'done' || status === 'error') {
+              return;
             }
-            onComplete?.();
-            return;
-          } else if (data.startsWith('ERROR:')) {
-            onError?.(data.slice(6));
-            return;
-          } else {
-             // Check if it is an Agent Event (JSON)
-             if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData)) {
-                 if (parsedData.type === 'tool_start' || parsedData.type === 'tool_end') {
-                     onToolUpdate?.(parsedData);
-                 } else if (parsedData.type === 'content') {
-                     onChunk?.(parsedData.content);
-                 } else if (parsedData.type === 'error') {
-                     onError?.(parsedData.content);
-                 } else {
-                     // Fallback for generative UI in standard chat (legacy check)
-                    if (JSON.stringify(parsedData).includes('"type":"container"') && JSON.stringify(parsedData).includes('search_results')) {
-                        hasSearchData = true;
-                        onChunk?.(JSON.stringify(parsedData)); // Pass full JSON for generative UI
-                    } else {
-                        // Regular message chunk probably in JSON format? 
-                        // If it's none of the above, key might be missing or logic differs.
-                        // For standard chat, parsedData might be just the chunk string if JSON.parse worked on a quoted string?
-                        // Actually standard chat `yield chunk` sends the string. `f"data: {chunk}\n\n"` in python.
-                        // If chunk is `Hello`, data is `Hello`. JSON.parse fails. passed as string.
-                        // If chunk is `{"foo": "bar"}`, data is `{"foo": "bar"}`. JSON.parse works.
-                    }
-                 }
-             } else {
-                 // It's a string chunk (standard chat)
-                 onChunk?.(data);
-             }
+          } else if (currentEventData !== '') {
+            // Preserve blank lines inside a chunk (backend doesn't split multiline data per SSE spec).
+            currentEventData += '\n';
           }
+          continue;
+        }
+
+        if (line.startsWith('data:')) {
+          let dataPart = line.slice(5);
+          if (dataPart.startsWith(' ')) dataPart = dataPart.slice(1);
+          currentEventData += (currentEventData ? '\n' : '') + dataPart;
+        } else if (line.startsWith(':')) {
+          // Comment line in SSE, ignore.
+        } else {
+          // Non-standard continuation without "data:" prefix (backend may emit raw newlines).
+          currentEventData += (currentEventData ? '\n' : '') + line;
         }
       }
     }
 
-    onComplete?.();
+    if (currentEventData !== '') {
+      processEvent(currentEventData);
+    }
   } catch (error) {
     console.error('Streaming error:', error);
     onError?.(error instanceof Error ? error.message : 'Unknown error occurred');

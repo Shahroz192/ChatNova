@@ -10,6 +10,7 @@ from fastapi import (
     File,
 )
 from fastapi.responses import StreamingResponse
+from starlette.responses import FileResponse
 from sqlalchemy.orm import Session
 from app import crud
 from app.schemas.message import Message, MessageCreate, MessagePagination
@@ -34,7 +35,7 @@ import gzip
 import os
 import json
 import logging
-import tempfile
+from pathlib import Path
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -822,8 +823,6 @@ async def process_document_task(
         logging.error(f"Error processing document {document_id}: {e}")
     finally:
         db.close()
-        if os.path.exists(file_path):
-            os.remove(file_path)
 
 
 @router.post("/chat/upload", response_model=DocumentSchema)
@@ -848,19 +847,55 @@ async def upload_file(
     }
     doc_record = document_crud.create(db, obj_in=doc_in)
 
-    temp_dir = tempfile.gettempdir()
+    backend_dir = Path(__file__).resolve().parents[3]
+    upload_dir = backend_dir / "uploads"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
     sanitized_filename = InputSanitizer.sanitize_filename(file.filename)
-    temp_path = os.path.join(temp_dir, f"{doc_record.id}_{sanitized_filename}")
-    with open(temp_path, "wb") as f:
+    stored_path = upload_dir / f"{doc_record.id}_{sanitized_filename}"
+    with open(stored_path, "wb") as f:
         f.write(await file.read())
+
+    doc_record.file_path = str(stored_path)
+    db.add(doc_record)
+    db.commit()
+    db.refresh(doc_record)
 
     from app.database import SessionLocal
 
     background_tasks.add_task(
-        process_document_task, temp_path, doc_record.id, current_user.id, SessionLocal
+        process_document_task,
+        str(stored_path),
+        doc_record.id,
+        current_user.id,
+        SessionLocal,
     )
 
     return doc_record
+
+
+@router.get("/chat/documents/{document_id}/preview")
+def preview_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    doc_record = document_crud.get(db, id=document_id)
+    if not doc_record or doc_record.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    if doc_record.file_type.lower() != "pdf":
+        raise HTTPException(status_code=400, detail="Preview only supported for PDF")
+
+    if not doc_record.file_path or not os.path.exists(doc_record.file_path):
+        raise HTTPException(status_code=404, detail="File not available for preview")
+
+    filename = doc_record.filename or f"document_{doc_record.id}.pdf"
+    return FileResponse(
+        doc_record.file_path,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
 
 
 @router.post("/chat/transcribe")

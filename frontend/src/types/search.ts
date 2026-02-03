@@ -78,6 +78,7 @@ export interface WebSearchOptions {
   language?: string;
   region?: string;
   modifiers?: SearchQueryModifiers;
+  document_ids?: number[];
 }
 
 export interface SearchHistoryItem {
