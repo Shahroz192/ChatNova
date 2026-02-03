@@ -9,13 +9,15 @@
 
 ## Description
 
-ChatNova is a robust and modern AI chat application designed to provide a unified interface for interacting with multiple Large Language Models (LLMs). It seamlessly integrates models from providers like Google (Gemini), Cerebras (Qwen), and Groq, allowing users to leverage the best AI tools from a single platform. Beyond standard text chat, ChatNova features "Generative UI" capabilities, enabling the dynamic rendering of charts and image galleries directly within the conversation stream.
+ChatNova is a robust and modern AI chat application designed to provide a unified interface for interacting with multiple Large Language Models (LLMs). It seamlessly integrates models from providers like Google (Gemini), Cerebras (Qwen), and Groq, allowing users to leverage the best AI tools from a single platform.
 
-Built with performance and scalability in mind, the application employs a high-performance FastAPI backend and a reactive frontend using React 19 and Vite. It includes comprehensive user authentication, chat history management, and detailed performance profiling tools for memory and database optimization.
+Beyond standard text chat, ChatNova features **Multi-Modal RAG (Retrieval-Augmented Generation)** capabilities, allowing users to upload documents and images to provide session-specific context. The application also includes **Web Search** integration for real-time information retrieval and "Generative UI" for dynamic rendering of charts and image galleries directly within the conversation stream.
 
 ## Key Features
 
 - **Multi-Provider AI Support**: Interact with models from Google, Cerebras, and Groq via LangChain integration.
+- **Multi-Modal RAG Support**: Upload documents (PDF, DOCX, TXT, MD) and images (Gemini models) to provide session-bound context for AI responses with automatic inline citations.
+- **Web Search Integration**: Real-time web access to supplement AI responses with up-to-date information.
 - **Model Context Protocol (MCP)**: Implements MCP adapters to standardize interactions and extend capabilities with various tools and resources.
 - **Generative UI**: Automatically render interactive charts (Bar, Line, Pie) and image galleries based on AI responses using Recharts and React components.
 - **Custom Instructions**: Users can define personalized system instructions to tailor the AI's persona and response style.
@@ -28,14 +30,15 @@ Built with performance and scalability in mind, the application employs a high-p
 
 ChatNova follows a modern client-server architecture:
 
-1.  **Frontend (Client)**: A React-based Single Page Application (SPA) served via Vite. It handles user interactions, renders the Generative UI components, and communicates with the backend via RESTful APIs.
-2.  **Backend (API)**: A FastAPI application that serves as the orchestrator. It manages authentication, processes chat requests, integrates with external AI APIs using LangChain, and handles database operations.
-3.  **Database**: PostgreSQL is used for persistent storage of user data, chat sessions, messages, and memories.
-4.  **AI Integration Layer**: The backend utilizes LangChain and Model Context Protocol (MCP) adapters to standardize interactions with various LLM providers.
+1. **Frontend (Client)**: A React-based Single Page Application (SPA) served via Vite. It handles user interactions, renders the Generative UI components, and communicates with the backend via RESTful APIs.
+2. **Backend (API)**: A FastAPI application that serves as the orchestrator. It manages authentication, processes chat requests, performs document chunking/embedding, and integrates with external AI APIs.
+3. **Database**: PostgreSQL with the **pgvector** extension is used for persistent storage and high-performance vector similarity search for RAG.
+4. **AI Integration Layer**: The backend utilizes LangChain and Model Context Protocol (MCP) adapters to standardize interactions with various LLM providers.
 
 ## Tech Stack
 
 **Frontend:**
+
 - **Framework**: React 19, TypeScript 5.9
 - **Build Tool**: Vite 7
 - **Styling**: Bootstrap 5, React-Bootstrap
@@ -44,14 +47,17 @@ ChatNova follows a modern client-server architecture:
 - **Package Manager**: pnpm
 
 **Backend:**
+
 - **Framework**: Python 3.12+, FastAPI 0.118+
-- **Database**: PostgreSQL 16, SQLAlchemy, Alembic
+- **Database**: PostgreSQL 16, pgvector, SQLAlchemy 2.0, Alembic
 - **AI/ML**: LangChain (Core, Google, Cerebras, Groq), MCP Adapters
+- **Document Processing**: PyMuPDF (fitz), python-docx
 - **Security**: OAuth2 (JWT), Passlib (Bcrypt), Bleach (Sanitization)
-- **Utilities**: SlowAPI (Rate Limiting), Pydantic
+- **Utilities**: SlowAPI (Rate Limiting), Pydantic V2
 - **Package Manager**: uv
 
 **Infrastructure:**
+
 - Docker & Docker Compose
 
 ## Installation and Setup
@@ -79,6 +85,7 @@ cp .env.example .env
 ```
 
 Open `.env` and populate the critical variables:
+
 - `POSTGRES_PASSWORD`: Set a strong password.
 - `GOOGLE_API_KEY`: Your Google Gemini API key.
 - `CEREBRAS_API_KEY`: Your Cerebras API key.
@@ -116,32 +123,36 @@ The easiest way to run the entire application is with Docker Compose.
 docker-compose up --build
 ```
 
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:8000
-- **API Docs**: http://localhost:8000/docs
+- **Frontend**: <http://localhost:5173>
+- **Backend API**: <http://localhost:8000>
+- **API Docs**: <http://localhost:8000/docs>
 
 ### Option 2: Local Development
 
 If you prefer running services locally:
 
-1.  **Start the Database**:
+1. **Start the Database**:
+
     ```bash
     docker-compose up db -d
     ```
 
-2.  **Run Migrations**:
+2. **Run Migrations**:
+
     ```bash
     cd backend
     uv run alembic upgrade head
     ```
 
-3.  **Start Backend**:
+3. **Start Backend**:
+
     ```bash
     # From backend/ directory
     uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
     ```
 
-4.  **Start Frontend**:
+4. **Start Frontend**:
+
     ```bash
     # From frontend/ directory
     pnpm dev
