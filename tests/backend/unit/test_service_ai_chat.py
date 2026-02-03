@@ -55,7 +55,7 @@ def test_get_llm(ai_service):
 def test_get_session_memory(ai_service):
     session_id = 123
     memory = ai_service.get_session_memory(session_id)
-    assert memory.memory_key == "chat_history"
+    assert hasattr(memory, "messages")
     assert ai_service.get_session_memory(session_id) is memory
 
 

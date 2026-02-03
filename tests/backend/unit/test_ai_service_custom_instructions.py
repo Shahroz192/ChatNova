@@ -31,7 +31,9 @@ async def test_simple_chat_includes_custom_instructions():
         async def mock_astream(*args, **kwargs):
             yield "Test response"
 
-        mock_llm.astream = mock_astream
+        # Fix: Use MagicMock with side_effect to track calls to the async generator
+        mock_astream_mock = MagicMock(side_effect=mock_astream)
+        mock_llm.astream = mock_astream_mock
 
         with patch.object(service, "get_llm", return_value=mock_llm):
             # We want to capture the prompt sent to the LLM.
@@ -43,7 +45,7 @@ async def test_simple_chat_includes_custom_instructions():
             ) as mock_from_messages:
                 mock_prompt = MagicMock()
                 mock_prompt.__or__.return_value = mock_prompt  # Mock the pipe operator
-                mock_prompt.astream = mock_astream
+                mock_prompt.astream = mock_astream_mock
                 mock_from_messages.return_value = mock_prompt
 
                 # Execute simple_chat
@@ -56,12 +58,13 @@ async def test_simple_chat_includes_custom_instructions():
                     pass
 
                 # Check if system prompt included custom instructions
-                # The call to from_messages should have the system prompt as first element
-                args, _ = mock_from_messages.call_args
-                messages = args[0]
-                system_msg = next(m for m in messages if m[0] == "system")[1]
+                # The prompt template is rendered with variables passed to astream
+                # So we inspect the call to astream
+                args, _ = mock_prompt.astream.call_args
+                input_data = args[0]
+                system_prompt = input_data.get("system_prompt", "")
 
-                assert custom_instr in system_msg
+                assert custom_instr in system_prompt
 
 
 @pytest.mark.asyncio
@@ -84,7 +87,8 @@ async def test_simple_chat_no_instructions_behavior():
         async def mock_astream(*args, **kwargs):
             yield "Test response"
 
-        mock_llm.astream = mock_astream
+        mock_astream_mock = MagicMock(side_effect=mock_astream)
+        mock_llm.astream = mock_astream_mock
 
         with patch.object(service, "get_llm", return_value=mock_llm):
             with patch(
@@ -92,7 +96,7 @@ async def test_simple_chat_no_instructions_behavior():
             ) as mock_from_messages:
                 mock_prompt = MagicMock()
                 mock_prompt.__or__.return_value = mock_prompt
-                mock_prompt.astream = mock_astream
+                mock_prompt.astream = mock_astream_mock
                 mock_from_messages.return_value = mock_prompt
 
                 async for _ in service.simple_chat(
@@ -103,9 +107,10 @@ async def test_simple_chat_no_instructions_behavior():
                 ):
                     pass
 
-                args, _ = mock_from_messages.call_args
-                messages = args[0]
-                system_msg = next(m for m in messages if m[0] == "system")[1]
+                # Check arguments passed to astream
+                args, _ = mock_prompt.astream.call_args
+                input_data = args[0]
+                system_msg = input_data.get("system_prompt", "")
 
                 # Should NOT contain a specific "Custom Instructions" section if empty
                 assert "Custom Instructions" not in system_msg
