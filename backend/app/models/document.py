@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, ARRAY, Float
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, ARRAY, Float, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base, engine
@@ -19,7 +19,11 @@ if has_vector:
 
     embedding_type = Vector(768)
 else:
-    embedding_type = ARRAY(Float)
+    # Use JSON for SQLite (testing)
+    if engine.dialect.name == "sqlite":
+        embedding_type = JSON
+    else:
+        embedding_type = ARRAY(Float)
 
 
 class SessionDocument(Base):
