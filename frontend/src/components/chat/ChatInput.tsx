@@ -16,7 +16,7 @@ import { transcribeAudio } from '../../utils/api';
 
 interface ChatInputProps {
   input: string;
-  setInput: (value: string) => void;
+  setInput: React.Dispatch<React.SetStateAction<string>>;
   sendMessage: (images?: string[]) => void;
   loading: boolean;
   isUploadingDocs?: boolean;
@@ -122,7 +122,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           const audioBlob = new Blob(chunksRef.current, { type: 'audio/wav' });
           try {
             const text = await transcribeAudio(audioBlob);
-            setInput(prev => prev ? `${prev} ${text}` : text);
+            setInput((prev: string) => prev ? `${prev} ${text}` : text);
           } catch (error) {
             console.error('Transcription error:', error);
           } finally {
