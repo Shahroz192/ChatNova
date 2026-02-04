@@ -195,8 +195,11 @@ class InputSanitizer:
 
         # Check for command injection patterns
         cmd_patterns = [
-            r"[\|&;`$(){}\[\]<>]",  # Shell metacharacters
-            r"&&\s*|\|\|\s*",  # Command chaining
+            r"[`].+[`]",            # Backticks: `command`
+            r"\$\(.*\)",            # Command substitution: $(command)
+            r"\${.*}",              # Variable expansion: ${VAR}
+            r"&&|\|\|",             # Command chaining: && or ||
+            r"<\s*\(|>\s*\(",       # Process substitution: <(cmd) or >(cmd)
         ]
 
         for pattern in cmd_patterns:
@@ -383,8 +386,10 @@ class InputSanitizer:
 
         # Check for command injection patterns
         cmd_indicators = [
-            (r"[;&|`$(){}[\]<>]", "Command injection characters"),
-            (r"&&\s*|\|\|", "Command chaining"),
+            (r"[`].+[`]", "Backticks usage"),
+            (r"\$\(.*\)", "Command substitution"),
+            (r"\${.*}", "Variable expansion"),
+            (r"&&|\|\|", "Command chaining"),
             (r"curl\s+|wget\s+|nc\s+|netcat\s+", "Network command usage"),
         ]
 
