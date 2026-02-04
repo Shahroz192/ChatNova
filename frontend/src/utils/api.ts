@@ -136,6 +136,8 @@ export const streamChat = async (
         } else if (parsedData.type === 'error') {
           onError?.(parsedData.content);
           return 'error';
+        } else if (parsedData.type === 'container' && Array.isArray(parsedData.children)) {
+          onChunk?.(JSON.stringify(parsedData));
         } else {
           // Fallback for generative UI in standard chat (legacy check)
           const jsonString = JSON.stringify(parsedData);
@@ -195,7 +197,12 @@ export const streamChat = async (
         if (line.startsWith('data:')) {
           let dataPart = line.slice(5);
           if (dataPart.startsWith(' ')) dataPart = dataPart.slice(1);
-          currentEventData += (currentEventData ? '\n' : '') + dataPart;
+          if (dataPart === '' && currentEventData === '') {
+            // Backend can emit a standalone newline chunk as an empty data line.
+            currentEventData = '\n';
+          } else {
+            currentEventData += (currentEventData ? '\n' : '') + dataPart;
+          }
         } else if (line.startsWith(':')) {
           // Comment line in SSE, ignore.
         } else {

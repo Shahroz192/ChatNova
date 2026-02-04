@@ -359,6 +359,12 @@ def chat_stream(
     Optionally associate with a session for conversation context.
     """
 
+    def _format_sse_data(chunk: str) -> str:
+        # SSE requires each line to be prefixed with "data: "
+        # Preserve empty lines by emitting an empty data field.
+        lines = chunk.split("\n")
+        return "".join(f"data: {line}\n" for line in lines) + "\n"
+
     async def stream_response():
         try:
             # Create message record first
@@ -402,7 +408,7 @@ def chat_stream(
                 full_response += chunk
 
                 # Send chunk to client
-                yield f"data: {chunk}\n\n"
+                yield _format_sse_data(chunk)
 
             # Update the message with the complete response
             crud.message.update(db, db_obj=msg, obj_in={"response": full_response})
@@ -449,6 +455,10 @@ def chat_agent_stream(
     Events are JSON objects with types: 'tool_start', 'tool_end', 'content'.
     """
 
+    def _format_sse_data(chunk: str) -> str:
+        lines = chunk.split("\n")
+        return "".join(f"data: {line}\n" for line in lines) + "\n"
+
     async def stream_response():
         try:
             msg = crud.message.create(
@@ -483,7 +493,7 @@ def chat_agent_stream(
                 db,
                 session_id,
             ):
-                yield f"data: {chunk}\n\n"
+                yield _format_sse_data(chunk)
 
                 try:
                     data = json.loads(chunk)
