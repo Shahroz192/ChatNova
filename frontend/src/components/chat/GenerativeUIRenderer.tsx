@@ -5,6 +5,7 @@ import ChartRenderer from './ChartRenderer';
 import SearchResults from './SearchResults';
 import NewsCard from './NewsCard';
 import ImageGallery from './ImageGallery';
+import MarkdownRenderer from './MarkdownRenderer';
 import '../../styles/GenerativeUI.css';
 
 interface RendererProps {
@@ -339,9 +340,9 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                 case 'text':
                     return (
                         <ComponentWrapper width={props.width} key={key}>
-                            <p className="gen-ui-text-label">
-                                {props.label || props.text}
-                            </p>
+                            <div className="gen-ui-text-container">
+                                <MarkdownRenderer content={props.label || props.text || ''} />
+                            </div>
                         </ComponentWrapper>
                     );
 

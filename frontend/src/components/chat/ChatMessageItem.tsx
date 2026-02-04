@@ -68,10 +68,20 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
         ? streamingResponse
         : selectedResponse;
 
+    const { displayResponse, sources } = useMemo(() => {
+        const sourcesMatch = responseText.match(/\n\nSources:\n([\s\S]*)$/);
+        const display = sourcesMatch ? responseText.substring(0, sourcesMatch.index) : responseText;
+        const srcList = sourcesMatch ? sourcesMatch[1].trim().split('\n').map(line => {
+            const m = line.match(/^\[(\d+)\] (.*)$/);
+            return m ? { id: parseInt(m[1]), filename: m[2] } : null;
+        }).filter((s): s is { id: number; filename: string } => s !== null) : [];
+        return { displayResponse: display, sources: srcList };
+    }, [responseText]);
+
     const uiData = useMemo(() => {
-        if (!responseText) return null;
+        if (!displayResponse) return null;
         try {
-            let jsonString = responseText.trim();
+            let jsonString = displayResponse.trim();
             const jsonBlockMatch = jsonString.match(/```json\n([\s\S]*?)\n```/);
             if (jsonBlockMatch) {
                 jsonString = jsonBlockMatch[1];
@@ -87,17 +97,7 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
         } catch (e) {
             return null;
         }
-    }, [responseText]);
-    
-    const { displayResponse, sources } = useMemo(() => {
-        const sourcesMatch = responseText.match(/\n\nSources:\n([\s\S]*)$/);
-        const display = sourcesMatch ? responseText.substring(0, sourcesMatch.index) : responseText;
-        const srcList = sourcesMatch ? sourcesMatch[1].trim().split('\n').map(line => {
-            const m = line.match(/^\[(\d+)\] (.*)$/);
-            return m ? { id: parseInt(m[1]), filename: m[2] } : null;
-        }).filter((s): s is { id: number; filename: string } => s !== null) : [];
-        return { displayResponse: display, sources: srcList };
-    }, [responseText]);
+    }, [displayResponse]);
 
     const isUserActive = activeContextMenu?.id === msg.id && activeContextMenu?.type === 'user';
     const isAssistantActive = activeContextMenu?.id === msg.id && activeContextMenu?.type === 'assistant';

@@ -294,8 +294,9 @@ class AIChatService:
     ) -> str:
         """Optimize the user's message into a search-engine friendly query."""
         from datetime import datetime
+
         current_date = datetime.now().strftime("%B %Y")
-        
+
         opt_prompt = ChatPromptTemplate.from_messages(
             [
                 (
@@ -491,7 +492,7 @@ class AIChatService:
                 )
 
             if not chunks:
-                # Greedy Fallback: If no chunks match the specific keywords, 
+                # Greedy Fallback: If no chunks match the specific keywords,
                 # fetch the most recent chunks from this session anyway.
                 # This ensures the AI always has some context if documents exist.
                 chunks = (
@@ -521,8 +522,9 @@ class AIChatService:
 
             return {
                 "text": "\n\n### DOCUMENT CONTEXT (RAG)\n"
-                        "Use the following information from the user's uploaded files to answer their question. "
-                        "If the answer is found here, prioritize it.\n\n" + "\n---\n".join(context_parts),
+                "Use the following information from the user's uploaded files to answer their question. "
+                "If the answer is found here, prioritize it.\n\n"
+                + "\n---\n".join(context_parts),
                 "sources": sources,
             }
         except Exception as e:
@@ -591,7 +593,7 @@ class AIChatService:
 
         # Get relevant document chunks (RAG)
         document_context_data = {"text": "", "sources": []}
-        if session_id and db:
+        if session_id and db and user_id:
             document_context_data = await self.get_relevant_chunks(
                 sanitized_message, session_id, user_id, db
             )
@@ -606,6 +608,7 @@ class AIChatService:
         tagged_message = f"<USER_INPUT>\n{sanitized_message}\n</USER_INPUT>"
 
         from datetime import datetime
+
         current_date_full = datetime.now().strftime("%A, %B %d, %Y")
 
         if is_multimodal and images:
@@ -648,6 +651,7 @@ class AIChatService:
                     "- Synthesize information from multiple search results to provide a comprehensive answer.\n"
                     "- If search results conflict, present the different viewpoints or the most recent information.\n"
                     "- Synthesize information from the 'DOCUMENT CONTEXT' if provided to answer queries about uploaded files.\n"
+                    "- RAG Format: Prefer standard Markdown text for document-based answers. Use UI components ONLY if the user explicitly asks for a chart, table, or visualization from the document data.\n"
                     "- DO NOT mention your internal training data cutoff; act as if you are always up-to-date.\n"
                     "- If search results are insufficient, use them as far as possible and supplement with general knowledge, but clearly distinguish between searched facts and general knowledge.\n\n"
                     "FORMATTING & STYLE:\n"
@@ -702,6 +706,7 @@ class AIChatService:
                 "- Tone: Professional, helpful, and concise.\n"
                 "- Formatting: Use rich Markdown (tables, bolding, lists) to make information digestible.\n"
                 "- Document Awareness: If 'DOCUMENT CONTEXT' is provided below, use it as your authoritative source for answering questions about the user's files.\n"
+                "- RAG Format: Prefer standard Markdown text for document-based answers. Use UI components ONLY if the user explicitly asks for a chart, table, or visualization from the document data.\n"
                 "- Citations: When using information from provided documents or context, cite them clearly using [Source Name/Number].\n"
                 f"{custom_instructions}"
                 f"{relevant_memories}"

@@ -92,15 +92,16 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
 
   // Status-based messages
   const statusMessage = useMemo(() => {
+    const withModel = !showModel;
     switch (status) {
       case 'processing':
-        return `${modelName} is processing`;
+        return withModel ? `${modelName} is processing` : 'Processing';
       case 'generating':
-        return `${modelName} is generating response`;
+        return withModel ? `${modelName} is generating response` : 'Generating response';
       default:
-        return `${modelName} is thinking`;
+        return withModel ? `${modelName} is thinking` : 'Thinking';
     }
-  }, [status, modelName]);
+  }, [status, modelName, showModel]);
 
   // Render animation content based on style
   const renderAnimation = () => {
@@ -236,9 +237,9 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
       <div
         className="sr-only"
         aria-live="polite"
-        aria-label={`${modelName} is ${status === 'thinking' ? 'thinking' : status}`}
+        aria-label={showModel ? statusMessage : `${modelName} is ${status === 'thinking' ? 'thinking' : status}`}
       >
-        {modelName} is {status === 'thinking' ? 'thinking' : status}
+        {showModel ? statusMessage : `${modelName} is ${status === 'thinking' ? 'thinking' : status}`}
       </div>
     </div>
   );
