@@ -7,6 +7,7 @@ import {
   SortDesc
 } from 'lucide-react';
 import type { SearchResultData, SearchControlsData } from '../../types/search';
+import { useToast } from '../../contexts/ToastContext';
 
 interface SearchResultsProps {
   results: SearchResultData[];
@@ -35,40 +36,51 @@ const SearchResults: React.FC<SearchResultsProps> = ({
   controls,
   onControlChange
 }) => {
+  const { success, error } = useToast();
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [selectedResults, setSelectedResults] = useState<Set<number>>(new Set());
+  const [selectedUrls, setSelectedUrls] = useState<Set<string>>(new Set());
 
   const handleSort = useCallback(() => {
-    setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
-  }, []);
+    const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+    setSortOrder(newOrder);
+    success(`Sorted by relevance (${newOrder === 'desc' ? 'descending' : 'ascending'})`);
+  }, [sortOrder, success]);
 
-  const handleResultSelect = useCallback((index: number) => {
-    setSelectedResults(prev => {
+  const handleResultSelect = useCallback((url: string) => {
+    setSelectedUrls(prev => {
       const newSelected = new Set(prev);
-      if (newSelected.has(index)) {
-        newSelected.delete(index);
+      if (newSelected.has(url)) {
+        newSelected.delete(url);
       } else {
-        newSelected.add(index);
+        newSelected.add(url);
       }
       return newSelected;
     });
   }, []);
 
   const handleSelectAll = useCallback(() => {
-    setSelectedResults(prev => {
+    setSelectedUrls(prev => {
       if (prev.size === results.length) {
         return new Set();
       } else {
-        return new Set(results.map((_, i) => i));
+        return new Set(results.map(r => r.url));
       }
     });
   }, [results]);
-
 
   const formatTime = useCallback((ms: number) => {
     if (ms < 1000) return `${ms}ms`;
     return `${(ms / 1000).toFixed(1)}s`;
   }, []);
+
+
+  const sortedResults = React.useMemo(() => {
+    return [...results].sort((a, b) => {
+      const scoreA = a.relevance_score ?? 0;
+      const scoreB = b.relevance_score ?? 0;
+      return sortOrder === 'asc' ? scoreA - scoreB : scoreB - scoreA;
+    });
+  }, [results, sortOrder]);
 
   return (
     <div className="search-results-container">
@@ -103,7 +115,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
               variant="outline-secondary"
               size="sm"
               onClick={handleSort}
-              title="Sort by relevance"
+              title={sortOrder === 'desc' ? "Sort ascending by relevance" : "Sort descending by relevance"}
             >
               {sortOrder === 'desc' ? <SortDesc size={16} /> : <SortAsc size={16} />}
             </Button>
@@ -141,18 +153,47 @@ const SearchResults: React.FC<SearchResultsProps> = ({
               <div className="d-flex align-items-center gap-2">
                 <input
                   type="checkbox"
-                  checked={selectedResults.size === results.length && results.length > 0}
+                  checked={selectedUrls.size === results.length && results.length > 0}
                   onChange={handleSelectAll}
                   className="form-check-input"
                 />
                 <span className="text-muted">
-                  {selectedResults.size > 0
-                    ? `${selectedResults.size} selected`
+                  {selectedUrls.size > 0
+                    ? `${selectedUrls.size} selected`
                     : 'Select all results'
                   }
                 </span>
               </div>
-
+              
+              {selectedUrls.size > 0 && (
+                <div className="d-flex gap-2">
+                  <Button 
+                    variant="outline-primary" 
+                    size="sm"
+                    onClick={async () => {
+                      const urlsText = Array.from(selectedUrls).join('\n');
+                      try {
+                        await navigator.clipboard.writeText(urlsText);
+                        success(`Copied ${selectedUrls.size} links to clipboard`);
+                      } catch (err) {
+                        error('Failed to copy links');
+                      }
+                    }}
+                  >
+                    Copy Links
+                  </Button>
+                  <Button 
+                    variant="outline-secondary" 
+                    size="sm"
+                    onClick={() => {
+                        setSelectedUrls(new Set());
+                        success('Selection cleared');
+                    }}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -160,7 +201,7 @@ const SearchResults: React.FC<SearchResultsProps> = ({
 
       {/* Results */}
       <div className="search-results-list">
-        {results.length === 0 ? (
+        {sortedResults.length === 0 ? (
           <div className="no-results text-center py-5">
             <div className="mb-3">
               <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-muted">
@@ -172,15 +213,15 @@ const SearchResults: React.FC<SearchResultsProps> = ({
             <p className="text-muted">Try adjusting your search query or filters</p>
           </div>
         ) : (
-          results.map((result, index) => (
+          sortedResults.map((result, index) => (
             <Card key={index} className="search-result-item mb-3">
               <Card.Body>
                 <div className="d-flex justify-content-between align-items-start mb-2">
                   <div className="form-check me-3">
                     <input
                       type="checkbox"
-                      checked={selectedResults.has(index)}
-                      onChange={() => handleResultSelect(index)}
+                      checked={selectedUrls.has(result.url)}
+                      onChange={() => handleResultSelect(result.url)}
                       className="form-check-input"
                     />
                   </div>

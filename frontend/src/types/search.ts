@@ -28,6 +28,7 @@ export interface ImageGalleryData {
     title?: string;
     source?: string;
     url?: string;
+    thumbnail?: string;
   }>;
   title?: string;
   total_count?: number;

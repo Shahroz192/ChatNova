@@ -4,13 +4,13 @@ import {
     ExternalLink,
     Download,
     Share2,
-    Maximize2,
     Grid3X3,
     List,
     SortAsc,
     SortDesc
 } from 'lucide-react';
 import type { ImageGalleryData } from '../../types/search';
+import { useToast } from '../../contexts/ToastContext';
 
 interface ImageGalleryProps {
     data: ImageGalleryData;
@@ -28,37 +28,50 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
     columns = 3,
     showControls = true
 }) => {
+    const { success, error: toastError } = useToast();
     const [selectedImage, setSelectedImage] = useState<ImageGalleryData['images'][0] | null>(null);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-    const [selectedImages, setSelectedImages] = useState<Set<number>>(new Set());
+    const [selectedImageSrcs, setSelectedImageSrcs] = useState<Set<string>>(new Set());
+
+    const sortedImages = useMemo(() => {
+        return [...data.images].sort((a, b) => {
+            const titleA = a.title || a.alt || '';
+            const titleB = b.title || b.alt || '';
+            return sortOrder === 'asc' 
+                ? titleA.localeCompare(titleB) 
+                : titleB.localeCompare(titleA);
+        });
+    }, [data.images, sortOrder]);
 
     const handleImageClick = useCallback((image: ImageGalleryData['images'][0], index: number) => {
         setSelectedImage(image);
         onImageClick?.(image, index);
     }, [onImageClick]);
 
-    const handleImageSelect = useCallback((index: number) => {
-        setSelectedImages(prev => {
+    const handleImageSelect = useCallback((src: string) => {
+        setSelectedImageSrcs(prev => {
             const newSelected = new Set(prev);
-            if (newSelected.has(index)) {
-                newSelected.delete(index);
+            if (newSelected.has(src)) {
+                newSelected.delete(src);
             } else {
-                newSelected.add(index);
+                newSelected.add(src);
             }
             return newSelected;
         });
     }, []);
 
     const handleSelectAll = useCallback(() => {
-        setSelectedImages(prev => {
+        setSelectedImageSrcs(prev => {
             if (prev.size === data.images.length) {
+                success('All images deselected');
                 return new Set();
             } else {
-                return new Set(data.images.map((_, i) => i));
+                success(`Selected all ${data.images.length} images`);
+                return new Set(data.images.map(img => img.src));
             }
         });
-    }, [data.images.length]);
+    }, [data.images, success]);
 
     const handleDownload = useCallback((image: ImageGalleryData['images'][0]) => {
         const link = document.createElement('a');
@@ -67,24 +80,13 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-    }, []);
+        success('Download started');
+    }, [success]);
 
     const handleShare = useCallback(async (image: ImageGalleryData['images'][0]) => {
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: image.title || image.alt,
-                    text: `Check out this image: ${image.title || image.alt}`,
-                    url: image.url || image.src,
-                });
-            } catch (error) {
-                // Fallback to copying URL
-                navigator.clipboard.writeText(image.url || image.src);
-            }
-        } else {
-            navigator.clipboard.writeText(image.url || image.src);
+        if (onImageShare) {
+            onImageShare(image);
         }
-        onImageShare?.(image);
     }, [onImageShare]);
 
     const gridClass = useMemo(() => {
@@ -99,15 +101,19 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
     }, [viewMode, columns]);
 
     const toggleSortOrder = useCallback(() => {
-        setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
-    }, []);
+        const newOrder = sortOrder === 'asc' ? 'desc' : 'asc';
+        setSortOrder(newOrder);
+        success(`Sorted by title (${newOrder === 'desc' ? 'descending' : 'ascending'})`);
+    }, [sortOrder, success]);
 
     const handleDownloadSelected = useCallback(() => {
-        selectedImages.forEach(index => {
-            const image = data.images[index];
-            if (image) handleDownload(image);
+        data.images.forEach(image => {
+            if (selectedImageSrcs.has(image.src)) {
+                handleDownload(image);
+            }
         });
-    }, [selectedImages, data.images, handleDownload]);
+        success(`Downloading ${selectedImageSrcs.size} images`);
+    }, [selectedImageSrcs, data.images, handleDownload, success]);
 
     const handleCloseModal = useCallback(() => setSelectedImage(null), []);
 
@@ -116,10 +122,10 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
             key={index}
             className={`image-gallery-item ${viewMode === 'list' ? 'image-gallery-item-list' : ''}`}
         >
-            <div className="image-gallery-card">
+            <div className="image-gallery-card" onClick={() => handleImageClick(image, index)}>
                 <div className="image-gallery-image-container">
                     <img
-                        src={image.src}
+                        src={image.thumbnail || image.src}
                         alt={image.alt}
                         className="image-gallery-image"
                         loading="lazy"
@@ -128,48 +134,13 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
                         }}
                     />
 
-                    {/* Overlay controls */}
-                    <div className="image-gallery-overlay">
-                        <div className="image-gallery-actions">
-                            <Button
-                                variant="light"
-                                size="sm"
-                                className="image-gallery-action-btn"
-                                onClick={() => handleImageClick(image, index)}
-                                title="View full size"
-                            >
-                                <Maximize2 size={16} />
-                            </Button>
-
-                            <Button
-                                variant="light"
-                                size="sm"
-                                className="image-gallery-action-btn"
-                                onClick={() => handleDownload(image)}
-                                title="Download"
-                            >
-                                <Download size={16} />
-                            </Button>
-
-                            <Button
-                                variant="light"
-                                size="sm"
-                                className="image-gallery-action-btn"
-                                onClick={() => handleShare(image)}
-                                title="Share"
-                            >
-                                <Share2 size={16} />
-                            </Button>
-                        </div>
-                    </div>
-
                     {/* Selection checkbox */}
                     {showControls ? (
-                        <div className="image-gallery-select">
+                        <div className="image-gallery-select" onClick={(e) => e.stopPropagation()}>
                             <input
                                 type="checkbox"
-                                checked={selectedImages.has(index)}
-                                onChange={() => handleImageSelect(index)}
+                                checked={selectedImageSrcs.has(image.src)}
+                                onChange={() => handleImageSelect(image.src)}
                                 className="form-check-input"
                             />
                         </div>
@@ -180,14 +151,13 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
                 {(image.title || image.alt || image.source) ? (
                     <div className="image-gallery-info">
                         {image.title ? (
-                            <h6 className="image-gallery-title">{image.title}</h6>
-                        ) : null}
-                        {image.alt && !image.title ? (
-                            <p className="image-gallery-alt">{image.alt}</p>
+                            <h6 className="image-gallery-title text-truncate">{image.title}</h6>
+                        ) : image.alt ? (
+                            <p className="image-gallery-alt text-truncate mb-0">{image.alt}</p>
                         ) : null}
                         {image.source ? (
-                            <div className="image-gallery-source">
-                                <span className="badge bg-secondary image-gallery-source-badge">
+                            <div className="image-gallery-source mt-1">
+                                <span className="badge bg-secondary-subtle text-secondary-emphasis small border-0">
                                     {image.source}
                                 </span>
                             </div>
@@ -251,11 +221,11 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
                 </div>
 
                 {/* Bulk actions */}
-                {selectedImages.size > 0 ? (
+                {selectedImageSrcs.size > 0 ? (
                     <div className="image-gallery-bulk-actions mt-3">
                         <div className="d-flex justify-content-between align-items-center">
                             <span className="text-muted">
-                                {selectedImages.size} image{selectedImages.size !== 1 ? 's' : ''} selected
+                                {selectedImageSrcs.size} image{selectedImageSrcs.size !== 1 ? 's' : ''} selected
                             </span>
                             <div className="d-flex gap-2">
                                 <Button
@@ -270,7 +240,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
                                     size="sm"
                                     onClick={handleSelectAll}
                                 >
-                                    {selectedImages.size === data.images.length ? 'Deselect All' : 'Select All'}
+                                    {selectedImageSrcs.size === data.images.length ? 'Deselect All' : 'Select All'}
                                 </Button>
                             </div>
                         </div>
@@ -280,7 +250,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
 
             {/* Gallery */}
             <div className={`image-gallery ${gridClass}`}>
-                {data.images.length === 0 ? (
+                {sortedImages.length === 0 ? (
                     <div className="no-images text-center py-5">
                         <div className="mb-3">
                             <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="text-muted">
@@ -293,7 +263,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({
                         <p className="text-muted">Try adjusting your search query</p>
                     </div>
                 ) : (
-                    data.images.map((image, index) => renderImageCard(image, index))
+                    sortedImages.map((image, index) => renderImageCard(image, index))
                 )}
             </div>
 

@@ -35,23 +35,9 @@ const NewsCard: React.FC<NewsCardProps> = ({
         }
     };
 
-    const handleShare = async () => {
-        if (navigator.share && onShare) {
-            try {
-                await navigator.share({
-                    title: article.title,
-                    text: article.snippet,
-                    url: article.source_url,
-                });
-                onShare(article);
-            } catch (error) {
-                try {
-                    await navigator.clipboard.writeText(article.source_url);
-                } catch (clipboardError) {
-                    console.error('Failed to copy article URL to clipboard:', clipboardError);
-                }
-            }
-        } else if (onShare) {
+    const handleShare = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onShare) {
             onShare(article);
         }
     };

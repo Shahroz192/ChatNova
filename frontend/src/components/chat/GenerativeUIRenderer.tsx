@@ -6,6 +6,7 @@ import SearchResults from './SearchResults';
 import NewsCard from './NewsCard';
 import ImageGallery from './ImageGallery';
 import MarkdownRenderer from './MarkdownRenderer';
+import { useToast } from '../../contexts/ToastContext';
 import '../../styles/GenerativeUI.css';
 
 interface RendererProps {
@@ -81,7 +82,39 @@ const ComponentWrapper: React.FC<WrapperProps> = React.memo(({ children, width }
 });
 
 const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
+    const { success, error: toastError } = useToast();
+    
     if (!data) return null;
+
+    const handleShare = async (title: string, text: string, url: string) => {
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title,
+                    text,
+                    url,
+                });
+                success('Shared successfully');
+            } catch (err) {
+                if ((err as Error).name !== 'AbortError') {
+                    // Fallback to clipboard if share fails
+                    try {
+                        await navigator.clipboard.writeText(url);
+                        success('Link copied to clipboard');
+                    } catch (clipErr) {
+                        toastError('Failed to share or copy link');
+                    }
+                }
+            }
+        } else {
+            try {
+                await navigator.clipboard.writeText(url);
+                success('Link copied to clipboard');
+            } catch (clipErr) {
+                toastError('Failed to copy link');
+            }
+        }
+    };
 
     const renderChart = (props: UIComponent['props']) => {
         if (!props) return null;
@@ -153,23 +186,13 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                 currentPage={pagination?.current_page}
                 totalPages={pagination?.total_pages}
                 onResultClick={(result) => window.open(result.url, '_blank')}
-                onShareResult={(result) => {
-                    if (navigator.share) {
-                        navigator.share({
-                            title: result.title,
-                            text: result.snippet,
-                            url: result.url,
-                        });
-                    } else {
-                        navigator.clipboard.writeText(result.url);
-                    }
-                }}
+                onShareResult={(result) => handleShare(result.title, result.snippet, result.url)}
             />
         );
     };
 
     const renderNewsCard = (props: any) => {
-        const { title, source_url, snippet, source_name, timestamp, tags, actions } = props;
+        const { title, source_url, snippet, source_name, timestamp, tags, actions, thumbnail } = props;
 
         return (
             <NewsCard
@@ -180,19 +203,10 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                     source_name,
                     timestamp,
                     tags,
-                    actions
+                    actions,
+                    thumbnail
                 }}
-                onShare={(article) => {
-                    if (navigator.share) {
-                        navigator.share({
-                            title: article.title,
-                            text: article.snippet,
-                            url: article.source_url,
-                        });
-                    } else {
-                        navigator.clipboard.writeText(article.source_url);
-                    }
-                }}
+                onShare={(article) => handleShare(article.title, article.snippet, article.source_url)}
                 onReadMore={(article) => window.open(article.source_url, '_blank')}
             />
         );
@@ -208,6 +222,7 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
         const galleryData: ImageGalleryData = {
             images: images.map((img: any) => ({
                 src: img.src || img.url,
+                thumbnail: img.thumbnail || img.src || img.url,
                 alt: img.alt || img.title || 'Image',
                 title: img.title,
                 source: img.source,
@@ -221,17 +236,7 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
             <ImageGallery
                 data={galleryData}
                 onImageClick={(image, index) => console.log('Image clicked:', image, index)}
-                onImageShare={(image) => {
-                    if (navigator.share) {
-                        navigator.share({
-                            title: image.title || image.alt,
-                            text: `Check out this image: ${image.title || image.alt}`,
-                            url: image.url || image.src,
-                        });
-                    } else {
-                        navigator.clipboard.writeText(image.url || image.src);
-                    }
-                }}
+                onImageShare={(image) => handleShare(image.title || image.alt, `Check out this image: ${image.title || image.alt}`, image.url || image.src)}
             />
         );
     };
