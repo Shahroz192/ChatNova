@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+import json
 from io import BytesIO
 from dotenv import load_dotenv
 from app.core.generative_ui import GENERATIVE_UI_INSTRUCTION
@@ -22,6 +23,7 @@ from app.core.security import decrypt_api_key
 from app.crud.user import user_api_key, user_mcp_server
 from app.crud.message import message as message_crud
 from app.services.web_search import web_search_service
+from app.services.rerank_service import rerank_service
 from app.models.document import SessionDocument, DocumentChunk
 from sqlalchemy.orm import Session
 import json
@@ -289,6 +291,30 @@ class AIChatService:
 
         return memory
 
+    async def _should_search_images(
+        self, message: str, chat_history: List[Any], llm: Any
+    ) -> bool:
+        """Determine if the user's request suggests a need for image search."""
+        detector_prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "You are an intent detection expert. Analyze the user's request and determine if they are looking for images, photos, pictures, or visual representations. "
+                    "Output 'YES' if they want images, and 'NO' otherwise. Output ONLY the word.",
+                ),
+                MessagesPlaceholder(variable_name="chat_history"),
+                ("human", "{input}"),
+            ]
+        )
+        chain = detector_prompt | llm | StrOutputParser()
+        try:
+            result = await chain.ainvoke(
+                {"input": message, "chat_history": chat_history}
+            )
+            return "YES" in result.upper()
+        except Exception:
+            return False
+
     async def _optimize_search_query(
         self, message: str, chat_history: List[Any], llm: Any
     ) -> str:
@@ -316,6 +342,32 @@ class AIChatService:
             {"input": message, "chat_history": chat_history}
         )
         return optimized_query.strip().strip('"')
+
+    async def _optimize_rag_query(
+        self, message: str, chat_history: List[Any], llm: Any
+    ) -> str:
+        """Optimize the user's message into a better query for document retrieval."""
+        opt_prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "You are a retrieval expert. Convert the user's request into a query that is optimized for finding relevant information in technical or informative documents. "
+                    "Focus on the core keywords and entities. If there is relevant conversation history, use it to disambiguate the query. "
+                    "Output ONLY the optimized query string, no quotes or explanation.",
+                ),
+                MessagesPlaceholder(variable_name="chat_history"),
+                ("human", "{input}"),
+            ]
+        )
+        chain = opt_prompt | llm | StrOutputParser()
+        try:
+            optimized_query = await chain.ainvoke(
+                {"input": message, "chat_history": chat_history}
+            )
+            return optimized_query.strip().strip('"')
+        except Exception as e:
+            logging.error(f"Error optimizing RAG query: {e}")
+            return message
 
     async def get_relevant_memories(
         self, query: str, user_id: int, db: Session, llm: Any
@@ -415,16 +467,34 @@ class AIChatService:
             logging.error(f"Error extracting memories: {e}")
 
     async def get_relevant_chunks(
-        self, query: str, session_id: int, user_id: int, db: Session, limit: int = 5
+        self,
+        query: str,
+        session_id: int,
+        user_id: int,
+        db: Session,
+        limit: int = 5,
+        llm: Optional[Any] = None,
+        chat_history: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
-        """Retrieve relevant document chunks for the current query and session."""
+        """Retrieve and rerank relevant document chunks for the current query and session."""
         try:
             from app.models.document import has_vector
 
-            # Extract key terms for keyword matching (used in both paths)
-            search_terms = [t for t in re.findall(r"\w+", query) if len(t) > 3]
+            # 1. Optimize Query for RAG
+            optimized_query = query
+            if llm:
+                optimized_query = await self._optimize_rag_query(
+                    query, chat_history or [], llm
+                )
+                logging.info(f"🔍 Optimized RAG Query: {optimized_query}")
+
+            # 2. Fetch Candidates (fetch more than the final limit for reranking)
+            candidate_limit = limit * 3
+
+            # Extract key terms for keyword matching
+            search_terms = [t for t in re.findall(r"\w+", optimized_query) if len(t) > 3]
             if not search_terms:
-                search_terms = [query[:50]]
+                search_terms = [optimized_query[:50]]
             query_filter = sa.or_(
                 *[DocumentChunk.content.ilike(f"%{term}%") for term in search_terms]
             )
@@ -434,7 +504,9 @@ class AIChatService:
 
                 try:
                     embedding_service = EmbeddingService(user_id, db)
-                    query_embedding = await embedding_service.embed_query(query)
+                    query_embedding = await embedding_service.embed_query(
+                        optimized_query
+                    )
 
                     # Vector search
                     vector_chunks = (
@@ -444,58 +516,52 @@ class AIChatService:
                         .order_by(
                             DocumentChunk.embedding.cosine_distance(query_embedding)
                         )
-                        .limit(limit)
+                        .limit(candidate_limit)
                         .all()
                     )
 
-                    # Keyword search (as a supplement to vector search)
+                    # Keyword search
                     keyword_chunks = (
                         db.query(DocumentChunk)
                         .join(SessionDocument)
                         .filter(SessionDocument.session_id == session_id)
                         .filter(query_filter)
-                        .limit(limit // 2)
+                        .limit(candidate_limit // 2)
                         .all()
                     )
 
                     # Merge and deduplicate
                     seen_ids = set()
-                    chunks = []
+                    candidates = []
                     for c in vector_chunks + keyword_chunks:
                         if c.id not in seen_ids:
-                            chunks.append(c)
+                            candidates.append(c)
                             seen_ids.add(c.id)
-                    chunks = chunks[:limit]
                 except ValueError as e:
-                    # Missing embeddings credentials: fall back to keyword search.
                     logging.warning(
-                        f"Embeddings unavailable for user {user_id}, "
-                        f"falling back to keyword search: {e}"
+                        f"Embeddings unavailable for user {user_id}: {e}"
                     )
-                    chunks = (
+                    candidates = (
                         db.query(DocumentChunk)
                         .join(SessionDocument)
                         .filter(SessionDocument.session_id == session_id)
                         .filter(query_filter)
-                        .limit(limit)
+                        .limit(candidate_limit)
                         .all()
                     )
             else:
-                # Fallback to simple keyword search if pgvector is missing
-                chunks = (
+                candidates = (
                     db.query(DocumentChunk)
                     .join(SessionDocument)
                     .filter(SessionDocument.session_id == session_id)
                     .filter(query_filter)
-                    .limit(limit)
+                    .limit(candidate_limit)
                     .all()
                 )
 
-            if not chunks:
-                # Greedy Fallback: If no chunks match the specific keywords,
-                # fetch the most recent chunks from this session anyway.
-                # This ensures the AI always has some context if documents exist.
-                chunks = (
+            if not candidates:
+                # Greedy Fallback
+                candidates = (
                     db.query(DocumentChunk)
                     .join(SessionDocument)
                     .filter(SessionDocument.session_id == session_id)
@@ -504,8 +570,11 @@ class AIChatService:
                     .all()
                 )
 
-            if not chunks:
+            if not candidates:
                 return {"text": "", "sources": []}
+
+            # 3. Rerank Candidates
+            chunks = rerank_service.rerank(optimized_query, candidates, top_n=limit)
 
             context_parts = []
             sources = []
@@ -530,6 +599,7 @@ class AIChatService:
         except Exception as e:
             logging.error(f"Error retrieving relevant chunks: {e}")
             return {"text": "", "sources": []}
+
 
     async def simple_chat(
         self,
@@ -595,7 +665,12 @@ class AIChatService:
         document_context_data = {"text": "", "sources": []}
         if session_id and db and user_id:
             document_context_data = await self.get_relevant_chunks(
-                sanitized_message, session_id, user_id, db
+                sanitized_message,
+                session_id,
+                user_id,
+                db,
+                llm=llm,
+                chat_history=chat_history,
             )
         document_context = document_context_data["text"]
         sources = document_context_data["sources"]
@@ -638,6 +713,20 @@ class AIChatService:
                 )
                 logging.info(f"Optimized query: {optimized_query}")
                 search_results = web_search_service.search(optimized_query)
+
+                # Optional image search
+                should_search_images = await self._should_search_images(
+                    sanitized_message, chat_history, llm
+                )
+                if should_search_images:
+                    logging.info(f"Performing image search for: {optimized_query}")
+                    image_results = web_search_service.search_images(optimized_query)
+                    if image_results:
+                        search_results += (
+                            f"\n\n### IMAGE SEARCH RESULTS\n"
+                            f"The following images were found for the query. If relevant, you can use the 'image_gallery' component to display them.\n"
+                            f"{json.dumps(image_results, indent=2)}"
+                        )
 
                 system_prompt = (
                     f"You are ChatNova, a sophisticated AI assistant with real-time web access. Current Date: {current_date_full}\n\n"

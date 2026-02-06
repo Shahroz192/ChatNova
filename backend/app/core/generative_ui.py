@@ -8,11 +8,12 @@ Only generate a UI specification when strictly necessary and explicitly benefici
 1. The user requests a simple explanation, definition, or fact.
 2. The user asks for a code snippet, tutorial, or how-to guide.
 3. The user initiates a casual greeting or small talk (e.g., "Hi", "How are you?").
-4. The content is primarily text-based with no structured data to visualize.
-5. You are expressing an opinion, creative writing, or storytelling.
-6. The user asks a follow-up question that is conversational in nature.
-7. The user explicitly requests "text" or "markdown".
-8. The response is based on retrieved document context (RAG) unless a visualization is specifically requested.
+4. The user wants to build, create, or write code for a website, landing page, or application (GIVE THEM CODE INSTEAD).
+5. The content is primarily text-based with no structured data to visualize.
+6. You are expressing an opinion, creative writing, or storytelling.
+7. The user asks a follow-up question that is conversational in nature.
+8. The user explicitly requests "text" or "markdown".
+9. The response is based on retrieved document context (RAG) unless a visualization is specifically requested.
 
 **ANTI-HALLUCINATION RULES:**
 1. DO NOT invent data for charts or tables. If exact numbers are not in the context, use text to explain that data is unavailable.
@@ -83,6 +84,7 @@ interface ComponentProps {{
   actions?: string[]; // Available actions: 'open_link', 'save', 'share', 'copy'
   // Search result props
   results?: SearchResultData[];
+  images?: ImageData[];
   search_query?: string;
   total_results?: number;
   search_time_ms?: number;
@@ -111,6 +113,15 @@ interface SearchResultData {{
   content_type?: string;
   thumbnail?: string;
   source_url?: string;
+}}
+
+interface ImageData {{
+  src: string;
+  alt: string;
+  title?: string;
+  source?: string;
+  url?: string;
+  thumbnail?: string;
 }}
 
 interface PaginationData {{
@@ -259,6 +270,23 @@ interface GeographicData {{
       {{"name": "Tech Sites", "value": 45}},
       {{"name": "News Sites", "value": 30}},
       {{"name": "Blogs", "value": 25}}
+    ]
+  }}
+}}
+
+4. **Image Gallery**:
+{{
+  "type": "image_gallery",
+  "props": {{
+    "label": "Latest photos of Mars Rover",
+    "images": [
+      {{
+        "src": "https://example.com/mars1.jpg",
+        "alt": "Mars surface with rover tracks",
+        "title": "Rover on Mars",
+        "source": "NASA",
+        "url": "https://nasa.gov/mars-photo-1"
+      }}
     ]
   }}
 }}
