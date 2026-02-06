@@ -360,69 +360,31 @@
     border-radius: 0.5rem;
     overflow: hidden;
     transition: all 0.2s ease;
-    background: white;
+    background: var(--bg-primary);
+    cursor: pointer;
 }
 
 .image-gallery-card:hover {
-    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.1);
-    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border-color: var(--accent);
 }
 
 .image-gallery-image-container {
     position: relative;
     aspect-ratio: 1;
     overflow: hidden;
+    background: var(--bg-tertiary);
 }
 
 .image-gallery-image {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.3s ease;
+    transition: transform 0.5s ease;
 }
 
 .image-gallery-card:hover .image-gallery-image {
-    transform: scale(1.05);
-}
-
-.image-gallery-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-}
-
-.image-gallery-card:hover .image-gallery-overlay {
-    opacity: 1;
-}
-
-.image-gallery-actions {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.image-gallery-action-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.9);
-    border: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-}
-
-.image-gallery-action-btn:hover {
-    background: white;
-    transform: scale(1.1);
+    transform: scale(1.08);
 }
 
 .image-gallery-select {
@@ -430,6 +392,13 @@
     top: 0.5rem;
     left: 0.5rem;
     z-index: 2;
+    padding: 4px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-sm);
 }
 
 .image-gallery-select .form-check-input {
@@ -468,21 +437,24 @@
 
 /* List view for image gallery */
 .image-gallery-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1rem !important;
 }
 
 .image-gallery-item-list .image-gallery-card {
     display: flex;
     flex-direction: row;
     height: auto;
+    align-items: center;
+    background: var(--bg-primary);
 }
 
 .image-gallery-item-list .image-gallery-image-container {
-    width: 120px;
-    height: 80px;
+    width: 160px;
+    height: 100px;
     flex-shrink: 0;
+    aspect-ratio: auto;
 }
 
 .image-gallery-item-list .image-gallery-info {
@@ -490,6 +462,8 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
+    padding: 1rem;
+    overflow: hidden;
 }
 
 /* Search analytics styles */

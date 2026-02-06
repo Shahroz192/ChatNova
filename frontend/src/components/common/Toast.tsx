@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react';
+import '../../styles/Toast.css';
 
 export interface ToastMessage {
   id: string;
@@ -41,25 +42,25 @@ const Toast: React.FC<ToastProps> = React.memo(({ toast, onClose }) => {
   const getIcon = () => {
     switch (toast.type) {
       case 'success':
-        return <CheckCircle size={20} className="text-success" />;
+        return <CheckCircle size={20} />;
       case 'error':
-        return <AlertCircle size={20} className="text-danger" />;
+        return <AlertCircle size={20} />;
       case 'warning':
-        return <AlertTriangle size={20} className="text-warning" />;
+        return <AlertTriangle size={20} />;
       case 'info':
-        return <Info size={20} className="text-info" />;
+        return <Info size={20} />;
       default:
-        return <Info size={20} className="text-info" />;
+        return <Info size={20} />;
     }
   };
 
   const getToastClasses = () => {
-    const baseClasses = "toast-custom d-flex align-items-start p-3 mb-2 border-0 shadow-sm";
+    const baseClasses = "toast-custom d-flex align-items-start p-3 mb-2 border shadow-sm";
     const typeClasses = {
-      success: 'bg-success-subtle border-success',
-      error: 'bg-danger-subtle border-danger',
-      warning: 'bg-warning-subtle border-warning',
-      info: 'bg-info-subtle border-info'
+      success: 'bg-success-subtle border-success-subtle text-success-emphasis',
+      error: 'bg-danger-subtle border-danger-subtle text-danger-emphasis',
+      warning: 'bg-warning-subtle border-warning-subtle text-warning-emphasis',
+      info: 'bg-info-subtle border-info-subtle text-info-emphasis'
     };
 
     const animationClasses = isLeaving
@@ -82,7 +83,7 @@ const Toast: React.FC<ToastProps> = React.memo(({ toast, onClose }) => {
       </div>
       <button
         type="button"
-        className="btn-close btn-close-sm ms-2 mt-1 opacity-50"
+        className="btn-toast-close ms-2 mt-1 opacity-50"
         onClick={handleClose}
         aria-label="Close"
       >
