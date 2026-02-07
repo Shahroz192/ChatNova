@@ -1,33 +1,44 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getSearchHistory, addToSearchHistory, streamChat } from '../api';
+import api from '../api';
 
-// Mock localStorage
-const localStorageMock = (() => {
-  let store: Record<string, string> = {};
+// Mock api
+vi.mock('../api', async (importOriginal) => {
+  const actual: any = await importOriginal();
   return {
-    getItem: (key: string) => store[key] || null,
-    setItem: (key: string, value: string) => { store[key] = value; },
-    clear: () => { store = {}; },
+    ...actual,
+    default: {
+      get: vi.fn(),
+      post: vi.fn(),
+      delete: vi.fn(),
+    },
   };
-})();
-Object.defineProperty(window, 'localStorage', { value: localStorageMock });
+});
 
 describe('api utility', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
   });
 
   describe('search history', () => {
-    it('gets empty history when none saved', () => {
-      expect(getSearchHistory()).toEqual([]);
+    it('gets empty history when none saved', async () => {
+      (api.get as any).mockResolvedValue({ data: [] });
+      const history = await getSearchHistory();
+      expect(history).toEqual([]);
+      expect(api.get).toHaveBeenCalledWith('/search/');
     });
 
-    it('adds and gets history', () => {
-      const item = addToSearchHistory('test query', 5, 'general', true);
+    it('adds and gets history', async () => {
+      const mockItem = { id: 1, query: 'test query', search_type: 'general', created_at: new Date().toISOString() };
+      (api.post as any).mockResolvedValue({ data: mockItem });
+      (api.get as any).mockResolvedValue({ data: [mockItem] });
+
+      const item = await addToSearchHistory('test query', 'general');
       expect(item.query).toBe('test query');
-      expect(getSearchHistory().length).toBe(1);
-      expect(getSearchHistory()[0].query).toBe('test query');
+      
+      const history = await getSearchHistory();
+      expect(history.length).toBe(1);
+      expect(history[0].query).toBe('test query');
     });
   });
 

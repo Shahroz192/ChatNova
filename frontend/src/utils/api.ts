@@ -20,25 +20,29 @@ api.interceptors.response.use(
   }
 );
 
-export const getSearchHistory = (): SearchHistoryItem[] => {
-  const saved = localStorage.getItem('searchHistory');
-  return saved ? JSON.parse(saved) : [];
+export const getSearchHistory = async (): Promise<SearchHistoryItem[]> => {
+  const response = await api.get('/search/');
+  return response.data.map((item: any) => ({
+    id: item.id.toString(),
+    query: item.query,
+    timestamp: item.created_at,
+    results_count: 0,
+    search_type: item.search_type,
+    web_search_enabled: true, // Backend items are all web searches for now
+  }));
 };
 
-export const addToSearchHistory = (query: string, resultsCount: number, searchType: string, webSearchEnabled: boolean) => {
-  const history = getSearchHistory();
-  const newItem: SearchHistoryItem = {
-    id: Date.now().toString(),
+export const addToSearchHistory = async (query: string, searchType: string = "general") => {
+  const response = await api.post('/search/', {
     query,
-    timestamp: new Date().toISOString(),
-    results_count: resultsCount,
     search_type: searchType,
-    web_search_enabled: webSearchEnabled,
-  };
+  });
+  return response.data;
+};
 
-  const updated = [newItem, ...history.slice(0, 99)];
-  localStorage.setItem('searchHistory', JSON.stringify(updated));
-  return newItem;
+export const clearSearchHistory = async () => {
+  const response = await api.delete('/search/');
+  return response.data;
 };
 
 export const streamChat = async (
@@ -52,6 +56,7 @@ export const streamChat = async (
   onComplete?: () => void,
   onError?: (error: string) => void,
   onToolUpdate?: (update: any) => void,
+  onMemorySaved?: (fact: string) => void,
   signal?: AbortSignal
 ) => {
   try {
@@ -117,7 +122,7 @@ export const streamChat = async (
 
       if (dataTrimmed === '[DONE]') {
         if (hasSearchData && searchOptions?.search_web) {
-          addToSearchHistory(content, 0, 'general', true);
+          addToSearchHistory(content, searchOptions.search_type || 'general');
         }
         onComplete?.();
         return 'done';
@@ -133,6 +138,8 @@ export const streamChat = async (
           onToolUpdate?.(parsedData);
         } else if (parsedData.type === 'content') {
           onChunk?.(parsedData.content);
+        } else if (parsedData.type === 'memory_saved') {
+          onMemorySaved?.(parsedData.content);
         } else if (parsedData.type === 'error') {
           onError?.(parsedData.content);
           return 'error';
