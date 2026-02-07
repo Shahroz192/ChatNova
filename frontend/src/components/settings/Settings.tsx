@@ -6,7 +6,6 @@ import MCPServerForm from './MCPServerForm';
 import MCPServerList from './MCPServerList';
 import PersonalizationForm from './PersonalizationForm';
 import MemoryManagement from './MemoryManagement';
-import HistoryManagement from '../chat/HistoryManagement';
 import api from '../../utils/api';
 import '../../styles/Settings.css';
 import '../../styles/MCPServer.css';
@@ -21,9 +20,9 @@ interface User {
 interface SettingsProps {}
 
 const Settings: React.FC<SettingsProps> = () => {
-  const [activeTab, setActiveTab] = useState<'keys' | 'personalization' | 'memory' | 'servers' | 'account' | 'privacy' | 'appearance' | 'history'>('keys');
+  const [activeTab, setActiveTab] = useState<'keys' | 'personalization' | 'memory' | 'servers' | 'account' | 'privacy' | 'appearance'>('keys');
 
-  const handleTabChange = useCallback((tab: 'keys' | 'personalization' | 'memory' | 'servers' | 'account' | 'privacy' | 'appearance' | 'history') => {
+  const handleTabChange = useCallback((tab: 'keys' | 'personalization' | 'memory' | 'servers' | 'account' | 'privacy' | 'appearance') => {
     setActiveTab(tab);
   }, []);
 
@@ -75,18 +74,6 @@ const Settings: React.FC<SettingsProps> = () => {
               </Nav.Item>
               <Nav.Item className="mb-2">
                 <Nav.Link
-                  eventKey="history"
-                  active={activeTab === 'history'}
-                  onClick={() => handleTabChange('history')}
-                  className="d-flex align-items-center py-2 px-3 rounded-lg"
-                  style={{ transition: 'all 0.2s ease' }}
-                >
-                  <History size={18} className="mr-2" />
-                  <span className="font-weight-medium">History</span>
-                </Nav.Link>
-              </Nav.Item>
-              <Nav.Item className="mb-2">
-                <Nav.Link
                   eventKey="servers"
                   active={activeTab === 'servers'}
                   onClick={() => handleTabChange('servers')}
@@ -114,20 +101,6 @@ const Settings: React.FC<SettingsProps> = () => {
 
           <Col md={9} className="d-flex flex-column p-4">
             <div className="flex-grow-1">
-              
-              {activeTab === 'history' ? (
-                <Card>
-                  <Card.Header>
-                    <Card.Title>Chat History</Card.Title>
-                    <Card.Text>
-                      View and manage your chat history.
-                    </Card.Text>
-                  </Card.Header>
-                  <Card.Body className="p-0">
-                    <HistoryManagement />
-                  </Card.Body>
-                </Card>
-              ) : null}
               
               {activeTab === 'keys' ? (
                 <Card>
