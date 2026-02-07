@@ -286,14 +286,18 @@ async def chat(
                 db, db_obj=session_obj, obj_in=ChatSessionUpdate(title=new_title)
             )
 
-    # Extract memories from the user message in background
-    background_tasks.add_task(
-        ai_service.extract_and_save_memories,
-        message_in.content,
-        current_user.id,
-        message_in.model,
-    )
+    # Extract memories from the user message synchronously
+    saved_memories = []
+    try:
+        saved_memories = await ai_service.extract_and_save_memories(
+            message_in.content,
+            current_user.id,
+            message_in.model,
+        )
+    except Exception as e:
+        logger.error(f"Failed to extract memories in chat: {e}")
 
+    msg.saved_memories = saved_memories
     return msg
 
 
@@ -301,6 +305,7 @@ async def chat(
 @request_profiler.profile_endpoint("/chat-with-tools", "POST")
 def chat_with_tools(
     message_in: MessageCreate,
+    background_tasks: BackgroundTasks,
     session_id: Optional[int] = Query(
         None, description="Session ID for conversation context"
     ),
@@ -340,6 +345,19 @@ def chat_with_tools(
                 db, db_obj=session_obj, obj_in=ChatSessionUpdate(title=new_title)
             )
 
+    # Extract memories from the user message synchronously
+    saved_memories = []
+    try:
+        # Since this endpoint is def (sync), we use asyncio.run to call the async extract method
+        saved_memories = asyncio.run(ai_service.extract_and_save_memories(
+            message_in.content,
+            current_user.id,
+            message_in.model,
+        ))
+    except Exception as e:
+        logger.error(f"Failed to extract memories in chat-with-tools: {e}")
+
+    msg.saved_memories = saved_memories
     return msg
 
 
@@ -413,13 +431,18 @@ def chat_stream(
             # Update the message with the complete response
             crud.message.update(db, db_obj=msg, obj_in={"response": full_response})
 
-            # Extract memories in background after response is complete
-            background_tasks.add_task(
-                ai_service.extract_and_save_memories,
-                message_in.content,
-                current_user.id,
-                message_in.model,
-            )
+            # Extract memories and yield notification events
+            try:
+                saved_facts = await ai_service.extract_and_save_memories(
+                    message_in.content,
+                    current_user.id,
+                    message_in.model,
+                )
+                for fact in saved_facts:
+                    memory_event = json.dumps({"type": "memory_saved", "content": fact})
+                    yield _format_sse_data(memory_event)
+            except Exception as e:
+                logging.error(f"Failed to process memories in stream: {e}")
 
             # Send completion signal
             yield "data: [DONE]\n\n"
@@ -504,13 +527,18 @@ def chat_agent_stream(
 
             crud.message.update(db, db_obj=msg, obj_in={"response": full_response})
 
-            background_tasks.add_task(
-                ai_service.extract_and_save_memories,
-                message_in.content,
-                current_user.id,
-                db,
-                message_in.model,
-            )
+            # Extract memories and yield notification events
+            try:
+                saved_facts = await ai_service.extract_and_save_memories(
+                    message_in.content,
+                    current_user.id,
+                    message_in.model,
+                )
+                for fact in saved_facts:
+                    memory_event = json.dumps({"type": "memory_saved", "content": fact})
+                    yield _format_sse_data(memory_event)
+            except Exception as e:
+                logging.error(f"Failed to process memories in agent stream: {e}")
 
             yield "data: [DONE]\n\n"
 

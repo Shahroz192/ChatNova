@@ -63,6 +63,7 @@ class Message(MessageBase):
     user_id: int
     created_at: datetime
     documents: Optional[List[DocumentSchema]] = None
+    saved_memories: Optional[List[str]] = None
 
     model_config = ConfigDict(from_attributes=True)
 

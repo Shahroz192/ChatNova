@@ -415,8 +415,12 @@ class AIChatService:
         message: str,
         user_id: int,
         model_name: str = "gemini-2.5-flash",
-    ):
-        """Extract permanent facts from a user message and save them to memory."""
+    ) -> List[str]:
+        """Extract permanent facts from a user message and save them to memory.
+        
+        Returns:
+            List[str]: List of successfully extracted and saved facts.
+        """
         # Sanitize message before extraction
         sanitized_msg = sanitize_user_input(message)
 
@@ -424,32 +428,35 @@ class AIChatService:
         from app.schemas.memory import MemoryCreate
         from app.database import SessionLocal
 
-        llm = self.get_llm(model_name)
-        if not llm:
-            return
+        saved_facts = []
 
-        extract_prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "You are a memory assistant. Extract any new, permanent facts about the user from the message. "
-                    "Focus on facts like identity, location, job, family, pets, and strong preferences. "
-                    "Ignore temporary feelings, questions, or greetings. "
-                    "Output each fact as a simple, standalone sentence. If no new facts found, output 'NONE'.",
-                ),
-                ("human", "{message}"),
-            ]
-        )
+        with SessionLocal() as db:
+            llm = self.get_llm(model_name, user_id=user_id, db=db)
+            if not llm:
+                logging.warning(f"Could not initialize LLM {model_name} for memory extraction for user {user_id}")
+                return []
 
-        chain = extract_prompt | llm | StrOutputParser()
-        try:
-            result = await chain.ainvoke({"message": sanitized_msg})
-            if result.strip() == "NONE":
-                return
+            extract_prompt = ChatPromptTemplate.from_messages(
+                [
+                    (
+                        "system",
+                        "You are a memory assistant. Extract any new, permanent facts about the user from the message. "
+                        "Focus on facts like identity, location, job, family, pets, and strong preferences. "
+                        "Ignore temporary feelings, questions, or greetings. "
+                        "Output each fact as a simple, standalone sentence. If no new facts found, output 'NONE'.",
+                    ),
+                    ("human", "{message}"),
+                ]
+            )
 
-            facts = [f.strip("- ").strip() for f in result.split("\n") if f.strip()]
+            chain = extract_prompt | llm | StrOutputParser()
+            try:
+                result = await chain.ainvoke({"message": sanitized_msg})
+                if result.strip() == "NONE":
+                    return []
 
-            with SessionLocal() as db:
+                facts = [f.strip("- ").strip() for f in result.split("\n") if f.strip()]
+
                 # Get existing memories to avoid duplicates
                 existing_memories = memory_crud.get_by_user(
                     db, user_id=user_id, limit=100
@@ -461,10 +468,14 @@ class AIChatService:
                         memory_crud.create_with_user(
                             db, obj_in=MemoryCreate(content=fact), user_id=user_id
                         )
+                        saved_facts.append(fact)
                         logging.info(f"Saved new memory for user {user_id}: {fact}")
 
-        except Exception as e:
-            logging.error(f"Error extracting memories: {e}")
+                return saved_facts
+
+            except Exception as e:
+                logging.error(f"Error extracting memories: {e}")
+                return []
 
     async def get_relevant_chunks(
         self,
