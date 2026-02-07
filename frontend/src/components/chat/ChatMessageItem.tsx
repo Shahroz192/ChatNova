@@ -132,10 +132,9 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
             ) : null}
             <div className="d-flex justify-content-end mb-2">
                 <div className="d-flex flex-column align-items-end position-relative">
-                    <Card
-                        body
+                    <div
                         className="message-bubble-user"
-                        style={{ width: "fit-content", maxWidth: "95%" }}
+                        style={{ width: "fit-content", maxWidth: "85%", cursor: "pointer" }}
                         onContextMenu={(e) => {
                             e.preventDefault();
                             setActiveContextMenu({ id: msg.id, type: 'user' });
@@ -175,10 +174,9 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                             </div>
                         ) : null}
                         <div className="d-flex align-items-center">
-                            <User className="me-2" />
-                            {msg.content}
+                            <span>{msg.content}</span>
                         </div>
-                    </Card>
+                    </div>
                     {isUserActive ? (
                         <MessageContextMenu
                             message={msg}
@@ -198,7 +196,7 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                 </div>
             </div>
             <div className="d-flex justify-content-start">
-                <div className="d-flex flex-column align-items-start position-relative" style={{ maxWidth: "100%" }}>
+                <div className="d-flex flex-column align-items-start position-relative" style={{ maxWidth: "100%", minWidth: 0 }}>
                     <div
                         className="message-content-assistant"
                         onContextMenu={(e) => {
@@ -209,9 +207,10 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                             e.preventDefault();
                             setActiveContextMenu({ id: msg.id, type: 'assistant' });
                         }}
+                        style={{ width: '100%', minWidth: 0 }}
                     >
-                        <div className="d-flex w-100">
-                            <div style={{ flex: 1 }}>
+                        <div className="d-flex w-100" style={{ minWidth: 0 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
                                 {msg.tool_calls && msg.tool_calls.length > 0 ? (
                                     <div className="tool-calls mb-3">
                                         {msg.tool_calls.map((tool, idx) => (

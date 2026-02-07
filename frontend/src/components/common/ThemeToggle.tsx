@@ -22,12 +22,12 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = React.memo(({ className =
   const icon = useMemo(() => {
     switch (theme) {
       case 'dark':
-        return <Moon size={18} />;
+        return <Moon size={20} />;
       case 'light':
-        return <Sun size={18} />;
+        return <Sun size={20} />;
       case 'system':
       default:
-        return <Monitor size={18} />;
+        return <Monitor size={20} />;
     }
   }, [theme]);
 

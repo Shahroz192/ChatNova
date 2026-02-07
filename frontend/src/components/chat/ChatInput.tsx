@@ -9,7 +9,8 @@ import {
   Square,
   Paperclip,
   X,
-  FileText
+  FileText,
+  ChevronDown
 } from 'lucide-react';
 import type { WebSearchOptions } from '../../types/search';
 import { transcribeAudio } from '../../utils/api';
@@ -28,6 +29,12 @@ interface ChatInputProps {
   onRecentSearchSelect?: (query: string) => void;
   selectedModel: string;
   onFileUpload: (file: File) => void;
+  models?: string[];
+  useTools?: boolean;
+  onUseToolsChange?: (use: boolean) => void;
+  onModelSelect?: (model: string) => void;
+  showOnboarding?: boolean;
+  onDismissOnboarding?: () => void;
 }
 
 type RecordingState = 'idle' | 'recording' | 'processing';
@@ -45,9 +52,18 @@ const ChatInput: React.FC<ChatInputProps> = ({
   recentSearches = [],
   onRecentSearchSelect,
   selectedModel,
-  onFileUpload
+  onFileUpload,
+  models = [],
+  useTools = false,
+  onUseToolsChange,
+  onModelSelect,
+  showOnboarding = false,
+  onDismissOnboarding
 }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showCommands, setShowCommands] = useState(false);
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [commandFilter, setCommandFilter] = useState('');
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [recordingTime, setRecordingTime] = useState(0);
   const [pendingImages, setPendingImages] = useState<{name: string, data: string}[]>([]);
@@ -60,6 +76,26 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isGemini = useMemo(() => selectedModel.toLowerCase().includes('gemini'), [selectedModel]);
+
+  const commands = useMemo(() => [
+    { 
+      id: 'search', 
+      name: `Search: ${searchOptions.search_web ? 'ON' : 'OFF'}`, 
+      icon: <Globe size={14} />,
+      action: () => handleWebSearchToggle()
+    },
+    { 
+      id: 'tools', 
+      name: `Tools: ${useTools ? 'ON' : 'OFF'}`, 
+      icon: <FileText size={14} />,
+      action: () => onUseToolsChange?.(!useTools)
+    }
+  ], [searchOptions.search_web, useTools, onUseToolsChange]);
+
+  const filteredCommands = useMemo(() => {
+    if (!commandFilter) return commands;
+    return commands.filter(c => c.name.toLowerCase().includes(commandFilter.toLowerCase()));
+  }, [commands, commandFilter]);
 
   useEffect(() => {
     return () => {
@@ -203,25 +239,50 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setInput(value);
-    setShowSuggestions(value.length > 0);
+    
+    if (value.startsWith('/')) {
+      setShowCommands(true);
+      setCommandFilter(value.slice(1));
+      setShowSuggestions(false);
+      setShowModelDropdown(false);
+    } else {
+      setShowCommands(false);
+      setShowSuggestions(value.length > 0);
+    }
   }, [setInput]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
+      if (showCommands && filteredCommands.length > 0) {
+        e.preventDefault();
+        filteredCommands[0].action();
+        setShowCommands(false);
+        return;
+      }
       e.preventDefault();
       handleSendMessage();
     }
     if (e.key === 'Escape') {
       setShowSuggestions(false);
+      setShowCommands(false);
+      setShowModelDropdown(false);
     }
-  }, [handleSendMessage]);
+  }, [handleSendMessage, showCommands, filteredCommands]);
 
   const handleFocus = useCallback(() => {
-    setShowSuggestions(true);
-  }, []);
+    if (input.startsWith('/')) {
+      setShowCommands(true);
+    } else {
+      setShowSuggestions(true);
+    }
+  }, [input]);
 
   const handleBlur = useCallback(() => {
-    setTimeout(() => setShowSuggestions(false), 200);
+    setTimeout(() => {
+      setShowSuggestions(false);
+      setShowCommands(false);
+      setShowModelDropdown(false);
+    }, 200);
   }, []);
 
   return (
@@ -262,7 +323,28 @@ const ChatInput: React.FC<ChatInputProps> = ({
       ) : null}
       
       <div className="chat-input-container-modern">
-        {showSuggestions && (searchSuggestions.length > 0 || recentSearches.length > 0) ? (
+        {showCommands && filteredCommands.length > 0 && (
+          <div className="search-suggestions-container">
+            <div className="suggestions-group">
+              <div className="suggestions-group-label">Commands</div>
+              {filteredCommands.map((command) => (
+                <button
+                  key={command.id}
+                  className="suggestion-row"
+                  onClick={() => {
+                    command.action();
+                    setShowCommands(false);
+                  }}
+                >
+                  <span className="icon-muted">{command.icon}</span>
+                  <span>{command.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {showSuggestions && !showCommands && (searchSuggestions.length > 0 || recentSearches.length > 0) ? (
           <div
             className="search-suggestions-container"
           >
@@ -305,24 +387,69 @@ const ChatInput: React.FC<ChatInputProps> = ({
         {/* Unified Input Area */}
         <div className={`modern-input-box ${searchOptions.search_web ? 'search-mode' : ''} ${recordingState === 'recording' ? 'recording-active' : ''}`}>
           <div className="input-prefix">
-            <button
-              className={`action-icon-btn ${searchOptions.search_web ? 'active' : ''}`}
-              onClick={handleWebSearchToggle}
-              title="Toggle web search"
-              type="button"
-            >
-              {searchOptions.search_web ? <Globe size={18} /> : <Search size={18} />}
-            </button>
+            <div className="model-selector-container onboarding-anchor">
+              <button
+                className="model-select-btn"
+                onClick={() => setShowModelDropdown(!showModelDropdown)}
+                type="button"
+                title="Select model"
+              >
+                <span className="model-name-text text-truncate">{selectedModel}</span>
+                <ChevronDown size={14} className={`dropdown-chevron ${showModelDropdown ? 'active' : ''}`} />
+              </button>
+
+              {showOnboarding ? (
+                <div className="onboarding-inline-tip">Choose a model</div>
+              ) : null}
+              
+              {showModelDropdown && (
+                <div className="model-dropdown-menu">
+                  {models.map((model) => (
+                    <button
+                      key={model}
+                      className={`model-option ${selectedModel === model ? 'active' : ''}`}
+                      onClick={() => {
+                        onModelSelect?.(model);
+                        setShowModelDropdown(false);
+                      }}
+                    >
+                      {model}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {searchOptions.search_web ? (
+              <div className="onboarding-anchor">
+                <button
+                  className="action-icon-btn active"
+                  onClick={handleWebSearchToggle}
+                  title="Toggle web search"
+                  type="button"
+                >
+                  <Globe size={18} />
+                </button>
+                {showOnboarding ? (
+                  <div className="onboarding-inline-tip">Web search on</div>
+                ) : null}
+              </div>
+            ) : null}
             
             {/* File Upload Button */}
-            <button
-              className="action-icon-btn"
-              onClick={handleFileClick}
-              title="Upload files"
-              type="button"
-            >
-              <Paperclip size={18} />
-            </button>
+            <div className="onboarding-anchor">
+              <button
+                className="action-icon-btn"
+                onClick={handleFileClick}
+                title="Upload files"
+                type="button"
+              >
+                <Paperclip size={18} />
+              </button>
+              {showOnboarding ? (
+                <div className="onboarding-inline-tip">Attach files</div>
+              ) : null}
+            </div>
             <input 
               type="file" 
               ref={fileInputRef} 
@@ -332,19 +459,24 @@ const ChatInput: React.FC<ChatInputProps> = ({
               accept=".pdf,.docx,.doc,.txt,.md,.png,.jpg,.jpeg,.webp"
             />
 
-            <button
-              className={`action-icon-btn mic-btn ${recordingState === 'recording' ? 'recording' : ''}`}
-              onClick={toggleRecording}
-              title={recordingState === 'idle' ? 'Start recording' : 'Stop recording'}
-              type="button"
-              disabled={recordingState === 'processing'}
-            >
-              {recordingState === 'recording' ? (
-                <Square size={18} />
-              ) : (
-                <Mic size={18} />
-              )}
-            </button>
+            <div className="onboarding-anchor">
+              <button
+                className={`action-icon-btn mic-btn ${recordingState === 'recording' ? 'recording' : ''}`}
+                onClick={toggleRecording}
+                title={recordingState === 'idle' ? 'Start recording' : 'Stop recording'}
+                type="button"
+                disabled={recordingState === 'processing'}
+              >
+                {recordingState === 'recording' ? (
+                  <Square size={18} />
+                ) : (
+                  <Mic size={18} />
+                )}
+              </button>
+              {showOnboarding ? (
+                <div className="onboarding-inline-tip">Voice input</div>
+              ) : null}
+            </div>
           </div>
 
           <textarea
@@ -361,20 +493,33 @@ const ChatInput: React.FC<ChatInputProps> = ({
           />
 
           <div className="input-suffix">
-            <button
-              onClick={handleSendMessage}
-              disabled={loading || isUploadingDocs || (!input.trim() && pendingImages.length === 0) || recordingState === 'processing'}
-              className="send-icon-btn"
-              title="Send message"
-            >
-              {loading ? (
-                <Loader size={18} className="animate-spin" />
-              ) : (
-                <Send size={18} />
-              )}
-            </button>
+            <div className="onboarding-anchor">
+              <button
+                onClick={handleSendMessage}
+                disabled={loading || isUploadingDocs || (!input.trim() && pendingImages.length === 0) || recordingState === 'processing'}
+                className="send-icon-btn"
+                title="Send message"
+              >
+                {loading ? (
+                  <Loader size={18} className="animate-spin" />
+                ) : (
+                  <Send size={18} />
+                )}
+              </button>
+              {showOnboarding ? (
+                <div className="onboarding-inline-tip">Send</div>
+              ) : null}
+            </div>
           </div>
         </div>
+        {showOnboarding ? (
+          <div className="onboarding-inline-row">
+            <div className="onboarding-inline-note">Tip: type `/search` to toggle web search.</div>
+            <button className="onboarding-dismiss" onClick={() => onDismissOnboarding?.()} type="button">
+              Got it
+            </button>
+          </div>
+        ) : null}
       </div>
 
     </div>

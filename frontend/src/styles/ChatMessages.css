@@ -7,14 +7,16 @@
   border-radius: 1.25rem 1.25rem 0.25rem 1.25rem;
   padding: 0.75rem 1.25rem;
   margin: 0.5rem 0;
-  max-width: 80%;
-  word-wrap: break-word;
+  max-width: 85%;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
   position: relative;
   overflow: hidden;
   font-weight: 500;
   line-height: 1.5;
   transition: transform 0.2s ease;
+  white-space: pre-wrap;
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
 
 .message-bubble-user:hover {
@@ -34,7 +36,9 @@
   padding: 0;
   margin: var(--space-2) 0;
   max-width: 100%;
+  overflow-wrap: break-word;
   word-wrap: break-word;
+  word-break: break-word;
   position: relative;
   font-family: var(--font-family-sans);
   line-height: var(--line-height-relaxed);

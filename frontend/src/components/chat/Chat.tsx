@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ListGroup } from "react-bootstrap";
-import api, { streamChat } from "../../utils/api";
+import api, { streamChat, getSearchHistory, addToSearchHistory } from "../../utils/api";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "../../contexts/ToastContext";
 import TypingIndicator from "./TypingIndicator";
@@ -11,7 +11,6 @@ import type { Message } from "../../types/chat";
 import type { WebSearchOptions } from "../../types/search";
 import "../../styles/ChatVariables.css";
 import "../../styles/ChatBase.css";
-import "../../styles/ChatSidebar.css";
 import "../../styles/ChatMessages.css";
 import "../../styles/ChatInput.css";
 import "../../styles/ChatUtils.css";
@@ -38,7 +37,7 @@ const Chat: React.FC<ChatProps> = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const sessionIdFromUrl = searchParams.get("session");
-    const { error: showError } = useToast();
+    const { error: showError, success: showSuccess } = useToast();
 
     const [isStreaming, setIsStreaming] = useState(false);
     const [streamingMessageId, setStreamingMessageId] = useState<number | null>(
@@ -72,13 +71,72 @@ const Chat: React.FC<ChatProps> = () => {
             safe_search: true
         };
     });
-    const [recentSearches, setRecentSearches] = useState<string[]>(() => {
-        const saved = localStorage.getItem("recentSearches");
-        return saved ? JSON.parse(saved) : [];
-    });
+    const [recentSearches, setRecentSearches] = useState<string[]>([]);
+    const [sessions, setSessions] = useState<any[]>([]);
+    const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+    const [sessionsSkip, setSessionsSkip] = useState(0);
+    const [hasMoreSessions, setHasMoreSessions] = useState(true);
+    const [sessionsSearch, setSessionsSearch] = useState("");
+    const SESSIONS_LIMIT = 20;
+
+    // Fetch search history on mount
+    useEffect(() => {
+        const fetchHistory = async () => {
+            try {
+                const history = await getSearchHistory();
+                setRecentSearches(history.map(item => item.query));
+            } catch (error) {
+                console.error("Failed to fetch search history:", error);
+            }
+        };
+        fetchHistory();
+    }, []);
+
+    const fetchSessions = useCallback(async (isLoadMore = false, searchTerm = sessionsSearch) => {
+        setIsLoadingSessions(true);
+        try {
+            const skip = isLoadMore ? sessionsSkip + SESSIONS_LIMIT : 0;
+            const params = new URLSearchParams({
+                skip: skip.toString(),
+                limit: SESSIONS_LIMIT.toString(),
+                newest_first: "true",
+            });
+            if (searchTerm) params.append("search", searchTerm);
+            
+            const response = await api.get(`/sessions?${params}`);
+            const newSessions = response.data.data;
+            const meta = response.data.meta;
+
+            setSessions(prev => isLoadMore ? [...prev, ...newSessions] : newSessions);
+            setSessionsSkip(skip);
+            setHasMoreSessions(meta.has_more);
+        } catch (error) {
+            console.error("Failed to fetch sessions", error);
+        } finally {
+            setIsLoadingSessions(false);
+        }
+    }, [sessionsSkip, sessionsSearch]);
+
+    // Fetch sessions on mount
+    useEffect(() => {
+        fetchSessions();
+    }, []);
+
+    const handleSearchSessions = useCallback((query: string) => {
+        setSessionsSearch(query);
+        fetchSessions(false, query);
+    }, [fetchSessions]);
+
+    const handleLoadMoreSessions = useCallback(() => {
+        if (!isLoadingSessions && hasMoreSessions) {
+            fetchSessions(true);
+        }
+    }, [fetchSessions, isLoadingSessions, hasMoreSessions]);
+
     const [searchSuggestions] = useState<string[]>([]);
     const [activeContextMenu, setActiveContextMenu] = useState<{ id: number, type: 'user' | 'assistant' } | null>(null);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [showOnboarding, setShowOnboarding] = useState(false);
 
     // Use a ref to store the latest input for sendMessage to avoid re-creating it on every keystroke
     const inputRef = useRef(input);
@@ -189,13 +247,14 @@ const Chat: React.FC<ChatProps> = () => {
             setCurrentSessionId(response.data.id);
             setMessages([]);
             navigate(`/chat?session=${response.data.id}`, { replace: true });
+            await fetchSessions();
             return response.data.id;
         } catch (error) {
             showError("Session Error", "Failed to create session.");
             console.error("Failed to create session", error);
             throw error;
         }
-    }, [navigate, showError]);
+    }, [navigate, showError, fetchSessions]);
 
     const copyToClipboard = useCallback(async (text: string) => {
         try {
@@ -288,6 +347,7 @@ const Chat: React.FC<ChatProps> = () => {
                     );
                     resetStreamingState();
                     setInput("");
+                    fetchSessions();
                 },
                 (error) => {
                     setMessages((prev) =>
@@ -304,6 +364,7 @@ const Chat: React.FC<ChatProps> = () => {
                     resetStreamingState();
                 },
                 (toolUpdate) => applyToolUpdate(tempMessage.id, toolUpdate),
+                (fact) => showSuccess("Memory Saved", fact),
                 controller.signal
             );
         } catch (error) {
@@ -454,6 +515,7 @@ const Chat: React.FC<ChatProps> = () => {
                     resetStreamingState();
                 },
                 (toolUpdate) => applyToolUpdate(message.id, toolUpdate),
+                (fact) => showSuccess("Memory Saved", fact),
                 controller.signal
             );
         } catch (error) {
@@ -494,6 +556,25 @@ const Chat: React.FC<ChatProps> = () => {
         }
     }, [showError]);
 
+    const handleSessionSelect = useCallback((sessionId: number) => {
+        navigate(`/chat?session=${sessionId}`);
+    }, [navigate]);
+
+    const handleDeleteSession = useCallback(async (sessionId: number) => {
+        try {
+            await api.delete(`/sessions/${sessionId}`);
+            setSessions(prev => prev.filter(s => s.id !== sessionId));
+            if (currentSessionId === sessionId) {
+                setCurrentSessionId(null);
+                setMessages([]);
+                navigate("/chat", { replace: true });
+            }
+            showSuccess("Deleted", "Session deleted successfully");
+        } catch (error) {
+            showError("Delete Error", "Failed to delete session");
+        }
+    }, [currentSessionId, navigate, showSuccess, showError]);
+
     useEffect(() => {
         const handleClickOutside = () => {
             setActiveContextMenu(null);
@@ -501,6 +582,13 @@ const Chat: React.FC<ChatProps> = () => {
 
         document.addEventListener("click", handleClickOutside);
         return () => document.removeEventListener("click", handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        const seen = localStorage.getItem("chatOnboardingSeen");
+        if (!seen) {
+            setShowOnboarding(true);
+        }
     }, []);
 
     useEffect(() => {
@@ -649,9 +737,10 @@ const Chat: React.FC<ChatProps> = () => {
         localStorage.setItem("searchOptions", JSON.stringify(searchOptions));
     }, [searchOptions]);
 
-    useEffect(() => {
-        localStorage.setItem("recentSearches", JSON.stringify(recentSearches));
-    }, [recentSearches]);
+    const dismissOnboarding = useCallback(() => {
+        localStorage.setItem("chatOnboardingSeen", "true");
+        setShowOnboarding(false);
+    }, []);
 
     const handleFileUpload = useCallback(async (file: File) => {
         try {
@@ -697,6 +786,14 @@ const Chat: React.FC<ChatProps> = () => {
                 setIsDropdownOpen={setIsDropdownOpen}
                 setCurrentSessionId={setCurrentSessionId}
                 setMessages={setMessages}
+                sessions={sessions}
+                currentSessionId={currentSessionId}
+                onSessionSelect={handleSessionSelect}
+                onDeleteSession={handleDeleteSession}
+                onSearch={handleSearchSessions}
+                onLoadMore={handleLoadMoreSessions}
+                hasMore={hasMoreSessions}
+                isLoading={isLoadingSessions}
             />
 
             <div className="chat-main-content">
@@ -751,6 +848,12 @@ const Chat: React.FC<ChatProps> = () => {
                         onRecentSearchSelect={handleRecentSearchSelect}
                         selectedModel={selectedModel}
                         onFileUpload={handleFileUpload}
+                        models={models}
+                        useTools={useTools}
+                        onUseToolsChange={setUseTools}
+                        onModelSelect={setSelectedModel}
+                        showOnboarding={showOnboarding}
+                        onDismissOnboarding={dismissOnboarding}
                     />
                 </div>
             </div>
