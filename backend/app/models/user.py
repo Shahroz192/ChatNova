@@ -24,6 +24,9 @@ class User(Base):
     memories = relationship(
         "UserMemory", back_populates="user", cascade="all, delete-orphan"
     )
+    search_history = relationship(
+        "SearchHistory", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class UserAPIKey(Base):
