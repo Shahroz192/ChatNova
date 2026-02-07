@@ -16,7 +16,9 @@ from app.core.security import get_password_hash, verify_password
 
 class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
     def get_by_email(self, db: Session, *, email: str) -> Optional[User]:
-        # This is already optimized thanks to the unique index on email
+        # Ensure email is lowercased and stripped for case-insensitive lookup
+        if email:
+            email = email.lower().strip()
         return db.query(User).filter(User.email == email).first()
 
     def create(self, db: Session, *, obj_in: UserCreate) -> User:
