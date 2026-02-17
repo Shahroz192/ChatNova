@@ -1,17 +1,18 @@
-from typing import Optional, List
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from typing import List, Optional
+
+from app.core.security import get_password_hash, verify_password
 from app.crud.base import CRUDBase
 from app.models.user import User, UserAPIKey, UserMCPServer
 from app.schemas.user import (
-    UserCreate,
-    UserUpdate,
     UserAPIKeyCreate,
     UserAPIKeyUpdate,
+    UserCreate,
     UserMCPServerCreate,
     UserMCPServerUpdate,
+    UserUpdate,
 )
-from app.core.security import get_password_hash, verify_password
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 
 class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
