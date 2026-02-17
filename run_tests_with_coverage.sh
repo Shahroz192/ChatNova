@@ -4,7 +4,7 @@
 echo "Running tests with coverage for ChatNova AI Chat Application..."
 
 # Run tests with coverage
-python -m pytest --cov=app --cov-report=html --cov-report=term-missing --cov-report=xml -v
+PYTHONPATH=backend uv run pytest backend/tests --cov=app --cov-report=html --cov-report=term-missing --cov-report=xml -v
 
 echo "Test coverage report generated:"
 echo "- Terminal output above"

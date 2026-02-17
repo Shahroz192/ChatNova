@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from app.models.user import User  # type: ignore
+from app.models.user import User
 from unittest.mock import patch
 
 

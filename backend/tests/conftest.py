@@ -12,7 +12,7 @@ os.environ["ENVIRONMENT"] = "testing"
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 # Load environment variables from backend/.env
-backend_dir = Path(__file__).parent.parent / "backend"
+backend_dir = Path(__file__).resolve().parents[1]
 env_file = backend_dir / ".env"
 if env_file.exists():
     from dotenv import load_dotenv
@@ -20,6 +20,7 @@ if env_file.exists():
     load_dotenv(env_file)
 
 from app.main import app  # noqa: E402
+from app.core.cache import cache_manager  # noqa: E402
 from app.database import Base, get_db  # noqa: E402
 from app.models.user import User  # noqa: E402
 from app.core.security import get_password_hash  # noqa: E402
@@ -40,6 +41,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 @pytest.fixture(scope="function")
 def db_session():
     """Create a new database session for each test."""
+    cache_manager.clear_all_cache()
     # Drop all tables and recreate to ensure clean state
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)

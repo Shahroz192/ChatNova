@@ -1,7 +1,5 @@
-import pytest
 from app.core.input_validation import InputSanitizer
 from app.services.ai_chat import AIChatService, sanitize_user_input
-from unittest.mock import MagicMock, patch
 
 
 def test_pii_masking():

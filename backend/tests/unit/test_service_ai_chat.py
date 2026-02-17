@@ -75,6 +75,85 @@ async def test_simple_chat_cached(ai_service):
 
 
 @pytest.mark.asyncio
+async def test_simple_chat_cached_string_yields_single_chunk(ai_service):
+    with patch("app.services.ai_chat.cache_manager") as mock_cache:
+        mock_cache.get_llm_response.return_value = "cached response"
+
+        with patch.object(ai_service, "get_llm", return_value=MagicMock()):
+            responses = []
+            async for chunk in ai_service.simple_chat(
+                "hello", "gemini-2.5-flash", user_id=1
+            ):
+                responses.append(chunk)
+
+            assert responses == ["cached response"]
+
+
+@pytest.mark.asyncio
+async def test_simple_chat_skips_cache_for_web_search(ai_service):
+    async def mock_astream(*args, **kwargs):
+        yield "search response"
+
+    mock_chain = MagicMock()
+    mock_chain.astream = MagicMock(side_effect=mock_astream)
+
+    with (
+        patch.object(ai_service, "get_llm", return_value=MagicMock()),
+        patch.object(ai_service, "_optimize_search_query", new_callable=AsyncMock, return_value="test query"),
+        patch.object(
+            ai_service,
+            "_build_search_queries",
+            new_callable=AsyncMock,
+            return_value=["test query", "test query latest"],
+        ),
+        patch.object(ai_service, "_should_search_images", new_callable=AsyncMock, return_value=False),
+        patch("app.services.ai_chat.web_search_service.search_many_with_metadata", return_value={
+            "status": "ok",
+            "had_results": True,
+            "formatted_results": "### WEB SEARCH RESULTS\n[1] Title: Example",
+            "results": [{"title": "Example"}],
+            "errors": [],
+            "queries": ["test query", "test query latest"],
+        }),
+        patch("app.services.ai_chat.ChatPromptTemplate.from_messages") as mock_prompt_builder,
+        patch("app.services.ai_chat.cache_manager") as mock_cache,
+    ):
+        mock_prompt_builder.return_value.__or__.return_value.__or__.return_value = mock_chain
+
+        responses = []
+        async for chunk in ai_service.simple_chat(
+            "latest update", "gemini-2.5-flash", user_id=1, search_web=True
+        ):
+            responses.append(chunk)
+
+        assert "".join(responses) == "search response"
+        mock_cache.get_llm_response.assert_not_called()
+        mock_cache.set_llm_response.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_build_search_queries_has_generic_fallback_variants(ai_service):
+    llm = MagicMock()
+
+    with patch("app.services.ai_chat.ChatPromptTemplate.from_messages") as mock_prompt:
+        mock_chain = AsyncMock()
+        mock_chain.ainvoke.return_value = "not json output"
+        mock_prompt.return_value.__or__.return_value.__or__.return_value = mock_chain
+
+        queries = await ai_service._build_search_queries(
+            message="compare latest model releases across providers",
+            optimized_query="latest model releases",
+            chat_history=[],
+            llm=llm,
+            max_queries=6,
+        )
+
+    assert "latest model releases" in queries
+    assert any(q.endswith(" latest") for q in queries)
+    assert any("official announcement" in q for q in queries)
+
+
+@pytest.mark.asyncio
 async def test_get_relevant_memories_small(ai_service):
     db = MagicMock()
     user_id = 1
