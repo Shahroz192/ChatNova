@@ -128,7 +128,12 @@ class ChatSessionService:
             return []
 
         messages = message_crud.get_by_session(
-            db, session_id=session_id, skip=skip, limit=limit, newest_first=newest_first
+            db,
+            session_id=session_id,
+            user_id=user.id,
+            skip=skip,
+            limit=limit,
+            newest_first=newest_first,
         )
 
         return [

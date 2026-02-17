@@ -139,6 +139,7 @@ class CRUDMessage(CRUDBase[Message, MessageCreate, MessageUpdate]):
         db: Session,
         *,
         session_id: int,
+        user_id: Optional[int] = None,
         skip: int = 0,
         limit: int = 100,
         newest_first: bool = True,
@@ -147,6 +148,8 @@ class CRUDMessage(CRUDBase[Message, MessageCreate, MessageUpdate]):
         Retrieve messages by session with pagination and ordering
         """
         query = db.query(Message).filter(Message.session_id == session_id)
+        if user_id is not None:
+            query = query.filter(Message.user_id == user_id)
 
         # Apply ordering - descending by default to get newest first
         if newest_first:

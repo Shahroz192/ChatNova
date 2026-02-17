@@ -1,47 +1,54 @@
 import asyncio
-from typing import Optional, Dict, Any
-from fastapi import (
-    APIRouter,
-    Depends,
-    Query,
-    HTTPException,
-    BackgroundTasks,
-    UploadFile,
-    File,
-)
-from fastapi.responses import StreamingResponse
-from starlette.responses import FileResponse
-from sqlalchemy.orm import Session
+import gzip
+import json
+import logging
+import os
+from pathlib import Path
+from typing import Any, Dict, Optional
+
 from app import crud
+from app.api.deps import get_current_active_user, get_db
+from app.core.input_validation import InputSanitizer
+from app.core.profiler import request_profiler
+from app.crud.document import chunk as chunk_crud
+from app.crud.document import document as document_crud
+from app.models.user import User
+from app.schemas.document import Document as DocumentSchema
 from app.schemas.message import Message, MessageCreate, MessagePagination
 from app.schemas.session import (
     ChatSession,
     ChatSessionCreate,
-    ChatSessionUpdate,
     ChatSessionPagination,
+    ChatSessionUpdate,
 )
-from app.api.deps import get_db, get_current_active_user
 from app.services.ai_chat import ai_service
-from app.services.session_service import session_service
 from app.services.document_processor import DocumentProcessor
 from app.services.embedding_service import EmbeddingService
-from app.crud.document import document as document_crud
-from app.crud.document import chunk as chunk_crud
-from app.schemas.document import Document as DocumentSchema
-from app.models.user import User
-from app.core.profiler import request_profiler
-from app.core.input_validation import InputSanitizer
-import gzip
-import os
-import json
-import logging
-from pathlib import Path
+from app.services.session_service import session_service
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    UploadFile,
+)
+from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
+from starlette.responses import FileResponse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 router = APIRouter()
+
+
+def _validate_session_ownership(db: Session, session_id: int, user_id: int) -> None:
+    session_obj = crud.session.get(db, id=session_id)
+    if not session_obj or session_obj.user_id != user_id:
+        raise HTTPException(status_code=404, detail="Session not found")
 
 
 # Session Management Endpoints
@@ -251,6 +258,9 @@ async def chat(
     Supports response compression for large outputs.
     Optionally associate with a session for conversation context.
     """
+    if session_id is not None:
+        _validate_session_ownership(db, session_id, current_user.id)
+
     response = ""
     async for chunk in ai_service.simple_chat(
         message_in.content,
@@ -316,6 +326,9 @@ def chat_with_tools(
     Create a chat message with tools/agents enabled.
     Optionally associate with a session for conversation context.
     """
+    if session_id is not None:
+        _validate_session_ownership(db, session_id, current_user.id)
+
     response = asyncio.run(
         ai_service.agent_chat(
             message_in.content, message_in.model, current_user.id, db, session_id
@@ -349,11 +362,13 @@ def chat_with_tools(
     saved_memories = []
     try:
         # Since this endpoint is def (sync), we use asyncio.run to call the async extract method
-        saved_memories = asyncio.run(ai_service.extract_and_save_memories(
-            message_in.content,
-            current_user.id,
-            message_in.model,
-        ))
+        saved_memories = asyncio.run(
+            ai_service.extract_and_save_memories(
+                message_in.content,
+                current_user.id,
+                message_in.model,
+            )
+        )
     except Exception as e:
         logger.error(f"Failed to extract memories in chat-with-tools: {e}")
 
@@ -376,6 +391,8 @@ def chat_stream(
     Stream AI response in real-time using Server-Sent Events.
     Optionally associate with a session for conversation context.
     """
+    if session_id is not None:
+        _validate_session_ownership(db, session_id, current_user.id)
 
     def _format_sse_data(chunk: str) -> str:
         # SSE requires each line to be prefixed with "data: "
@@ -477,6 +494,8 @@ def chat_agent_stream(
     Stream Agent response with tool execution details using Server-Sent Events.
     Events are JSON objects with types: 'tool_start', 'tool_end', 'content'.
     """
+    if session_id is not None:
+        _validate_session_ownership(db, session_id, current_user.id)
 
     def _format_sse_data(chunk: str) -> str:
         lines = chunk.split("\n")
@@ -876,6 +895,8 @@ async def upload_file(
     Upload a document to a chat session.
     Processes the document in the background for RAG.
     """
+    _validate_session_ownership(db, session_id, current_user.id)
+
     file_type = file.filename.split(".")[-1] if "." in file.filename else "txt"
     doc_in = {
         "filename": file.filename,
