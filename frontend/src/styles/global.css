@@ -114,7 +114,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Focus States - High Contrast accessibility */
-:focus-visible {
+:focus-visible:not(input) {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

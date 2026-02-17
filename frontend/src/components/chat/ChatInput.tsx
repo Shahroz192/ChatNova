@@ -8,6 +8,7 @@ import {
   Mic,
   Square,
   Paperclip,
+  Plus,
   X,
   FileText,
   ChevronDown
@@ -76,6 +77,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const isGemini = useMemo(() => selectedModel.toLowerCase().includes('gemini'), [selectedModel]);
+
+  const formatModelName = useCallback((name: string) => {
+    if (name === 'moonshotai/kimi-k2-instruct-0905') return 'Kimi-k2';
+    if (name === 'qwen-3-235b-a22b-instruct-2507') return 'Qwen-Instruct';
+    if (name === 'qwen-3-235b-a22b-thinking-2507') return 'Qwen-Thinking';
+    return name;
+  }, []);
 
   const commands = useMemo(() => [
     { 
@@ -386,99 +394,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
         {/* Unified Input Area */}
         <div className={`modern-input-box ${searchOptions.search_web ? 'search-mode' : ''} ${recordingState === 'recording' ? 'recording-active' : ''}`}>
-          <div className="input-prefix">
-            <div className="model-selector-container onboarding-anchor">
-              <button
-                className="model-select-btn"
-                onClick={() => setShowModelDropdown(!showModelDropdown)}
-                type="button"
-                title="Select model"
-              >
-                <span className="model-name-text text-truncate">{selectedModel}</span>
-                <ChevronDown size={14} className={`dropdown-chevron ${showModelDropdown ? 'active' : ''}`} />
-              </button>
-
-              {showOnboarding ? (
-                <div className="onboarding-inline-tip">Choose a model</div>
-              ) : null}
-              
-              {showModelDropdown && (
-                <div className="model-dropdown-menu">
-                  {models.map((model) => (
-                    <button
-                      key={model}
-                      className={`model-option ${selectedModel === model ? 'active' : ''}`}
-                      onClick={() => {
-                        onModelSelect?.(model);
-                        setShowModelDropdown(false);
-                      }}
-                    >
-                      {model}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {searchOptions.search_web ? (
-              <div className="onboarding-anchor">
-                <button
-                  className="action-icon-btn active"
-                  onClick={handleWebSearchToggle}
-                  title="Toggle web search"
-                  type="button"
-                >
-                  <Globe size={18} />
-                </button>
-                {showOnboarding ? (
-                  <div className="onboarding-inline-tip">Web search on</div>
-                ) : null}
-              </div>
-            ) : null}
-            
-            {/* File Upload Button */}
-            <div className="onboarding-anchor">
-              <button
-                className="action-icon-btn"
-                onClick={handleFileClick}
-                title="Upload files"
-                type="button"
-              >
-                <Paperclip size={18} />
-              </button>
-              {showOnboarding ? (
-                <div className="onboarding-inline-tip">Attach files</div>
-              ) : null}
-            </div>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              style={{ display: 'none' }} 
-              multiple 
-              onChange={handleFileChange}
-              accept=".pdf,.docx,.doc,.txt,.md,.png,.jpg,.jpeg,.webp"
-            />
-
-            <div className="onboarding-anchor">
-              <button
-                className={`action-icon-btn mic-btn ${recordingState === 'recording' ? 'recording' : ''}`}
-                onClick={toggleRecording}
-                title={recordingState === 'idle' ? 'Start recording' : 'Stop recording'}
-                type="button"
-                disabled={recordingState === 'processing'}
-              >
-                {recordingState === 'recording' ? (
-                  <Square size={18} />
-                ) : (
-                  <Mic size={18} />
-                )}
-              </button>
-              {showOnboarding ? (
-                <div className="onboarding-inline-tip">Voice input</div>
-              ) : null}
-            </div>
-          </div>
-
           <textarea
             ref={textareaRef}
             className="modern-textarea"
@@ -490,25 +405,124 @@ const ChatInput: React.FC<ChatInputProps> = ({
             onBlur={handleBlur}
             placeholder={recordingState === 'processing' ? 'Transcribing...' : 'Ask anything...'}
             disabled={recordingState === 'processing'}
+            autoComplete="off"
           />
 
-          <div className="input-suffix">
-            <div className="onboarding-anchor">
-              <button
-                onClick={handleSendMessage}
-                disabled={loading || isUploadingDocs || (!input.trim() && pendingImages.length === 0) || recordingState === 'processing'}
-                className="send-icon-btn"
-                title="Send message"
-              >
-                {loading ? (
-                  <Loader size={18} className="animate-spin" />
-                ) : (
-                  <Send size={18} />
+          <div className="input-actions-row">
+            <div className="input-actions-left">
+              {/* File Upload Button (First) */}
+              <div className="onboarding-anchor">
+                <button
+                  className="action-icon-btn"
+                  onClick={handleFileClick}
+                  title="Upload files"
+                  type="button"
+                >
+                  <Plus size={18} strokeWidth={2} />
+                </button>
+                {showOnboarding ? (
+                  <div className="onboarding-inline-tip">Attach files</div>
+                ) : null}
+              </div>
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                style={{ display: 'none' }} 
+                multiple 
+                onChange={handleFileChange}
+                accept=".pdf,.docx,.doc,.txt,.md,.png,.jpg,.jpeg,.webp"
+              />
+
+              {/* Model Selector (Second) */}
+              <div className="model-selector-container onboarding-anchor">
+                <button
+                  className="model-select-btn"
+                  onClick={() => setShowModelDropdown(!showModelDropdown)}
+                  type="button"
+                  title="Select model"
+                >
+                  <span className="model-name-text text-truncate">{formatModelName(selectedModel)}</span>
+                  <ChevronDown size={14} strokeWidth={2.5} className={`dropdown-chevron ${showModelDropdown ? 'active' : ''}`} />
+                </button>
+
+                {showOnboarding ? (
+                  <div className="onboarding-inline-tip">Choose a model</div>
+                ) : null}
+                
+                {showModelDropdown && (
+                  <div className="model-dropdown-menu">
+                    {models.map((model) => (
+                      <button
+                        key={model}
+                        className={`model-option ${selectedModel === model ? 'active' : ''}`}
+                        onClick={() => {
+                          onModelSelect?.(model);
+                          setShowModelDropdown(false);
+                        }}
+                      >
+                        {formatModelName(model)}
+                      </button>
+                    ))}
+                  </div>
                 )}
-              </button>
-              {showOnboarding ? (
-                <div className="onboarding-inline-tip">Send</div>
-              ) : null}
+              </div>
+
+              {searchOptions.search_web && (
+                <div className="onboarding-anchor">
+                  <button
+                    className={`action-icon-btn active`}
+                    onClick={handleWebSearchToggle}
+                    title="Toggle web search"
+                    type="button"
+                  >
+                    <Globe size={18} strokeWidth={2} />
+                  </button>
+                  {showOnboarding ? (
+                    <div className="onboarding-inline-tip">Web search on</div>
+                  ) : null}
+                </div>
+              )}
+            </div>
+
+            <div className="input-actions-right">
+              {/* Voice Input (Near Send) */}
+              <div className="onboarding-anchor">
+                <button
+                  className={`action-icon-btn mic-btn ${recordingState === 'recording' ? 'recording' : ''}`}
+                  onClick={toggleRecording}
+                  title={recordingState === 'idle' ? 'Start recording' : 'Stop recording'}
+                  type="button"
+                  disabled={recordingState === 'processing'}
+                >
+                  {recordingState === 'recording' ? (
+                    <Square size={18} strokeWidth={2} />
+                  ) : (
+                    <Mic size={18} strokeWidth={2} />
+                  )}
+                </button>
+                {showOnboarding ? (
+                  <div className="onboarding-inline-tip">Voice input</div>
+                ) : null}
+              </div>
+
+              {/* Send Button */}
+              <div className="onboarding-anchor">
+                <button
+                  onClick={handleSendMessage}
+                  disabled={loading || isUploadingDocs || (!input.trim() && pendingImages.length === 0) || recordingState === 'processing'}
+                  className="send-icon-btn"
+                  title="Send message"
+                >
+                  {loading ? (
+                    <Loader size={18} strokeWidth={2.5} className="animate-spin" />
+                  ) : (
+                    <Send size={18} strokeWidth={2.5} />
+                  )}
+                </button>
+                {showOnboarding ? (
+                  <div className="onboarding-inline-tip">Send</div>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
