@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Any
+from typing import List, Any
 from flashrank import Ranker, RerankRequest
 
 class RerankService:

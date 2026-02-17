@@ -26,7 +26,6 @@ from app.services.web_search import web_search_service
 from app.services.rerank_service import rerank_service
 from app.models.document import SessionDocument, DocumentChunk
 from sqlalchemy.orm import Session
-import json
 
 load_dotenv()
 
@@ -276,12 +275,14 @@ class AIChatService:
             del self.session_memories[session_id]
 
     def load_session_history(
-        self, session_id: int, db: Session
+        self, session_id: int, db: Session, user_id: Optional[int] = None
     ) -> InMemoryChatMessageHistory:
         """Load conversation history into memory for a session"""
         memory = self.get_session_memory(session_id)
 
-        messages = message_crud.get_by_session(db, session_id=session_id)
+        messages = message_crud.get_by_session(
+            db, session_id=session_id, user_id=user_id
+        )
 
         memory.clear()
 
@@ -321,7 +322,7 @@ class AIChatService:
         """Optimize the user's message into a search-engine friendly query."""
         from datetime import datetime
 
-        current_date = datetime.now().strftime("%B %Y")
+        current_date = datetime.now().strftime("%A, %B %d, %Y")
 
         opt_prompt = ChatPromptTemplate.from_messages(
             [
@@ -330,6 +331,7 @@ class AIChatService:
                     f"You are a search expert. Today is {current_date}. "
                     "Convert the user's request into a single, concise, and highly effective search engine query. "
                     "If the user is asking about current events, include relevant year/month if necessary. "
+                    "If the user asks whether an event already happened, include terms like 'latest', 'official', and current year when useful. "
                     "If there is relevant conversation history, use it to make the query more specific. "
                     "Output ONLY the optimized query string, no quotes or explanation.",
                 ),
@@ -342,6 +344,84 @@ class AIChatService:
             {"input": message, "chat_history": chat_history}
         )
         return optimized_query.strip().strip('"')
+
+    async def _build_search_queries(
+        self,
+        message: str,
+        optimized_query: str,
+        chat_history: List[Any],
+        llm: Any,
+        max_queries: int = 6,
+    ) -> List[str]:
+        """Create multiple focused search queries for better recall on evolving topics."""
+        from datetime import datetime
+
+        current_date = datetime.now().strftime("%A, %B %d, %Y")
+        current_year = datetime.now().year
+        planner_prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    f"You generate web search query sets. Today is {current_date}. "
+                    "Given a user request and one optimized query, output up to 4 complementary search queries that maximize coverage of latest factual updates. "
+                    "If the request references multiple named entities, include targeted queries that each focus on one entity. "
+                    "Prioritize official release notes, provider announcements, and recent reputable news sources. "
+                    "Output ONLY a JSON array of strings, no explanation.",
+                ),
+                MessagesPlaceholder(variable_name="chat_history"),
+                (
+                    "human",
+                    "USER REQUEST: {message}\nBASE QUERY: {optimized_query}",
+                ),
+            ]
+        )
+
+        chain = planner_prompt | llm | StrOutputParser()
+        queries: List[str] = [optimized_query.strip()]
+
+        try:
+            raw_output = await chain.ainvoke(
+                {
+                    "message": message,
+                    "optimized_query": optimized_query,
+                    "chat_history": chat_history,
+                }
+            )
+            parsed_queries: List[str] = []
+            try:
+                parsed = json.loads(raw_output)
+                if isinstance(parsed, list):
+                    parsed_queries = [item.strip() for item in parsed if isinstance(item, str) and item.strip()]
+            except Exception:
+                # Fallback parser for non-JSON outputs.
+                parsed_queries = [
+                    line.strip("- ").strip()
+                    for line in raw_output.splitlines()
+                    if line.strip()
+                ]
+            queries.extend(parsed_queries)
+        except Exception as e:
+            logging.warning(f"Failed to generate multi-query plan, using fallback: {e}")
+
+        # Deterministic generic expansions so we don't depend only on LLM formatting.
+        queries.extend(
+            [
+                f"{optimized_query} latest",
+                f"{optimized_query} official announcement",
+                f"{optimized_query} {current_year}",
+            ]
+        )
+
+        deduped: List[str] = []
+        seen = set()
+        for q in queries:
+            key = q.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(q)
+
+        return deduped[:max_queries]
 
     async def _optimize_rag_query(
         self, message: str, chat_history: List[Any], llm: Any
@@ -523,7 +603,10 @@ class AIChatService:
                     vector_chunks = (
                         db.query(DocumentChunk)
                         .join(SessionDocument)
-                        .filter(SessionDocument.session_id == session_id)
+                        .filter(
+                            SessionDocument.session_id == session_id,
+                            SessionDocument.user_id == user_id,
+                        )
                         .order_by(
                             DocumentChunk.embedding.cosine_distance(query_embedding)
                         )
@@ -535,7 +618,10 @@ class AIChatService:
                     keyword_chunks = (
                         db.query(DocumentChunk)
                         .join(SessionDocument)
-                        .filter(SessionDocument.session_id == session_id)
+                        .filter(
+                            SessionDocument.session_id == session_id,
+                            SessionDocument.user_id == user_id,
+                        )
                         .filter(query_filter)
                         .limit(candidate_limit // 2)
                         .all()
@@ -555,7 +641,10 @@ class AIChatService:
                     candidates = (
                         db.query(DocumentChunk)
                         .join(SessionDocument)
-                        .filter(SessionDocument.session_id == session_id)
+                        .filter(
+                            SessionDocument.session_id == session_id,
+                            SessionDocument.user_id == user_id,
+                        )
                         .filter(query_filter)
                         .limit(candidate_limit)
                         .all()
@@ -564,7 +653,10 @@ class AIChatService:
                 candidates = (
                     db.query(DocumentChunk)
                     .join(SessionDocument)
-                    .filter(SessionDocument.session_id == session_id)
+                    .filter(
+                        SessionDocument.session_id == session_id,
+                        SessionDocument.user_id == user_id,
+                    )
                     .filter(query_filter)
                     .limit(candidate_limit)
                     .all()
@@ -575,7 +667,10 @@ class AIChatService:
                 candidates = (
                     db.query(DocumentChunk)
                     .join(SessionDocument)
-                    .filter(SessionDocument.session_id == session_id)
+                    .filter(
+                        SessionDocument.session_id == session_id,
+                        SessionDocument.user_id == user_id,
+                    )
                     .order_by(DocumentChunk.created_at.desc())
                     .limit(limit)
                     .all()
@@ -633,7 +728,7 @@ class AIChatService:
 
         cached_response = None
         if user_id:
-            if session_id or images:
+            if session_id or images or search_web:
                 pass
             else:
                 cache_key = f"{sanitized_message}:search:{search_web}"
@@ -643,7 +738,12 @@ class AIChatService:
 
         if cached_response:
             logging.info(f"Cache hit for user {user_id}")
-            for chunk in cached_response:
+            cached_chunks = (
+                [cached_response]
+                if isinstance(cached_response, str)
+                else cached_response
+            )
+            for chunk in cached_chunks:
                 yield chunk
                 await asyncio.sleep(0.01)
             return
@@ -651,7 +751,7 @@ class AIChatService:
         full_response = ""
         chat_history = []
         if session_id and db:
-            memory = self.load_session_history(session_id, db)
+            memory = self.load_session_history(session_id, db, user_id=user_id)
             chat_history = memory.messages
 
         # Get custom instructions
@@ -723,7 +823,16 @@ class AIChatService:
                     sanitized_message, chat_history, llm
                 )
                 logging.info(f"Optimized query: {optimized_query}")
-                search_results = web_search_service.search(optimized_query)
+                search_queries = await self._build_search_queries(
+                    sanitized_message, optimized_query, chat_history, llm
+                )
+                logging.info(f"Search query set: {search_queries}")
+                search_payload = web_search_service.search_many_with_metadata(
+                    search_queries, max_results=6, retries=1
+                )
+                search_results = search_payload["formatted_results"]
+                search_status = search_payload["status"]
+                had_search_results = search_payload["had_results"]
 
                 # Optional image search
                 should_search_images = await self._should_search_images(
@@ -750,6 +859,11 @@ class AIChatService:
                     "- Use the provided search results as your PRIMARY and most authoritative source.\n"
                     "- Synthesize information from multiple search results to provide a comprehensive answer.\n"
                     "- If search results conflict, present the different viewpoints or the most recent information.\n"
+                    "- NEVER claim an event definitely did NOT happen unless at least one provided source explicitly supports that negative claim.\n"
+                    "- If search results are missing/weak, say you cannot verify yet instead of making a definitive claim.\n"
+                    "- For time-sensitive/event questions, compare source dates against Current Date and explicitly mention the date you are relying on.\n"
+                    "- If an older source conflicts with a newer source, prioritize the newer source and call out the discrepancy.\n"
+                    "- When comparing model releases, prefer the newest version explicitly evidenced in sources and mention older versions only as historical context.\n"
                     "- Synthesize information from the 'DOCUMENT CONTEXT' if provided to answer queries about uploaded files.\n"
                     "- RAG Format: Prefer standard Markdown text for document-based answers. Use UI components ONLY if the user explicitly asks for a chart, table, or visualization from the document data.\n"
                     "- DO NOT mention your internal training data cutoff; act as if you are always up-to-date.\n"
@@ -769,7 +883,7 @@ class AIChatService:
                         MessagesPlaceholder(variable_name="chat_history"),
                         (
                             "human",
-                            "SEARCH RESULTS:\n{search_results}\n\nUSER QUESTION: {input}",
+                            "SEARCH STATUS: {search_status}\nHAS_RESULTS: {had_search_results}\nSEARCH RESULTS:\n{search_results}\n\nUSER QUESTION: {input}",
                         ),
                     ]
                 )
@@ -781,6 +895,8 @@ class AIChatService:
                     {
                         "input": sanitized_message,
                         "chat_history": chat_history,
+                        "search_status": search_status,
+                        "had_search_results": had_search_results,
                         "search_results": search_results,
                         "system_prompt": system_prompt,
                     }
@@ -855,7 +971,7 @@ class AIChatService:
                 memory.add_user_message(sanitized_message)
                 memory.add_ai_message(full_response)
 
-            if user_id and not session_id:
+            if user_id and not session_id and not search_web:
                 cache_key = f"{sanitized_message}:search:{search_web}"
                 cache_manager.set_llm_response(
                     user_id, cache_key, model_name, full_response
@@ -921,7 +1037,7 @@ class AIChatService:
                 return cached_response
 
             if session_id:
-                memory = self.load_session_history(session_id, db)
+                memory = self.load_session_history(session_id, db, user_id=user_id)
                 agent = MCPAgent(llm=llm, client=user_mcp_client, max_steps=50)
                 history_str = "\n".join(
                     [
@@ -1048,7 +1164,7 @@ class AIChatService:
 
             # Initialize agent with callback
             if session_id:
-                memory = self.load_session_history(session_id, db)
+                memory = self.load_session_history(session_id, db, user_id=user_id)
                 agent = MCPAgent(
                     llm=llm, client=user_mcp_client, max_steps=50, callbacks=[handler]
                 )
