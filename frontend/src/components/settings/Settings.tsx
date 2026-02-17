@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Container, Row, Col, Nav, Card, Button, Form } from 'react-bootstrap';
-import { Key, Server, User, History, Sparkles, Brain } from 'lucide-react';
+import { Key, Server, User, Sparkles, Brain } from 'lucide-react';
 import BYOKForm from './BYOKForm';
 import MCPServerForm from './MCPServerForm';
 import MCPServerList from './MCPServerList';

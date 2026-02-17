@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ListGroup } from "react-bootstrap";
-import api, { streamChat, getSearchHistory, addToSearchHistory } from "../../utils/api";
+import api, { streamChat, getSearchHistory } from "../../utils/api";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "../../contexts/ToastContext";
 import TypingIndicator from "./TypingIndicator";

@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { Form, Button } from 'react-bootstrap';
+import { Button } from 'react-bootstrap';
 import { Settings, Plus, MessageSquare, Trash2, Pin, PinOff, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ThemeToggle } from '../common/ThemeToggle';
@@ -26,13 +26,13 @@ interface ChatSidebarProps {
 }
 
 const ChatSidebar: React.FC<ChatSidebarProps> = ({
-  selectedModel,
-  setSelectedModel,
-  models,
-  useTools,
-  setUseTools,
-  isDropdownOpen,
-  setIsDropdownOpen,
+  selectedModel: _selectedModel,
+  setSelectedModel: _setSelectedModel,
+  models: _models,
+  useTools: _useTools,
+  setUseTools: _setUseTools,
+  isDropdownOpen: _isDropdownOpen,
+  setIsDropdownOpen: _setIsDropdownOpen,
   setCurrentSessionId,
   setMessages,
   sessions,
@@ -47,7 +47,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
   const navigate = useNavigate();
   const [pinnedSessions, setPinnedSessions] = React.useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = React.useState("");
-  const searchTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const searchTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => {
     const saved = localStorage.getItem('pinnedSessions');
@@ -93,19 +93,6 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
     });
   }, [sessions, pinnedSessions]);
 
-  const handleDropdownToggle = useCallback(() => {
-    setIsDropdownOpen(!isDropdownOpen);
-  }, [isDropdownOpen, setIsDropdownOpen]);
-
-  const handleModelSelect = useCallback((model: string) => {
-    setSelectedModel(model);
-    setIsDropdownOpen(false);
-  }, [setSelectedModel, setIsDropdownOpen]);
-
-  const handleToolsChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setUseTools(e.target.checked);
-  }, [setUseTools]);
-
   const handleNewChat = useCallback(() => {
     setCurrentSessionId(null);
     setMessages([]);
@@ -142,6 +129,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
               className="sidebar-search-input"
               value={searchQuery}
               onChange={handleSearchChange}
+              autoComplete="off"
             />
           </div>
         </div>

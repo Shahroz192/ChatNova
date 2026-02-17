@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Card, ListGroup, Button } from 'react-bootstrap';
-import { User, FileText } from 'lucide-react';
+import { ListGroup, Button } from 'react-bootstrap';
+import { FileText } from 'lucide-react';
 import Timestamp from './Timestamp';
 import MessageStatus from './MessageStatus';
 import MessageContextMenu from './MessageContextMenu';
