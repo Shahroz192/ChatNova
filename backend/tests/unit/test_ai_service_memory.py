@@ -64,7 +64,7 @@ async def test_simple_chat_includes_relevant_memories():
                     if isinstance(args[0], dict) and "system_prompt" in args[0]:
                         chat_call = call
                         break
-                
+
                 assert chat_call is not None
                 input_data = chat_call[0][0]
                 system_prompt = input_data["system_prompt"]

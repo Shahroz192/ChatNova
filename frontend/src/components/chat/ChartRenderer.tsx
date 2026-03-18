@@ -36,7 +36,7 @@ interface ChartProps {
 
 const ChartRenderer: React.FC<ChartProps> = ({ type, data, label }) => {
   const { isDark } = useTheme();
-  
+
   // Memoize sorted data to avoid re-sorting on every render
   const sortedData = useMemo(() => [...data].sort((a, b) => b.value - a.value), [data]);
 
@@ -58,23 +58,23 @@ const ChartRenderer: React.FC<ChartProps> = ({ type, data, label }) => {
         // For pie charts, make the primary category bold and others progressively softer
         backgroundColor: isPie
           ? [
-              '#4F46E5',          // primary (top of circle)
-              'rgba(79, 70, 229, 0.65)',
-              'rgba(79, 70, 229, 0.45)',
-              'rgba(79, 70, 229, 0.30)',
-              'rgba(148, 163, 184, 0.45)', // slate accents
-              'rgba(148, 163, 184, 0.25)',
-            ]
+            '#4F46E5',          // primary (top of circle)
+            'rgba(79, 70, 229, 0.65)',
+            'rgba(79, 70, 229, 0.45)',
+            'rgba(79, 70, 229, 0.30)',
+            'rgba(148, 163, 184, 0.45)', // slate accents
+            'rgba(148, 163, 184, 0.25)',
+          ]
           : 'rgba(79, 70, 229, 0.5)',
         borderColor: isPie
           ? [
-              '#312E81',
-              '#3730A3',
-              '#4338CA',
-              '#4F46E5',
-              '#64748B',
-              '#94A3B8',
-            ]
+            '#312E81',
+            '#3730A3',
+            '#4338CA',
+            '#4F46E5',
+            '#64748B',
+            '#94A3B8',
+          ]
           : 'rgba(79, 70, 229, 1)',
         borderWidth: isPie ? 2 : 1,
       },
@@ -100,25 +100,25 @@ const ChartRenderer: React.FC<ChartProps> = ({ type, data, label }) => {
     scales:
       !isPie
         ? {
-            x: {
-              grid: {
-                display: false,
-                color: gridColor,
-              },
-              ticks: {
-                color: textColor,
-              }
+          x: {
+            grid: {
+              display: false,
+              color: gridColor,
             },
-            y: {
-              beginAtZero: true,
-              grid: {
-                color: gridColor,
-              },
-              ticks: {
-                color: textColor,
-              }
+            ticks: {
+              color: textColor,
+            }
+          },
+          y: {
+            beginAtZero: true,
+            grid: {
+              color: gridColor,
             },
-          }
+            ticks: {
+              color: textColor,
+            }
+          },
+        }
         : {},
     maintainAspectRatio: false, // This will help with responsive sizing
   }), [isPie, textColor, label, gridColor]);

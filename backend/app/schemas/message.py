@@ -12,7 +12,9 @@ class MessageBase(BaseModel):
     model: str
     search_web: Optional[bool] = False
     images: Optional[List[str]] = None  # List of base64 strings or URLs
-    document_ids: Optional[List[int]] = None  # List of document IDs to associate with this message
+    document_ids: Optional[List[int]] = (
+        None  # List of document IDs to associate with this message
+    )
 
 
 class MessageCreate(MessageBase):

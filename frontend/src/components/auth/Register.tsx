@@ -20,8 +20,21 @@ const Register: React.FC = () => {
                 password: password,
             });
             navigate("/login");
-        } catch (err) {
-            setError("Failed to create an account");
+        } catch (err: any) {
+            if (err.response?.status === 422) {
+                const detail = err.response.data?.detail;
+                if (Array.isArray(detail)) {
+                    setError(detail[0]?.msg || "Invalid input");
+                } else if (typeof detail === 'string') {
+                    setError(detail);
+                } else {
+                    setError("Validation error occurred");
+                }
+            } else if (err.response?.data?.detail) {
+                setError(err.response.data.detail);
+            } else {
+                setError("Failed to create an account");
+            }
         }
     }, [email, password, navigate]);
 
@@ -63,6 +76,9 @@ const Register: React.FC = () => {
                                     className="register-input"
                                     placeholder="Create a password"
                                 />
+                                <Form.Text className="text-muted small">
+                                    At least 8 chars, including uppercase, lowercase, and a digit.
+                                </Form.Text>
                             </Form.Group>
                             <Button type="submit" className="register-button">
                                 Sign Up

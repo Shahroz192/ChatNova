@@ -35,9 +35,10 @@ class CRUDMessage(CRUDBase[Message, MessageCreate, MessageUpdate]):
         # Link documents to this message if provided
         if obj_in.document_ids:
             from app.models.document import SessionDocument
+
             db.query(SessionDocument).filter(
                 SessionDocument.id.in_(obj_in.document_ids),
-                SessionDocument.user_id == user_id
+                SessionDocument.user_id == user_id,
             ).update({"message_id": db_obj.id}, synchronize_session=False)
 
         db.commit()
@@ -64,7 +65,11 @@ class CRUDMessage(CRUDBase[Message, MessageCreate, MessageUpdate]):
         """
         # For now, skip caching when search or session_id is applied since these queries can be highly variable
         if search or session_id:
-            query = db.query(Message).filter(Message.user_id == user_id).options(selectinload(Message.documents))
+            query = (
+                db.query(Message)
+                .filter(Message.user_id == user_id)
+                .options(selectinload(Message.documents))
+            )
 
             if session_id:
                 query = query.filter(Message.session_id == session_id)
@@ -114,7 +119,11 @@ class CRUDMessage(CRUDBase[Message, MessageCreate, MessageUpdate]):
                 return messages
 
             # If not in cache, fetch from database
-            query = db.query(Message).filter(Message.user_id == user_id).options(selectinload(Message.documents))
+            query = (
+                db.query(Message)
+                .filter(Message.user_id == user_id)
+                .options(selectinload(Message.documents))
+            )
 
         # Apply ordering - descending by default to get newest first
         if newest_first:

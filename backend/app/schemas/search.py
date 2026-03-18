@@ -2,12 +2,15 @@ from typing import Optional
 from pydantic import BaseModel
 from datetime import datetime
 
+
 class SearchHistoryBase(BaseModel):
     query: str
     search_type: Optional[str] = "general"
 
+
 class SearchHistoryCreate(SearchHistoryBase):
     pass
+
 
 class SearchHistory(SearchHistoryBase):
     id: int

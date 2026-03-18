@@ -5,7 +5,10 @@ from app.crud.base import CRUDBase
 from app.models.search import SearchHistory
 from app.schemas.search import SearchHistoryCreate, SearchHistory as SearchHistorySchema
 
-class CRUDSearchHistory(CRUDBase[SearchHistory, SearchHistoryCreate, SearchHistorySchema]):
+
+class CRUDSearchHistory(
+    CRUDBase[SearchHistory, SearchHistoryCreate, SearchHistorySchema]
+):
     def create_with_user(
         self, db: Session, *, obj_in: SearchHistoryCreate, user_id: int
     ) -> SearchHistory:
@@ -34,5 +37,6 @@ class CRUDSearchHistory(CRUDBase[SearchHistory, SearchHistoryCreate, SearchHisto
         rows = db.query(SearchHistory).filter(SearchHistory.user_id == user_id).delete()
         db.commit()
         return rows
+
 
 search_history = CRUDSearchHistory(SearchHistory)

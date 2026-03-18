@@ -39,7 +39,9 @@ class WebSearchService:
             or "No snippet available."
         )
         link = item.get("link") or item.get("href") or item.get("url") or ""
-        date = item.get("date") or item.get("published") or item.get("published_at") or ""
+        date = (
+            item.get("date") or item.get("published") or item.get("published_at") or ""
+        )
 
         return {
             "title": str(title).strip(),
@@ -125,7 +127,9 @@ class WebSearchService:
             formatted = "\n".join(lines).strip()
             status = "ok"
         else:
-            error_text = "; ".join(errors) if errors else "No results returned by provider."
+            error_text = (
+                "; ".join(errors) if errors else "No results returned by provider."
+            )
             formatted = (
                 "### WEB SEARCH RESULTS\n"
                 "No reliable search results were retrieved for this query.\n"
@@ -148,14 +152,18 @@ class WebSearchService:
         """Run multiple searches and return a deduplicated merged payload."""
         cleaned_queries = [q.strip() for q in (queries or []) if q and q.strip()]
         if not cleaned_queries:
-            return self.search_with_metadata("", max_results=max_results, retries=retries)
+            return self.search_with_metadata(
+                "", max_results=max_results, retries=retries
+            )
 
         merged_results: List[Dict[str, str]] = []
         merged_errors: List[str] = []
         seen_keys = set()
 
         for q in cleaned_queries:
-            payload = self.search_with_metadata(q, max_results=max_results, retries=retries)
+            payload = self.search_with_metadata(
+                q, max_results=max_results, retries=retries
+            )
             for error in payload.get("errors", []):
                 merged_errors.append(f"{q}: {error}")
 
@@ -183,14 +191,20 @@ class WebSearchService:
                 if result.get("date"):
                     lines.append(f"Date: {result['date']}")
                 lines.append(f"Matched Query: {result.get('query', '')}")
-                lines.append(f"Snippet: {result.get('snippet', 'No snippet available.')}")
+                lines.append(
+                    f"Snippet: {result.get('snippet', 'No snippet available.')}"
+                )
                 if result.get("link"):
                     lines.append(f"URL: {result['link']}")
                 lines.append("")
             formatted = "\n".join(lines).strip()
             status = "ok"
         else:
-            error_text = "; ".join(merged_errors) if merged_errors else "No results returned by provider."
+            error_text = (
+                "; ".join(merged_errors)
+                if merged_errors
+                else "No results returned by provider."
+            )
             formatted = (
                 "### WEB SEARCH RESULTS\n"
                 "No reliable search results were retrieved for this query set.\n"
@@ -215,19 +229,23 @@ class WebSearchService:
         """Run image search and return a list of normalized image objects."""
         try:
             # DuckDuckGoSearchAPIWrapper.results supports source="images"
-            raw_results = self.image_search_wrapper.results(query, max_results, source="images")
-            
+            raw_results = self.image_search_wrapper.results(
+                query, max_results, source="images"
+            )
+
             # Normalize results to match the ImageData schema
             normalized_results = []
             for res in raw_results:
-                normalized_results.append({
-                    "src": res.get("image") or res.get("thumbnail"),
-                    "thumbnail": res.get("thumbnail") or res.get("image"),
-                    "alt": res.get("title", "Search image"),
-                    "title": res.get("title"),
-                    "source": res.get("source"),
-                    "url": res.get("url")
-                })
+                normalized_results.append(
+                    {
+                        "src": res.get("image") or res.get("thumbnail"),
+                        "thumbnail": res.get("thumbnail") or res.get("image"),
+                        "alt": res.get("title", "Search image"),
+                        "title": res.get("title"),
+                        "source": res.get("source"),
+                        "url": res.get("url"),
+                    }
+                )
             return normalized_results
         except Exception as e:
             logger.error(f"Image search failed: {e}")

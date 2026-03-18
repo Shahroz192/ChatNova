@@ -53,9 +53,7 @@ def upgrade() -> None:
             ["session_id"], ["chat_sessions.id"], ondelete="CASCADE"
         ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(
-            ["message_id"], ["messages.id"], ondelete="SET NULL"
-        ),
+        sa.ForeignKeyConstraint(["message_id"], ["messages.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(

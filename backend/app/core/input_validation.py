@@ -195,11 +195,11 @@ class InputSanitizer:
 
         # Check for command injection patterns
         cmd_patterns = [
-            r"[`].+[`]",            # Backticks: `command`
-            r"\$\(.*\)",            # Command substitution: $(command)
-            r"\${.*}",              # Variable expansion: ${VAR}
-            r"&&|\|\|",             # Command chaining: && or ||
-            r"<\s*\(|>\s*\(",       # Process substitution: <(cmd) or >(cmd)
+            r"[`].+[`]",  # Backticks: `command`
+            r"\$\(.*\)",  # Command substitution: $(command)
+            r"\${.*}",  # Variable expansion: ${VAR}
+            r"&&|\|\|",  # Command chaining: && or ||
+            r"<\s*\(|>\s*\(",  # Process substitution: <(cmd) or >(cmd)
         ]
 
         for pattern in cmd_patterns:

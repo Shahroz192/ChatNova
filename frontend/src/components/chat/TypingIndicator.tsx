@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { Bot, Brain, Sparkles, Zap } from 'lucide-react';
 
 interface TypingIndicatorProps {
@@ -21,7 +21,16 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
   const [waveOffset, setWaveOffset] = useState(0);
   const animationRef = useRef<number | null>(null);
 
-  // Model-specific styling and icons
+  const formatModelName = useCallback((name: string) => {
+    const id = name.toLowerCase();
+    if (id.includes('qwen')) return id.includes('thinking') ? 'Qwen Thinking' : 'Qwen';
+    if (id.includes('kimi')) return 'Kimi';
+    if (id.includes('gpt-4o')) return 'GPT-4o';
+    if (id.includes('claude')) return 'Claude';
+    if (id.includes('gemini')) return 'Gemini';
+    return name.split('/').pop()?.split(':')[0]?.replace(/-instruct.*$|-thinking.*$|-3-235b.*$/i, '') || name;
+  }, []);
+
   const modelStyle = useMemo(() => {
     const name = modelName.toLowerCase();
     
@@ -92,16 +101,17 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
 
   // Status-based messages
   const statusMessage = useMemo(() => {
+    const formattedName = formatModelName(modelName);
     const withModel = !showModel;
     switch (status) {
       case 'processing':
-        return withModel ? `${modelName} is processing` : 'Processing';
+        return withModel ? `${formattedName} is processing` : 'Processing';
       case 'generating':
-        return withModel ? `${modelName} is generating response` : 'Generating response';
+        return withModel ? `${formattedName} is generating response` : 'Generating response';
       default:
-        return withModel ? `${modelName} is thinking` : 'Thinking';
+        return withModel ? `${formattedName} is thinking` : 'Thinking';
     }
-  }, [status, modelName, showModel]);
+  }, [status, modelName, showModel, formatModelName]);
 
   // Render animation content based on style
   const renderAnimation = () => {
@@ -225,7 +235,7 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
               {showModel ? (
                 <div className="model-indicator" style={{ color: modelStyle.iconColor }}>
                   <ModelIcon size={14} />
-                  <span>{modelName}</span>
+                  <span>{formatModelName(modelName)}</span>
                 </div>
               ) : null}
             </div>
@@ -237,9 +247,8 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
       <div
         className="sr-only"
         aria-live="polite"
-        aria-label={showModel ? statusMessage : `${modelName} is ${status === 'thinking' ? 'thinking' : status}`}
       >
-        {showModel ? statusMessage : `${modelName} is ${status === 'thinking' ? 'thinking' : status}`}
+        {showModel ? statusMessage : `${formatModelName(modelName)} is ${status === 'thinking' ? 'thinking' : status}`}
       </div>
     </div>
   );

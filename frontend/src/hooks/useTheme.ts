@@ -1,19 +1,19 @@
-import { useTheme as useNextThemes } from 'next-themes';
+import { useTheme as useNextThemes } from "next-themes";
 
 export const useTheme = () => {
   const { theme, setTheme, resolvedTheme } = useNextThemes();
 
   const toggleTheme = () => {
-    if (theme === 'dark') {
-      setTheme('light');
-    } else if (theme === 'light') {
-      setTheme('dark');
+    if (theme === "dark") {
+      setTheme("light");
+    } else if (theme === "light") {
+      setTheme("dark");
     } else {
-      setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
+      setTheme(resolvedTheme === "dark" ? "light" : "dark");
     }
   };
 
-  const isDark = resolvedTheme === 'dark';
+  const isDark = resolvedTheme === "dark";
 
   return {
     theme,
@@ -21,6 +21,6 @@ export const useTheme = () => {
     resolvedTheme,
     toggleTheme,
     isDark,
-    isSystem: theme === 'system'
+    isSystem: theme === "system",
   };
 };

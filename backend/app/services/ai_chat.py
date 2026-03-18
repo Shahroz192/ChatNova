@@ -15,16 +15,16 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_cerebras import ChatCerebras
 from langchain_groq import ChatGroq
 import groq
-import sqlalchemy as sa
 from app.core.config import mcp_path
 from app.core.ai_profiler import profile_ai_service
 from app.core.cache import cache_manager
 from app.core.security import decrypt_api_key
 from app.crud.user import user_api_key, user_mcp_server
 from app.crud.message import message as message_crud
+from app.database import SessionLocal
 from app.services.web_search import web_search_service
-from app.services.rerank_service import rerank_service
-from app.models.document import SessionDocument, DocumentChunk
+from app.services.rag_service import rag_service
+from app.services.memory_service import memory_service
 from sqlalchemy.orm import Session
 
 load_dotenv()
@@ -391,7 +391,11 @@ class AIChatService:
             try:
                 parsed = json.loads(raw_output)
                 if isinstance(parsed, list):
-                    parsed_queries = [item.strip() for item in parsed if isinstance(item, str) and item.strip()]
+                    parsed_queries = [
+                        item.strip()
+                        for item in parsed
+                        if isinstance(item, str) and item.strip()
+                    ]
             except Exception:
                 # Fallback parser for non-JSON outputs.
                 parsed_queries = [
@@ -423,139 +427,24 @@ class AIChatService:
 
         return deduped[:max_queries]
 
-    async def _optimize_rag_query(
-        self, message: str, chat_history: List[Any], llm: Any
-    ) -> str:
-        """Optimize the user's message into a better query for document retrieval."""
-        opt_prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "You are a retrieval expert. Convert the user's request into a query that is optimized for finding relevant information in technical or informative documents. "
-                    "Focus on the core keywords and entities. If there is relevant conversation history, use it to disambiguate the query. "
-                    "Output ONLY the optimized query string, no quotes or explanation.",
-                ),
-                MessagesPlaceholder(variable_name="chat_history"),
-                ("human", "{input}"),
-            ]
-        )
-        chain = opt_prompt | llm | StrOutputParser()
-        try:
-            optimized_query = await chain.ainvoke(
-                {"input": message, "chat_history": chat_history}
-            )
-            return optimized_query.strip().strip('"')
-        except Exception as e:
-            logging.error(f"Error optimizing RAG query: {e}")
-            return message
-
-    async def get_relevant_memories(
-        self, query: str, user_id: int, db: Session, llm: Any
-    ) -> str:
-        """Retrieve and filter relevant memories for the current query."""
-        from app.crud.memory import memory as memory_crud
-
-        memories = memory_crud.get_by_user(db, user_id=user_id, limit=100)
-        if not memories:
-            return ""
-
-        memory_list = [f"- {m.content}" for m in memories]
-        if len(memories) <= 5:
-            return "\n\n### User Context (Memories)\n" + "\n".join(memory_list)
-
-        memory_text = "\n".join(memory_list)
-
-        filter_prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "You are a context manager. Given a list of user memories and a new user query, select only the memories that are relevant to answering the query. "
-                    "If none are relevant, output 'NONE'. "
-                    "Output the selected memories exactly as they appear in the list, one per line. "
-                    "Memories:\n{memories}",
-                ),
-                ("human", "{query}"),
-            ]
-        )
-
-        chain = filter_prompt | llm | StrOutputParser()
-        try:
-            filtered_memories = await chain.ainvoke(
-                {"memories": memory_text, "query": query}
-            )
-            if filtered_memories.strip() == "NONE":
-                return ""
-            return f"\n\n### User Context (Memories)\n{filtered_memories}"
-        except Exception as e:
-            logging.error(f"Error filtering memories: {e}")
-            return "\n\n### User Context (Memories)\n" + "\n".join(memory_list[:5])
-
     async def extract_and_save_memories(
         self,
         message: str,
         user_id: int,
         model_name: str = "gemini-2.5-flash",
     ) -> List[str]:
-        """Extract permanent facts from a user message and save them to memory.
-        
-        Returns:
-            List[str]: List of successfully extracted and saved facts.
-        """
-        # Sanitize message before extraction
-        sanitized_msg = sanitize_user_input(message)
-
-        from app.crud.memory import memory as memory_crud
-        from app.schemas.memory import MemoryCreate
-        from app.database import SessionLocal
-
-        saved_facts = []
-
+        """Delegate memory extraction to memory_service."""
         with SessionLocal() as db:
             llm = self.get_llm(model_name, user_id=user_id, db=db)
             if not llm:
-                logging.warning(f"Could not initialize LLM {model_name} for memory extraction for user {user_id}")
                 return []
+            return await memory_service.extract_and_save_memories(message, user_id, llm)
 
-            extract_prompt = ChatPromptTemplate.from_messages(
-                [
-                    (
-                        "system",
-                        "You are a memory assistant. Extract any new, permanent facts about the user from the message. "
-                        "Focus on facts like identity, location, job, family, pets, and strong preferences. "
-                        "Ignore temporary feelings, questions, or greetings. "
-                        "Output each fact as a simple, standalone sentence. If no new facts found, output 'NONE'.",
-                    ),
-                    ("human", "{message}"),
-                ]
-            )
-
-            chain = extract_prompt | llm | StrOutputParser()
-            try:
-                result = await chain.ainvoke({"message": sanitized_msg})
-                if result.strip() == "NONE":
-                    return []
-
-                facts = [f.strip("- ").strip() for f in result.split("\n") if f.strip()]
-
-                # Get existing memories to avoid duplicates
-                existing_memories = memory_crud.get_by_user(
-                    db, user_id=user_id, limit=100
-                )
-                existing_contents = [m.content.lower() for m in existing_memories]
-
-                for fact in facts:
-                    if fact.lower() not in existing_contents and fact != "NONE":
-                        memory_crud.create_with_user(
-                            db, obj_in=MemoryCreate(content=fact), user_id=user_id
-                        )
-                        saved_facts.append(fact)
-                        logging.info(f"Saved new memory for user {user_id}: {fact}")
-
-                return saved_facts
-
-            except Exception as e:
-                logging.error(f"Error extracting memories: {e}")
-                return []
+    async def get_relevant_memories(
+        self, query: str, user_id: int, db: Session, llm: Any
+    ) -> str:
+        """Delegate memory retrieval to memory_service."""
+        return await memory_service.get_relevant_memories(query, user_id, db, llm)
 
     async def get_relevant_chunks(
         self,
@@ -567,145 +456,16 @@ class AIChatService:
         llm: Optional[Any] = None,
         chat_history: Optional[List[Any]] = None,
     ) -> Dict[str, Any]:
-        """Retrieve and rerank relevant document chunks for the current query and session."""
-        try:
-            from app.models.document import has_vector
+        """Delegate RAG retrieval to rag_service."""
+        return await rag_service.get_relevant_chunks(
+            query, session_id, user_id, db, limit, llm, chat_history
+        )
 
-            # 1. Optimize Query for RAG
-            optimized_query = query
-            if llm:
-                optimized_query = await self._optimize_rag_query(
-                    query, chat_history or [], llm
-                )
-                logging.info(f"🔍 Optimized RAG Query: {optimized_query}")
-
-            # 2. Fetch Candidates (fetch more than the final limit for reranking)
-            candidate_limit = limit * 3
-
-            # Extract key terms for keyword matching
-            search_terms = [t for t in re.findall(r"\w+", optimized_query) if len(t) > 3]
-            if not search_terms:
-                search_terms = [optimized_query[:50]]
-            query_filter = sa.or_(
-                *[DocumentChunk.content.ilike(f"%{term}%") for term in search_terms]
-            )
-
-            if has_vector:
-                from app.services.embedding_service import EmbeddingService
-
-                try:
-                    embedding_service = EmbeddingService(user_id, db)
-                    query_embedding = await embedding_service.embed_query(
-                        optimized_query
-                    )
-
-                    # Vector search
-                    vector_chunks = (
-                        db.query(DocumentChunk)
-                        .join(SessionDocument)
-                        .filter(
-                            SessionDocument.session_id == session_id,
-                            SessionDocument.user_id == user_id,
-                        )
-                        .order_by(
-                            DocumentChunk.embedding.cosine_distance(query_embedding)
-                        )
-                        .limit(candidate_limit)
-                        .all()
-                    )
-
-                    # Keyword search
-                    keyword_chunks = (
-                        db.query(DocumentChunk)
-                        .join(SessionDocument)
-                        .filter(
-                            SessionDocument.session_id == session_id,
-                            SessionDocument.user_id == user_id,
-                        )
-                        .filter(query_filter)
-                        .limit(candidate_limit // 2)
-                        .all()
-                    )
-
-                    # Merge and deduplicate
-                    seen_ids = set()
-                    candidates = []
-                    for c in vector_chunks + keyword_chunks:
-                        if c.id not in seen_ids:
-                            candidates.append(c)
-                            seen_ids.add(c.id)
-                except ValueError as e:
-                    logging.warning(
-                        f"Embeddings unavailable for user {user_id}: {e}"
-                    )
-                    candidates = (
-                        db.query(DocumentChunk)
-                        .join(SessionDocument)
-                        .filter(
-                            SessionDocument.session_id == session_id,
-                            SessionDocument.user_id == user_id,
-                        )
-                        .filter(query_filter)
-                        .limit(candidate_limit)
-                        .all()
-                    )
-            else:
-                candidates = (
-                    db.query(DocumentChunk)
-                    .join(SessionDocument)
-                    .filter(
-                        SessionDocument.session_id == session_id,
-                        SessionDocument.user_id == user_id,
-                    )
-                    .filter(query_filter)
-                    .limit(candidate_limit)
-                    .all()
-                )
-
-            if not candidates:
-                # Greedy Fallback
-                candidates = (
-                    db.query(DocumentChunk)
-                    .join(SessionDocument)
-                    .filter(
-                        SessionDocument.session_id == session_id,
-                        SessionDocument.user_id == user_id,
-                    )
-                    .order_by(DocumentChunk.created_at.desc())
-                    .limit(limit)
-                    .all()
-                )
-
-            if not candidates:
-                return {"text": "", "sources": []}
-
-            # 3. Rerank Candidates
-            chunks = rerank_service.rerank(optimized_query, candidates, top_n=limit)
-
-            context_parts = []
-            sources = []
-            seen_docs = set()
-
-            for i, chunk in enumerate(chunks, 1):
-                filename = chunk.document.filename
-                context_parts.append(
-                    f"[{i}] Source File: {filename}\nContent: {chunk.content}"
-                )
-                if chunk.document_id not in seen_docs:
-                    sources.append({"id": i, "filename": filename})
-                    seen_docs.add(chunk.document_id)
-
-            return {
-                "text": "\n\n### DOCUMENT CONTEXT (RAG)\n"
-                "Use the following information from the user's uploaded files to answer their question. "
-                "If the answer is found here, prioritize it.\n\n"
-                + "\n---\n".join(context_parts),
-                "sources": sources,
-            }
-        except Exception as e:
-            logging.error(f"Error retrieving relevant chunks: {e}")
-            return {"text": "", "sources": []}
-
+    async def _optimize_rag_query(
+        self, message: str, chat_history: List[Any], llm: Any
+    ) -> str:
+        """Delegate RAG query optimization to rag_service."""
+        return await rag_service.optimize_query(message, chat_history, llm)
 
     async def simple_chat(
         self,
@@ -768,14 +528,14 @@ class AIChatService:
         # Get relevant memories
         relevant_memories = ""
         if user_id and db:
-            relevant_memories = await self.get_relevant_memories(
+            relevant_memories = await memory_service.get_relevant_memories(
                 sanitized_message, user_id, db, llm
             )
 
         # Get relevant document chunks (RAG)
         document_context_data = {"text": "", "sources": []}
         if session_id and db and user_id:
-            document_context_data = await self.get_relevant_chunks(
+            document_context_data = await rag_service.get_relevant_chunks(
                 sanitized_message,
                 session_id,
                 user_id,
@@ -1020,7 +780,7 @@ class AIChatService:
             # Get relevant memories
             relevant_memories = ""
             if user_id and db:
-                relevant_memories = await self.get_relevant_memories(
+                relevant_memories = await memory_service.get_relevant_memories(
                     sanitized_message, user_id, db, llm
                 )
 
@@ -1144,7 +904,7 @@ class AIChatService:
             # Get relevant memories
             relevant_memories = ""
             if user_id and db:
-                relevant_memories = await self.get_relevant_memories(
+                relevant_memories = await memory_service.get_relevant_memories(
                     sanitized_message, user_id, db, llm
                 )
 

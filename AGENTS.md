@@ -10,15 +10,35 @@
 
 ## Build, Test, and Development Commands
 
-- Backend dev server (from `backend/`):
+### **IMPORTANT: Run Full Project**
+- **Backend dev server (from `backend/`):**
   - `uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
-- Frontend dev server (from `frontend/`):
+- **Frontend dev server (from `frontend/`):**
   - `pnpm dev`
+- **Run migrations (from `backend/`):**
+  - `uv run python run_migrations.py`
+
 - Frontend build (from `frontend/`):
   - `pnpm build`
-- Backend tests:
-  - `./run_tests_with_coverage.sh` (coverage)
-  - `cd backend && uv run pytest`
+- Backend tests (from `backend/`):
+  - `PYTHONPATH=. uv run pytest` (Standard)
+  - `PYTHONPATH=. uv run pytest tests/unit/test_filename.py` (Specific file)
+  - `../run_tests_with_coverage.sh` (Coverage from root or backend)
+- Frontend tests (from `frontend/`):
+  - `pnpm test` (Watch mode)
+  - `pnpm test -- --run` (CI/Run once mode)
+  - `pnpm test -- src/components/chat/__tests__/ChatInput.test.tsx --run` (Specific file)
+
+## Workflow Guidelines
+
+### **CRITICAL: Reading Files**
+- **ALWAYS** read the file fully using the `read_file` tool before attempting any modification. This ensures you understand the context and don't introduce unintended side effects.
+
+### **CRITICAL: Linting & Type-Checking**
+- **ALWAYS** run linting or type-checking after making code changes:
+  - **Backend (from `backend/`):** `uv run ruff check .`
+  - **Frontend (from `frontend/`):** `pnpm build` (runs `tsc` for type-checking).
+- Ensure all tests pass before completing a task.
 
 ## Coding Style & Naming Conventions
 

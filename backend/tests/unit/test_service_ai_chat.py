@@ -99,26 +99,43 @@ async def test_simple_chat_skips_cache_for_web_search(ai_service):
 
     with (
         patch.object(ai_service, "get_llm", return_value=MagicMock()),
-        patch.object(ai_service, "_optimize_search_query", new_callable=AsyncMock, return_value="test query"),
+        patch.object(
+            ai_service,
+            "_optimize_search_query",
+            new_callable=AsyncMock,
+            return_value="test query",
+        ),
         patch.object(
             ai_service,
             "_build_search_queries",
             new_callable=AsyncMock,
             return_value=["test query", "test query latest"],
         ),
-        patch.object(ai_service, "_should_search_images", new_callable=AsyncMock, return_value=False),
-        patch("app.services.ai_chat.web_search_service.search_many_with_metadata", return_value={
-            "status": "ok",
-            "had_results": True,
-            "formatted_results": "### WEB SEARCH RESULTS\n[1] Title: Example",
-            "results": [{"title": "Example"}],
-            "errors": [],
-            "queries": ["test query", "test query latest"],
-        }),
-        patch("app.services.ai_chat.ChatPromptTemplate.from_messages") as mock_prompt_builder,
+        patch.object(
+            ai_service,
+            "_should_search_images",
+            new_callable=AsyncMock,
+            return_value=False,
+        ),
+        patch(
+            "app.services.ai_chat.web_search_service.search_many_with_metadata",
+            return_value={
+                "status": "ok",
+                "had_results": True,
+                "formatted_results": "### WEB SEARCH RESULTS\n[1] Title: Example",
+                "results": [{"title": "Example"}],
+                "errors": [],
+                "queries": ["test query", "test query latest"],
+            },
+        ),
+        patch(
+            "app.services.ai_chat.ChatPromptTemplate.from_messages"
+        ) as mock_prompt_builder,
         patch("app.services.ai_chat.cache_manager") as mock_cache,
     ):
-        mock_prompt_builder.return_value.__or__.return_value.__or__.return_value = mock_chain
+        mock_prompt_builder.return_value.__or__.return_value.__or__.return_value = (
+            mock_chain
+        )
 
         responses = []
         async for chunk in ai_service.simple_chat(
@@ -227,12 +244,16 @@ async def test_get_relevant_chunks_falls_back_without_embeddings(ai_service):
             raise ValueError("Google API key not found for embeddings.")
 
     with patch("app.models.document.has_vector", True):
-        with patch("app.services.ai_chat.sa.or_", side_effect=lambda *args: sa.text("1=1")):
-            with patch("app.services.ai_chat.DocumentChunk", document_chunk), patch(
-                "app.services.ai_chat.SessionDocument", MagicMock()
+        with patch(
+            "app.services.ai_chat.sa.or_", side_effect=lambda *args: sa.text("1=1")
+        ):
+            with (
+                patch("app.services.ai_chat.DocumentChunk", document_chunk),
+                patch("app.services.ai_chat.SessionDocument", MagicMock()),
             ):
                 with patch(
-                    "app.services.embedding_service.EmbeddingService", FakeEmbeddingService
+                    "app.services.embedding_service.EmbeddingService",
+                    FakeEmbeddingService,
                 ):
                     result = await ai_service.get_relevant_chunks(
                         "find this", session_id, user_id, db, limit=5

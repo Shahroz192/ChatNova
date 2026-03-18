@@ -7,7 +7,6 @@ import {
   Clock,
   Mic,
   Square,
-  Paperclip,
   Plus,
   X,
   FileText,
@@ -34,8 +33,6 @@ interface ChatInputProps {
   useTools?: boolean;
   onUseToolsChange?: (use: boolean) => void;
   onModelSelect?: (model: string) => void;
-  showOnboarding?: boolean;
-  onDismissOnboarding?: () => void;
 }
 
 type RecordingState = 'idle' | 'recording' | 'processing';
@@ -58,8 +55,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
   useTools = false,
   onUseToolsChange,
   onModelSelect,
-  showOnboarding = false,
-  onDismissOnboarding
 }) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showCommands, setShowCommands] = useState(false);
@@ -67,9 +62,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [commandFilter, setCommandFilter] = useState('');
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [recordingTime, setRecordingTime] = useState(0);
-  const [pendingImages, setPendingImages] = useState<{name: string, data: string}[]>([]);
-  const [pendingDocs, setPendingDocs] = useState<{name: string}[]>([]);
-  
+  const [pendingImages, setPendingImages] = useState<{ name: string, data: string }[]>([]);
+  const [pendingDocs, setPendingDocs] = useState<{ name: string }[]>([]);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -78,32 +73,68 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
   const isGemini = useMemo(() => selectedModel.toLowerCase().includes('gemini'), [selectedModel]);
 
-  const formatModelName = useCallback((name: string) => {
-    if (name === 'moonshotai/kimi-k2-instruct-0905') return 'Kimi-k2';
-    if (name === 'qwen-3-235b-a22b-instruct-2507') return 'Qwen-Instruct';
-    if (name === 'qwen-3-235b-a22b-thinking-2507') return 'Qwen-Thinking';
-    return name;
-  }, []);
+  const handleWebSearchToggle = useCallback(() => {
+    if (onSearchOptionsChange) {
+      onSearchOptionsChange({
+        ...searchOptions,
+        search_web: !searchOptions.search_web
+      });
+    }
+  }, [onSearchOptionsChange, searchOptions]);
 
   const commands = useMemo(() => [
-    { 
-      id: 'search', 
-      name: `Search: ${searchOptions.search_web ? 'ON' : 'OFF'}`, 
+    {
+      id: 'search',
+      name: `Search: ${searchOptions.search_web ? 'ON' : 'OFF'}`,
       icon: <Globe size={14} />,
       action: () => handleWebSearchToggle()
     },
-    { 
-      id: 'tools', 
-      name: `Tools: ${useTools ? 'ON' : 'OFF'}`, 
+    {
+      id: 'tools',
+      name: `Tools: ${useTools ? 'ON' : 'OFF'}`,
       icon: <FileText size={14} />,
       action: () => onUseToolsChange?.(!useTools)
     }
-  ], [searchOptions.search_web, useTools, onUseToolsChange]);
+  ], [searchOptions.search_web, useTools, onUseToolsChange, handleWebSearchToggle]);
 
   const filteredCommands = useMemo(() => {
     if (!commandFilter) return commands;
     return commands.filter(c => c.name.toLowerCase().includes(commandFilter.toLowerCase()));
   }, [commands, commandFilter]);
+
+  const formatModelName = useCallback((name: string) => {
+    if (!name) return 'Model';
+    
+    // Exact mapping for the problematic IDs
+    const mappings: Record<string, string> = {
+      'qwen-3-235b-a22b-instruct-2507': 'Qwen',
+      'qwen-3-235b-a22b-thinking-2507': 'Qwen Thinking',
+      'moonshotai/kimi-k2-instruct-0905': 'Kimi',
+    };
+
+    if (mappings[name]) return mappings[name];
+
+    // Normalize and clean model names
+    const modelId = name.toLowerCase();
+    
+    if (modelId.includes('qwen')) {
+      return modelId.includes('thinking') ? 'Qwen Thinking' : 'Qwen';
+    }
+    if (modelId.includes('kimi')) return 'Kimi';
+    if (modelId.includes('gpt-4o')) return 'GPT-4o';
+    if (modelId.includes('claude')) return 'Claude';
+    if (modelId.includes('gemini')) return 'Gemini';
+    
+    // Fallback: remove common suffixes and take the last part
+    const clean = name.split('/').pop()?.split(':')[0]?.replace(/-instruct.*$|-thinking.*$|-3-235b.*$/i, '') || name;
+    return clean.charAt(0).toUpperCase() + clean.slice(1);
+  }, []);
+
+  const formatTime = useCallback((seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -114,24 +145,17 @@ const ChatInput: React.FC<ChatInputProps> = ({
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+      const scrollHeight = textareaRef.current.scrollHeight;
+      textareaRef.current.style.height = `${Math.min(scrollHeight, 200)}px`;
+      
+      // Toggle overflow based on content height
+      if (scrollHeight > 200) {
+        textareaRef.current.style.overflowY = 'auto';
+      } else {
+        textareaRef.current.style.overflowY = 'hidden';
+      }
     }
-  }, [input]);
-
-  const formatTime = useCallback((seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  }, []);
-
-  const handleWebSearchToggle = useCallback(() => {
-    if (onSearchOptionsChange) {
-      onSearchOptionsChange({
-        ...searchOptions,
-        search_web: !searchOptions.search_web
-      });
-    }
-  }, [onSearchOptionsChange, searchOptions]);
+  }, [input]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSuggestionClick = useCallback((suggestion: string) => {
     if (onSuggestionSelect) {
@@ -172,6 +196,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           } finally {
             setRecordingState('idle');
             setRecordingTime(0);
+            mediaRecorder.stream.getTracks().forEach(track => { track.stop(); });
           }
         };
 
@@ -186,7 +211,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
     } else if (recordingState === 'recording') {
       mediaRecorderRef.current?.stop();
       if (timerRef.current) clearInterval(timerRef.current);
-      mediaRecorderRef.current?.stream.getTracks().forEach(track => track.stop());
+      mediaRecorderRef.current?.stream.getTracks().forEach(track => { track.stop(); });
     }
   }, [recordingState, setInput]);
 
@@ -207,7 +232,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           alert("Images are only supported for Gemini models. Please switch model to upload images.");
           continue;
         }
-        
+
         const reader = new FileReader();
         reader.onload = (e) => {
           const base64 = e.target?.result as string;
@@ -220,7 +245,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         onFileUpload(file);
       }
     }
-    
+
     // Reset input
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [isGemini, onFileUpload]);
@@ -247,7 +272,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setInput(value);
-    
+
     if (value.startsWith('/')) {
       setShowCommands(true);
       setCommandFilter(value.slice(1));
@@ -301,16 +326,16 @@ const ChatInput: React.FC<ChatInputProps> = ({
           {pendingImages.map((img, index) => (
             <div key={`img-${index}`} className="attachment-preview-item">
               <img src={img.data} alt={img.name} className="attachment-thumbnail" />
-              <button className="remove-attachment" onClick={() => removeImage(index)}>
-                <X size={12} />
-              </button>
-            </div>
-          ))}
-          {pendingDocs.map((doc, index) => (
-            <div key={`doc-${index}`} className="attachment-preview-item doc-item">
-              <FileText size={20} className="icon-muted" />
-              <span className="doc-name">{doc.name}</span>
-              <button className="remove-attachment" onClick={() => removeDoc(index)}>
+                <button type="button" className="remove-attachment" onClick={() => removeImage(index)}>
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+            {pendingDocs.map((doc, index) => (
+              <div key={`doc-${index}`} className="attachment-preview-item doc-item">
+                <FileText size={20} className="icon-muted" />
+                <span className="doc-name">{doc.name}</span>
+                <button type="button" className="remove-attachment" onClick={() => removeDoc(index)}>
                 <X size={12} />
               </button>
             </div>
@@ -329,7 +354,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           </span>
         </div>
       ) : null}
-      
+
       <div className="chat-input-container-modern">
         {showCommands && filteredCommands.length > 0 && (
           <div className="search-suggestions-container">
@@ -420,15 +445,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 >
                   <Plus size={18} strokeWidth={2} />
                 </button>
-                {showOnboarding ? (
-                  <div className="onboarding-inline-tip">Attach files</div>
-                ) : null}
               </div>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                style={{ display: 'none' }} 
-                multiple 
+              <input
+                type="file"
+                ref={fileInputRef}
+                style={{ display: 'none' }}
+                multiple
                 onChange={handleFileChange}
                 accept=".pdf,.docx,.doc,.txt,.md,.png,.jpg,.jpeg,.webp"
               />
@@ -441,14 +463,16 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   type="button"
                   title="Select model"
                 >
-                  <span className="model-name-text text-truncate">{formatModelName(selectedModel)}</span>
+                  <span className="model-name-text text-truncate">
+                    {loading ? (
+                      <span className="thinking-text-indicator">Thinking...</span>
+                    ) : (
+                      formatModelName(selectedModel)
+                    )}
+                  </span>
                   <ChevronDown size={14} strokeWidth={2.5} className={`dropdown-chevron ${showModelDropdown ? 'active' : ''}`} />
                 </button>
 
-                {showOnboarding ? (
-                  <div className="onboarding-inline-tip">Choose a model</div>
-                ) : null}
-                
                 {showModelDropdown && (
                   <div className="model-dropdown-menu">
                     {models.map((model) => (
@@ -467,21 +491,16 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 )}
               </div>
 
-              {searchOptions.search_web && (
-                <div className="onboarding-anchor">
-                  <button
-                    className={`action-icon-btn active`}
-                    onClick={handleWebSearchToggle}
-                    title="Toggle web search"
-                    type="button"
-                  >
-                    <Globe size={18} strokeWidth={2} />
-                  </button>
-                  {showOnboarding ? (
-                    <div className="onboarding-inline-tip">Web search on</div>
-                  ) : null}
-                </div>
-              )}
+              <div className="onboarding-anchor">
+                <button
+                  className={`action-icon-btn ${searchOptions.search_web ? 'active' : ''}`}
+                  onClick={handleWebSearchToggle}
+                  title="Toggle web search"
+                  type="button"
+                >
+                  <Globe size={18} strokeWidth={2} />
+                </button>
+              </div>
             </div>
 
             <div className="input-actions-right">
@@ -500,9 +519,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
                     <Mic size={18} strokeWidth={2} />
                   )}
                 </button>
-                {showOnboarding ? (
-                  <div className="onboarding-inline-tip">Voice input</div>
-                ) : null}
               </div>
 
               {/* Send Button */}
@@ -519,21 +535,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
                     <Send size={18} strokeWidth={2.5} />
                   )}
                 </button>
-                {showOnboarding ? (
-                  <div className="onboarding-inline-tip">Send</div>
-                ) : null}
               </div>
             </div>
           </div>
         </div>
-        {showOnboarding ? (
-          <div className="onboarding-inline-row">
-            <div className="onboarding-inline-note">Tip: type `/search` to toggle web search.</div>
-            <button className="onboarding-dismiss" onClick={() => onDismissOnboarding?.()} type="button">
-              Got it
-            </button>
-          </div>
-        ) : null}
       </div>
 
     </div>
