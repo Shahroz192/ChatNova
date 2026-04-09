@@ -29,13 +29,13 @@ def test_search_with_metadata_returns_no_results_status_on_errors():
     service.search_wrapper = MagicMock()
     service.search_wrapper.results.side_effect = RuntimeError("provider down")
 
-    result = service.search_with_metadata("failing query", retries=2)
+    result = service.search_with_metadata("failing query")
 
     assert result["had_results"] is False
     assert result["status"] == "no_results"
     assert "No reliable search results were retrieved" in result["formatted_results"]
-    # 3 query variants * 2 sources(news,text)
-    assert service.search_wrapper.results.call_count == 6
+    # Single query search (no variants)
+    assert service.search_wrapper.results.call_count == 1
 
 
 def test_search_with_metadata_deduplicates_across_sources_and_variants():
@@ -50,7 +50,7 @@ def test_search_with_metadata_deduplicates_across_sources_and_variants():
         }
     ]
 
-    result = service.search_with_metadata("samsung tri-fold phone launch", retries=2)
+    result = service.search_with_metadata("samsung tri-fold phone launch")
 
     assert result["had_results"] is True
     assert len(result["results"]) == 1

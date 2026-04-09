@@ -1,5 +1,4 @@
 import pytest
-import sqlalchemy as sa
 from unittest.mock import MagicMock, patch, AsyncMock
 from app.services.ai_chat import AIChatService, sanitize_user_input
 
@@ -101,15 +100,9 @@ async def test_simple_chat_skips_cache_for_web_search(ai_service):
         patch.object(ai_service, "get_llm", return_value=MagicMock()),
         patch.object(
             ai_service,
-            "_optimize_search_query",
-            new_callable=AsyncMock,
-            return_value="test query",
-        ),
-        patch.object(
-            ai_service,
             "_build_search_queries",
             new_callable=AsyncMock,
-            return_value=["test query", "test query latest"],
+            return_value=["test query", "test query latest", "test query 2026"],
         ),
         patch.object(
             ai_service,
@@ -125,7 +118,7 @@ async def test_simple_chat_skips_cache_for_web_search(ai_service):
                 "formatted_results": "### WEB SEARCH RESULTS\n[1] Title: Example",
                 "results": [{"title": "Example"}],
                 "errors": [],
-                "queries": ["test query", "test query latest"],
+                "queries": ["test query", "test query latest", "test query 2026"],
             },
         ),
         patch(
@@ -154,20 +147,21 @@ async def test_build_search_queries_has_generic_fallback_variants(ai_service):
 
     with patch("app.services.ai_chat.ChatPromptTemplate.from_messages") as mock_prompt:
         mock_chain = AsyncMock()
-        mock_chain.ainvoke.return_value = "not json output"
+        mock_chain.ainvoke.side_effect = Exception("LLM failed")
         mock_prompt.return_value.__or__.return_value.__or__.return_value = mock_chain
 
         queries = await ai_service._build_search_queries(
             message="compare latest model releases across providers",
-            optimized_query="latest model releases",
             chat_history=[],
             llm=llm,
-            max_queries=6,
+            max_queries=3,
         )
 
-    assert "latest model releases" in queries
+    # Fallback should include the message + latest + current year
+    assert len(queries) <= 3
+    assert any("compare latest model releases across providers" in q for q in queries)
     assert any(q.endswith(" latest") for q in queries)
-    assert any("official announcement" in q for q in queries)
+    assert any("2026" in q for q in queries)
 
 
 @pytest.mark.asyncio

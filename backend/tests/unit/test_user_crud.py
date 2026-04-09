@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 from app import crud
 from app.schemas.user import UserCreate, UserUpdate
 from app.models.user import User
+from app.core.security import verify_password
 
 
 def test_create_user(db_session: Session):
@@ -33,12 +34,38 @@ def test_get_user_by_email(db_session: Session, test_user: User):
 
 
 def test_update_user(db_session: Session, test_user: User):
-    """Test updating a user."""
-    new_messages_used = 10
-    user_update = UserUpdate(messages_used=new_messages_used)
+    """Test updating a user's allowed fields."""
+    new_instructions = "Always reply in markdown."
+    user_update = UserUpdate(custom_instructions=new_instructions)
     updated_user = crud.user.update(db_session, db_obj=test_user, obj_in=user_update)
 
-    assert updated_user.messages_used == new_messages_used
+    assert updated_user.custom_instructions == new_instructions
+
+
+def test_update_user_ignores_protected_fields(db_session: Session, test_user: User):
+    """Test that protected fields like messages_used cannot be updated via CRUD update."""
+    original_messages = test_user.messages_used
+    user_update = UserUpdate(messages_used=9999)
+    updated_user = crud.user.update(db_session, db_obj=test_user, obj_in=user_update)
+
+    # messages_used should remain unchanged
+    assert updated_user.messages_used == original_messages
+
+
+def test_update_user_password_hashes_new_password(db_session: Session, test_user: User):
+    """Test updating a user's password hashes and persists the new value."""
+    old_hash = test_user.hashed_password
+    new_password = "NewPassword123"
+
+    updated_user = crud.user.update(
+        db_session,
+        db_obj=test_user,
+        obj_in=UserUpdate(password=new_password),
+    )
+
+    assert updated_user.hashed_password != old_hash
+    assert verify_password(new_password, updated_user.hashed_password)
+    assert not verify_password("TestPassword123", updated_user.hashed_password)
 
 
 def test_delete_user(db_session: Session, test_user: User):

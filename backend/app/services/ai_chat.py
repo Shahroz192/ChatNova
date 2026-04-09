@@ -316,106 +316,72 @@ class AIChatService:
         except Exception:
             return False
 
-    async def _optimize_search_query(
-        self, message: str, chat_history: List[Any], llm: Any
-    ) -> str:
-        """Optimize the user's message into a search-engine friendly query."""
-        from datetime import datetime
-
-        current_date = datetime.now().strftime("%A, %B %d, %Y")
-
-        opt_prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    f"You are a search expert. Today is {current_date}. "
-                    "Convert the user's request into a single, concise, and highly effective search engine query. "
-                    "If the user is asking about current events, include relevant year/month if necessary. "
-                    "If the user asks whether an event already happened, include terms like 'latest', 'official', and current year when useful. "
-                    "If there is relevant conversation history, use it to make the query more specific. "
-                    "Output ONLY the optimized query string, no quotes or explanation.",
-                ),
-                MessagesPlaceholder(variable_name="chat_history"),
-                ("human", "{input}"),
-            ]
-        )
-        chain = opt_prompt | llm | StrOutputParser()
-        optimized_query = await chain.ainvoke(
-            {"input": message, "chat_history": chat_history}
-        )
-        return optimized_query.strip().strip('"')
-
     async def _build_search_queries(
         self,
         message: str,
-        optimized_query: str,
         chat_history: List[Any],
         llm: Any,
-        max_queries: int = 6,
+        max_queries: int = 3,
     ) -> List[str]:
-        """Create multiple focused search queries for better recall on evolving topics."""
+        """Create focused search queries - combines optimization and query expansion in single LLM call."""
         from datetime import datetime
 
         current_date = datetime.now().strftime("%A, %B %d, %Y")
         current_year = datetime.now().year
+        
         planner_prompt = ChatPromptTemplate.from_messages(
             [
                 (
                     "system",
                     f"You generate web search query sets. Today is {current_date}. "
-                    "Given a user request and one optimized query, output up to 4 complementary search queries that maximize coverage of latest factual updates. "
-                    "If the request references multiple named entities, include targeted queries that each focus on one entity. "
-                    "Prioritize official release notes, provider announcements, and recent reputable news sources. "
+                    f"Given a user request, output up to {max_queries} complementary search queries that maximize coverage of latest factual updates. "
+                    "Include the original query intent plus variations for official sources, recent updates, and current year. "
+                    "Prioritize official release notes, provider announcements, and reputable sources. "
                     "Output ONLY a JSON array of strings, no explanation.",
                 ),
                 MessagesPlaceholder(variable_name="chat_history"),
                 (
                     "human",
-                    "USER REQUEST: {message}\nBASE QUERY: {optimized_query}",
+                    "USER REQUEST: {message}",
                 ),
             ]
         )
 
         chain = planner_prompt | llm | StrOutputParser()
-        queries: List[str] = [optimized_query.strip()]
+        queries: List[str] = []
 
         try:
             raw_output = await chain.ainvoke(
                 {
                     "message": message,
-                    "optimized_query": optimized_query,
                     "chat_history": chat_history,
                 }
             )
-            parsed_queries: List[str] = []
             try:
                 parsed = json.loads(raw_output)
                 if isinstance(parsed, list):
-                    parsed_queries = [
+                    queries = [
                         item.strip()
                         for item in parsed
                         if isinstance(item, str) and item.strip()
-                    ]
+                    ][:max_queries]
             except Exception:
-                # Fallback parser for non-JSON outputs.
-                parsed_queries = [
+                # Fallback: split by newlines
+                queries = [
                     line.strip("- ").strip()
                     for line in raw_output.splitlines()
                     if line.strip()
-                ]
-            queries.extend(parsed_queries)
+                ][:max_queries]
         except Exception as e:
-            logging.warning(f"Failed to generate multi-query plan, using fallback: {e}")
+            logging.warning(f"Failed to generate search queries, using fallback: {e}")
+            # Deterministic fallback queries
+            queries = [
+                message.strip(),
+                f"{message.strip()} latest",
+                f"{message.strip()} {current_year}",
+            ][:max_queries]
 
-        # Deterministic generic expansions so we don't depend only on LLM formatting.
-        queries.extend(
-            [
-                f"{optimized_query} latest",
-                f"{optimized_query} official announcement",
-                f"{optimized_query} {current_year}",
-            ]
-        )
-
+        # Deduplicate
         deduped: List[str] = []
         seen = set()
         for q in queries:
@@ -579,34 +545,49 @@ class AIChatService:
             try:
                 logging.info(f"Performing web search for: {sanitized_message[:50]}...")
 
-                optimized_query = await self._optimize_search_query(
-                    sanitized_message, chat_history, llm
-                )
-                logging.info(f"Optimized query: {optimized_query}")
-                search_queries = await self._build_search_queries(
-                    sanitized_message, optimized_query, chat_history, llm
+                search_queries = await asyncio.wait_for(
+                    self._build_search_queries(
+                        sanitized_message, chat_history, llm, max_queries=3
+                    ),
+                    timeout=8.0
                 )
                 logging.info(f"Search query set: {search_queries}")
-                search_payload = web_search_service.search_many_with_metadata(
-                    search_queries, max_results=6, retries=1
+                
+                # Execute searches in parallel with timeout
+                search_payload = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda: web_search_service.search_many_with_metadata(
+                            search_queries, max_results=5
+                        )
+                    ),
+                    timeout=15.0
                 )
                 search_results = search_payload["formatted_results"]
                 search_status = search_payload["status"]
                 had_search_results = search_payload["had_results"]
 
-                # Optional image search
                 should_search_images = await self._should_search_images(
                     sanitized_message, chat_history, llm
                 )
-                if should_search_images:
-                    logging.info(f"Performing image search for: {optimized_query}")
-                    image_results = web_search_service.search_images(optimized_query)
-                    if image_results:
-                        search_results += (
-                            f"\n\n### IMAGE SEARCH RESULTS\n"
-                            f"The following images were found for the query. If relevant, you can use the 'image_gallery' component to display them.\n"
-                            f"{json.dumps(image_results, indent=2)}"
+                if should_search_images and search_queries:
+                    try:
+                        logging.info(f"Performing image search for: {search_queries[0]}")
+                        image_results = await asyncio.wait_for(
+                            asyncio.get_event_loop().run_in_executor(
+                                None,
+                                lambda: web_search_service.search_images(search_queries[0])
+                            ),
+                            timeout=8.0
                         )
+                        if image_results:
+                            search_results += (
+                                f"\n\n### IMAGE SEARCH RESULTS\n"
+                                f"The following images were found for the query. If relevant, you can use the 'image_gallery' component to display them.\n"
+                                f"{json.dumps(image_results, indent=2)}"
+                            )
+                    except asyncio.TimeoutError:
+                        logging.warning("Image search timed out, skipping")
 
                 system_prompt = (
                     f"You are ChatNova, a sophisticated AI assistant with real-time web access. Current Date: {current_date_full}\n\n"
@@ -625,9 +606,15 @@ class AIChatService:
                     "- If an older source conflicts with a newer source, prioritize the newer source and call out the discrepancy.\n"
                     "- When comparing model releases, prefer the newest version explicitly evidenced in sources and mention older versions only as historical context.\n"
                     "- Synthesize information from the 'DOCUMENT CONTEXT' if provided to answer queries about uploaded files.\n"
-                    "- RAG Format: Prefer standard Markdown text for document-based answers. Use UI components ONLY if the user explicitly asks for a chart, table, or visualization from the document data.\n"
                     "- DO NOT mention your internal training data cutoff; act as if you are always up-to-date.\n"
                     "- If search results are insufficient, use them as far as possible and supplement with general knowledge, but clearly distinguish between searched facts and general knowledge.\n\n"
+                    "DATA VISUALIZATION & CHARTS:\n"
+                    "- If the user asks for a chart, graph, plot, or visualization AND the search results contain numerical/time-series data, extract the data points and generate a chart component (not just text).\n"
+                    "- For time-series data (e.g., stock prices over years), use a 'line' chart with year labels as 'name' and values as 'value'.\n"
+                    "- For comparisons, use 'bar' charts. For proportions/percentages, use 'pie' charts.\n"
+                    "- Extract numerical values from search result snippets and construct the chart data array.\n"
+                    "- DO NOT output web image URLs or image search results as your primary response when the user asks for a chart/graph.\n"
+                    "- If the search results lack concrete numerical data, respond in text explaining the data is insufficient rather than fabricating numbers.\n\n"
                     "FORMATTING & STYLE:\n"
                     "- Use rich Markdown: bold important terms, use tables for structured data, and code blocks for technical info.\n"
                     "- Citations: ALWAYS cite your sources using [Source Name/Number] immediately after the relevant fact, especially from DOCUMENT CONTEXT.\n"
@@ -665,9 +652,18 @@ class AIChatService:
                     yield chunk
 
             except Exception as e:
-                logging.error(
-                    f"Web search flow failed: {e}. Falling back to standard chat."
-                )
+                error_msg = str(e)
+                is_token_quota = "token_quota_exceeded" in error_msg or "too_many_tokens" in error_msg
+                
+                if is_token_quota:
+                    logging.error(
+                        f"Token quota exceeded in search flow. Falling back to standard chat. "
+                        f"Error: {error_msg[:200]}"
+                    )
+                else:
+                    logging.error(
+                        f"Web search flow failed: {error_msg[:500]}. Falling back to standard chat."
+                    )
                 search_web = False
 
         if not search_web or (not full_response and not search_web):

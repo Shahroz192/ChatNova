@@ -11,6 +11,7 @@
 ## Build, Test, and Development Commands
 
 ### **IMPORTANT: Run Full Project**
+
 - **Backend dev server (from `backend/`):**
   - `uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
 - **Frontend dev server (from `frontend/`):**
@@ -32,9 +33,11 @@
 ## Workflow Guidelines
 
 ### **CRITICAL: Reading Files**
+
 - **ALWAYS** read the file fully using the `read_file` tool before attempting any modification. This ensures you understand the context and don't introduce unintended side effects.
 
 ### **CRITICAL: Linting & Type-Checking**
+
 - **ALWAYS** run linting or type-checking after making code changes:
   - **Backend (from `backend/`):** `uv run ruff check .`
   - **Frontend (from `frontend/`):** `pnpm build` (runs `tsc` for type-checking).

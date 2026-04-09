@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from app.services.rag_service import rag_service
 from app.services.memory_service import memory_service
 from app.services.ai_chat import AIChatService
-from app.models.document import DocumentChunk, SessionDocument
 
 from langchain_core.messages import AIMessage
 

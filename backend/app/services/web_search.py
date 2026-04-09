@@ -3,7 +3,7 @@ Web Search Service Module
 Provides access to DuckDuckGo search tool for LangChain agents.
 """
 
-from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List
 
 from langchain_community.tools import DuckDuckGoSearchResults
@@ -23,7 +23,29 @@ class WebSearchService:
         self.search_tool = DuckDuckGoSearchResults()
         self.search_wrapper = DuckDuckGoSearchAPIWrapper()
         self.image_search_wrapper = DuckDuckGoSearchAPIWrapper()
+        self._executor = None
         logger.info("WebSearchService initialized with DuckDuckGo tools")
+
+    def start(self):
+        """Start the thread pool executor. Called by FastAPI lifespan."""
+        if self._executor is None:
+            self._executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="duckduckgo")
+            logger.info("WebSearchService thread pool started")
+
+    def shutdown(self):
+        """Shutdown the thread pool executor. Called by FastAPI lifespan."""
+        if self._executor is not None:
+            self._executor.shutdown(wait=True)
+            self._executor = None
+            logger.info("WebSearchService thread pool shut down")
+
+    @property
+    def executor(self):
+        """Lazily create executor if accessed before lifespan start (dev fallback)."""
+        if self._executor is None:
+            self._executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="duckduckgo")
+            logger.warning("WebSearchService thread pool lazily initialized — prefer lifespan start()")
+        return self._executor
 
     def get_tool(self):
         """Get the search tool for agent use."""
@@ -50,66 +72,73 @@ class WebSearchService:
             "date": str(date).strip(),
         }
 
+    def _search_single_query(
+        self, query: str, max_results: int
+    ) -> Dict[str, Any]:
+        """Run single text search and return results with metadata."""
+        try:
+            raw_results = self.search_wrapper.results(
+                query, max_results, source="text"
+            )
+            candidate_results = [
+                self._normalize_result(r) for r in (raw_results or [])
+            ]
+
+            # Filter out useless results
+            candidate_results = [
+                r
+                for r in candidate_results
+                if r["title"] != "Untitled"
+                or r["snippet"] != "No snippet available."
+            ]
+
+            return {
+                "status": "ok" if candidate_results else "no_results",
+                "had_results": len(candidate_results) > 0,
+                "query": query,
+                "results": candidate_results,
+                "errors": [],
+            }
+        except Exception as e:
+            error_msg = f"{type(e).__name__}: {e}"
+            if "No results found" in str(e):
+                logger.info(f"No results for query '{query}'")
+                return {
+                    "status": "no_results",
+                    "had_results": False,
+                    "query": query,
+                    "results": [],
+                    "errors": [],
+                }
+            logger.warning(f"Search failed for query '{query}': {error_msg}")
+            return {
+                "status": "error",
+                "had_results": False,
+                "query": query,
+                "results": [],
+                "errors": [error_msg],
+            }
+
     def search_with_metadata(
-        self, query: str, max_results: int = 8, retries: int = 2
+        self, query: str, max_results: int = 8
     ) -> Dict[str, Any]:
         """Run resilient text search and return both metadata and formatted context."""
-        errors: List[str] = []
-        normalized_results: List[Dict[str, str]] = []
+        if not query or not query.strip():
+            return {
+                "status": "no_results",
+                "had_results": False,
+                "query": "",
+                "results": [],
+                "formatted_results": "### WEB SEARCH RESULTS\nNo query provided.",
+                "errors": ["Empty query"],
+            }
 
-        current_year = datetime.now().year
-        variant_queries = [
-            query,
-            f"{query} latest updates",
-            f"{query} {current_year}",
-        ]
-
-        # Expand coverage for time-sensitive/event queries by searching both news + text.
-        seen_keys = set()
-        deduped_results: List[Dict[str, str]] = []
-        sources = ("text", "news")
-
-        for attempt_query in variant_queries[: retries + 1]:
-            for source in sources:
-                try:
-                    raw_results = self.search_wrapper.results(
-                        attempt_query, max_results, source=source
-                    )
-                    candidate_results = [
-                        self._normalize_result(r) for r in (raw_results or [])
-                    ]
-
-                    candidate_results = [
-                        r
-                        for r in candidate_results
-                        if r["title"] != "Untitled"
-                        or r["snippet"] != "No snippet available."
-                    ]
-
-                    for result in candidate_results:
-                        dedup_key = (
-                            result["link"].strip().lower()
-                            or f"{result['title'].strip().lower()}::{result['snippet'][:120].strip().lower()}"
-                        )
-                        if dedup_key in seen_keys:
-                            continue
-                        seen_keys.add(dedup_key)
-                        deduped_results.append(result)
-                except Exception as e:
-                    error_msg = f"{type(e).__name__}: {e}"
-                    if "No results found" in str(e):
-                        logger.info(
-                            f"No results for query '{attempt_query}' (source={source})"
-                        )
-                        continue
-                    errors.append(error_msg)
-                    logger.warning(
-                        f"Search attempt failed for query '{attempt_query}' (source={source}): {error_msg}"
-                    )
+        payload = self._search_single_query(query.strip(), max_results)
+        normalized_results = payload["results"]
 
         # Prefer dated entries first; then keep the rest.
-        with_date = [r for r in deduped_results if r["date"]]
-        without_date = [r for r in deduped_results if not r["date"]]
+        with_date = [r for r in normalized_results if r["date"]]
+        without_date = [r for r in normalized_results if not r["date"]]
         normalized_results = with_date + without_date
 
         had_results = len(normalized_results) > 0
@@ -128,7 +157,7 @@ class WebSearchService:
             status = "ok"
         else:
             error_text = (
-                "; ".join(errors) if errors else "No results returned by provider."
+                "; ".join(payload["errors"]) if payload["errors"] else "No results returned by provider."
             )
             formatted = (
                 "### WEB SEARCH RESULTS\n"
@@ -143,27 +172,54 @@ class WebSearchService:
             "query": query,
             "results": normalized_results,
             "formatted_results": formatted,
-            "errors": errors,
+            "errors": payload["errors"],
         }
 
     def search_many_with_metadata(
-        self, queries: List[str], max_results: int = 6, retries: int = 1
+        self, queries: List[str], max_results: int = 6
     ) -> Dict[str, Any]:
-        """Run multiple searches and return a deduplicated merged payload."""
+        """Run multiple searches in parallel and return a deduplicated merged payload."""
         cleaned_queries = [q.strip() for q in (queries or []) if q and q.strip()]
         if not cleaned_queries:
             return self.search_with_metadata(
-                "", max_results=max_results, retries=retries
+                "", max_results=max_results
             )
 
+        # Execute searches in parallel using thread pool
+        futures = []
+        for q in cleaned_queries:
+            future = self.executor.submit(
+                self._search_single_query, q, max_results
+            )
+            futures.append((q, future))
+
+        # Collect results
         merged_results: List[Dict[str, str]] = []
         merged_errors: List[str] = []
         seen_keys = set()
 
-        for q in cleaned_queries:
-            payload = self.search_with_metadata(
-                q, max_results=max_results, retries=retries
-            )
+        for q, future in futures:
+            try:
+                payload = future.result(timeout=12.0)
+            except TimeoutError:
+                logger.warning(f"Search future timed out for query '{q}' (12s)")
+                payload = {
+                    "status": "timeout",
+                    "had_results": False,
+                    "query": q,
+                    "results": [],
+                    "errors": ["Timed out after 12s"],
+                }
+            except Exception as e:
+                logger.error(f"Search future failed for query '{q}': {e}")
+                payload = {
+                    "status": "error",
+                    "had_results": False,
+                    "query": q,
+                    "results": [],
+                    "errors": [f"{type(e).__name__}: {e}"],
+                }
+
             for error in payload.get("errors", []):
                 merged_errors.append(f"{q}: {error}")
 

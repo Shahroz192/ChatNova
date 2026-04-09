@@ -31,6 +31,28 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         db.refresh(db_obj)
         return db_obj
 
+    def update(self, db: Session, *, db_obj: User, obj_in: UserUpdate) -> User:
+        """Update a user, hashing a new password before persisting it."""
+        update_data = obj_in.model_dump(exclude_unset=True)
+
+        password = update_data.pop("password", None)
+        if password is not None:
+            db_obj.hashed_password = get_password_hash(password)
+
+        # Block user-unwritable fields to prevent mass-assignment abuse.
+        # These fields must only be modified server-side.
+        protected_fields = {"messages_used"}
+        for field in protected_fields:
+            update_data.pop(field, None)
+
+        for field, value in update_data.items():
+            setattr(db_obj, field, value)
+
+        db.add(db_obj)
+        db.commit()
+        db.refresh(db_obj)
+        return db_obj
+
     def authenticate(self, db: Session, *, email: str, password: str) -> Optional[User]:
         user = self.get_by_email(db, email=email)
         if not user or not verify_password(password, user.hashed_password):

@@ -84,6 +84,45 @@ def test_get_current_user(client: TestClient, db_session: Session):
     assert data["email"] == user_data["email"]
 
 
+def test_update_current_user_password(client: TestClient, db_session: Session):
+    """Test updating the current user's password through the API."""
+    user_data = {
+        "email": "password_update_test@example.com",
+        "password": "TestPassword123",
+        "username": "passwordupdatetest",
+    }
+    user_in = UserCreate(**user_data)
+    created_user = user.create(db_session, obj_in=user_in)
+
+    login_response = client.post(
+        "/api/v1/auth/login",
+        data={"username": user_data["email"], "password": user_data["password"]},
+    )
+    assert login_response.status_code == 200
+
+    update_response = client.put(
+        "/api/v1/users/me",
+        json={"password": "UpdatedPassword123"},
+    )
+    assert update_response.status_code == 200
+
+    updated_user = user.get(db_session, id=created_user.id)
+    assert updated_user is not None
+    assert user.authenticate(
+        db_session,
+        email=user_data["email"],
+        password="UpdatedPassword123",
+    )
+    assert (
+        user.authenticate(
+            db_session,
+            email=user_data["email"],
+            password=user_data["password"],
+        )
+        is None
+    )
+
+
 def test_chat_endpoint(client: TestClient, db_session: Session):
     """Test the chat endpoint with mocked AI service"""
     # Create a user

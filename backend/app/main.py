@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -11,6 +12,7 @@ from app.core.db_profiler import setup_db_profiling
 from app.core.memory_profiler import memory_profiler
 from app.core.compression import CompressionMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
+from app.services.web_search import web_search_service
 
 memory_profiler.start_tracemalloc()
 
@@ -20,7 +22,17 @@ try:
 except Exception as e:
     logging.error(f"Database connection failed: {e}. Make sure PostgreSQL is running.")
 
-app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    web_search_service.start()
+    yield
+    # Shutdown
+    web_search_service.shutdown()
+
+
+app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION, lifespan=lifespan)
 
 if settings.ENVIRONMENT == "testing":
     limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])

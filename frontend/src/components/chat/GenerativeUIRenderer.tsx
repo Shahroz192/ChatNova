@@ -438,7 +438,7 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                     const rows = props.rows || [];
                     return (
                         <ComponentWrapper width={props.width} key={key}>
-                            <div className="gen-ui-table-container">
+                            <div className="gen-ui-card">
                                 {props.label ? (
                                     <div className="gen-ui-card-header">
                                         {props.label}
@@ -447,11 +447,13 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                                 <div style={{ overflowX: 'auto' }}>
                                     <table className="gen-ui-table">
                                         <thead>
-                                            <tr>
-                                                {props.headers?.map((head: any, hIdx: number) => (
-                                                    <th key={hIdx}>{head}</th>
-                                                ))}
-                                            </tr>
+                                            {props.headers && props.headers.length > 0 ? (
+                                                <tr>
+                                                    {props.headers.map((head: any, hIdx: number) => (
+                                                        <th key={hIdx}>{head}</th>
+                                                    ))}
+                                                </tr>
+                                            ) : null}
                                         </thead>
                                         <tbody>
                                             {rows.map((row: any, rIdx: number) => (
@@ -462,7 +464,19 @@ const GenerativeUIRenderer: React.FC<RendererProps> = ({ data }) => {
                                                 </tr>
                                             ))}
                                             {rows.length === 0 ? (
-                                                <tr><td colSpan={props.headers?.length || 1} style={{ textAlign: 'center', padding: '20px', fontStyle: 'italic', color: 'var(--text-tertiary)' }}>No data generated</td></tr>
+                                                <tr>
+                                                    <td
+                                                        colSpan={props.headers?.length || 1}
+                                                        style={{
+                                                            textAlign: 'center',
+                                                            padding: '40px 20px',
+                                                            fontStyle: 'italic',
+                                                            color: 'var(--text-tertiary)',
+                                                        }}
+                                                    >
+                                                        No data generated
+                                                    </td>
+                                                </tr>
                                             ) : null}
                                         </tbody>
                                     </table>
