@@ -51,7 +51,6 @@ pnpm-debug.log*
 backend/uploads/
 
 # Generated design docs and temp files
-DESIGN.html
 Untitled
 
 # Editor / local config
