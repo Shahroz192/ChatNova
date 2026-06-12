@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Container, Row, Col, Nav, Card, Button, Form } from 'react-bootstrap';
-import { Key, Server, User, Sparkles, Brain } from 'lucide-react';
+import { Container, Row, Col, Nav, Card, Button, Form, Modal } from 'react-bootstrap';
+import { Key, Server, User, Sparkles, Brain, AlertTriangle } from 'lucide-react';
 import BYOKForm from './BYOKForm';
 import MCPServerForm from './MCPServerForm';
 import MCPServerList from './MCPServerList';
@@ -190,6 +190,66 @@ const Settings: React.FC<SettingsProps> = () => {
   );
 };
 
+// Delete Account Confirmation Modal
+const DeleteAccountModal: React.FC<{
+  show: boolean;
+  email: string;
+  onClose: () => void;
+  onConfirm: () => void;
+  loading: boolean;
+  error: string;
+}> = ({ show, email, onClose, onConfirm, loading, error }) => {
+  const [confirmInput, setConfirmInput] = useState('');
+
+  useEffect(() => {
+    if (!show) setConfirmInput('');
+  }, [show]);
+
+  const isConfirmed = confirmInput === email;
+
+  return (
+    <Modal show={show} onHide={onClose} centered>
+      <Modal.Header closeButton>
+        <Modal.Title className="text-danger d-flex align-items-center gap-2">
+          <AlertTriangle size={20} />
+          Delete Account
+        </Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        <p className="text-muted">
+          This will permanently delete your account and all associated data —
+          including chat history, memories, API keys, and MCP server configurations.
+          This action <strong>cannot</strong> be undone.
+        </p>
+        <Form.Group>
+          <Form.Label>
+            Type <strong>{email}</strong> to confirm:
+          </Form.Label>
+          <Form.Control
+            type="text"
+            value={confirmInput}
+            onChange={(e) => setConfirmInput(e.target.value)}
+            placeholder={email}
+          />
+        </Form.Group>
+        {error ? <div className="alert alert-danger mt-3">{error}</div> : null}
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onClose} disabled={loading}>
+          Cancel
+        </Button>
+        <Button
+          variant="danger"
+          onClick={onConfirm}
+          disabled={!isConfirmed || loading}
+        >
+          {loading ? 'Deleting...' : 'Permanently Delete My Account'}
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+};
+
 // Account Settings Form Component
 const AccountSettingsForm: React.FC = React.memo(() => {
   const [user, setUser] = useState<User | null>(null);
@@ -200,6 +260,9 @@ const AccountSettingsForm: React.FC = React.memo(() => {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   // Fetch current user data
   useEffect(() => {
@@ -254,6 +317,18 @@ const AccountSettingsForm: React.FC = React.memo(() => {
       setError('Failed to update account');
     }
   }, [password, confirmPassword, email, user?.email]);
+
+  const handleDeleteAccount = useCallback(async () => {
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await api.delete('/users/me');
+      window.location.href = '/login';
+    } catch (err: any) {
+      setDeleteError(err.response?.data?.detail || 'Failed to delete account');
+      setDeleting(false);
+    }
+  }, []);
 
   if (loading) {
     return <div>Loading...</div>;
@@ -311,6 +386,32 @@ const AccountSettingsForm: React.FC = React.memo(() => {
       <Button variant="primary" type="submit">
         Update Account
       </Button>
+
+      <hr className="my-4" />
+      <div className="danger-zone">
+        <h5 className="text-danger d-flex align-items-center gap-2 mb-2">
+          <AlertTriangle size={18} />
+          Danger Zone
+        </h5>
+        <p className="text-muted small mb-3">
+          Once you delete your account, there is no going back. Please be certain.
+        </p>
+        <Button
+          variant="outline-danger"
+          onClick={() => setShowDeleteModal(true)}
+        >
+          Delete Account
+        </Button>
+      </div>
+
+      <DeleteAccountModal
+        show={showDeleteModal}
+        email={email}
+        onClose={() => { setShowDeleteModal(false); setDeleteError(''); }}
+        onConfirm={handleDeleteAccount}
+        loading={deleting}
+        error={deleteError}
+      />
     </Form>
   );
 });

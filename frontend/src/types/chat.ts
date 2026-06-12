@@ -1,8 +1,9 @@
 export interface ToolCall {
+  id?: string;
   tool: string;
   input: string;
   output?: string;
-  status: 'running' | 'completed' | 'failed';
+  status: "running" | "completed" | "failed";
 }
 
 export interface ResponseVersion {
@@ -18,7 +19,7 @@ export interface Message {
   response: string;
   created_at: string;
   model?: string;
-  status?: 'sending' | 'sent' | 'delivered' | 'failed';
+  status?: "sending" | "sent" | "delivered" | "failed";
   tool_calls?: ToolCall[];
   sources?: { id: number; filename: string }[];
   images?: string[];

@@ -135,6 +135,7 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
           <div
             className="message-bubble-user"
             style={{ width: "fit-content", maxWidth: "85%", cursor: "pointer" }}
+            onClick={() => setActiveContextMenu(null)}
             onContextMenu={(e) => {
               e.preventDefault();
               setActiveContextMenu({ id: msg.id, type: 'user' });
@@ -199,6 +200,7 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
         <div className="d-flex flex-column align-items-start position-relative" style={{ maxWidth: "100%", minWidth: 0 }}>
           <div
             className="message-content-assistant"
+            onClick={() => setActiveContextMenu(null)}
             onContextMenu={(e) => {
               e.preventDefault();
               setActiveContextMenu({ id: msg.id, type: 'assistant' });

@@ -1,8 +1,8 @@
-import axios from 'axios';
-import type { WebSearchOptions, SearchHistoryItem } from '../types/search';
+import axios from "axios";
+import type { WebSearchOptions, SearchHistoryItem } from "../types/search";
 
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: "/api/v1",
   withCredentials: true,
 });
 
@@ -14,14 +14,14 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      window.location.href = '/login';
+      window.location.href = "/login";
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export const getSearchHistory = async (): Promise<SearchHistoryItem[]> => {
-  const response = await api.get('/search/');
+  const response = await api.get("/search/");
   return response.data.map((item: any) => ({
     id: item.id.toString(),
     query: item.query,
@@ -32,8 +32,11 @@ export const getSearchHistory = async (): Promise<SearchHistoryItem[]> => {
   }));
 };
 
-export const addToSearchHistory = async (query: string, searchType: string = "general") => {
-  const response = await api.post('/search/', {
+export const addToSearchHistory = async (
+  query: string,
+  searchType: string = "general",
+) => {
+  const response = await api.post("/search/", {
     query,
     search_type: searchType,
   });
@@ -41,7 +44,7 @@ export const addToSearchHistory = async (query: string, searchType: string = "ge
 };
 
 export const clearSearchHistory = async () => {
-  const response = await api.delete('/search/');
+  const response = await api.delete("/search/");
   return response.data;
 };
 
@@ -57,11 +60,12 @@ export const streamChat = async (
   onError?: (error: string) => void,
   onToolUpdate?: (update: any) => void,
   onMemorySaved?: (fact: string) => void,
-  signal?: AbortSignal
+  onMetadata?: (metadata: any) => void,
+  signal?: AbortSignal,
 ) => {
   try {
     const params = new URLSearchParams();
-    if (sessionId) params.append('session_id', sessionId.toString());
+    if (sessionId) params.append("session_id", sessionId.toString());
 
     const requestBody: any = {
       content,
@@ -71,25 +75,29 @@ export const streamChat = async (
 
     if (searchOptions) {
       requestBody.search_web = searchOptions.search_web;
-      if (searchOptions.search_type) requestBody.search_type = searchOptions.search_type;
-      if (searchOptions.max_results) requestBody.max_results = searchOptions.max_results;
+      if (searchOptions.search_type)
+        requestBody.search_type = searchOptions.search_type;
+      if (searchOptions.max_results)
+        requestBody.max_results = searchOptions.max_results;
       if (searchOptions.language) requestBody.language = searchOptions.language;
       if (searchOptions.region) requestBody.region = searchOptions.region;
-      if (searchOptions.modifiers) requestBody.search_modifiers = searchOptions.modifiers;
-      if (searchOptions.document_ids) requestBody.document_ids = searchOptions.document_ids;
+      if (searchOptions.modifiers)
+        requestBody.search_modifiers = searchOptions.modifiers;
+      if (searchOptions.document_ids)
+        requestBody.document_ids = searchOptions.document_ids;
     }
 
-    let endpoint = '/api/v1/chat/stream';
+    let endpoint = "/api/v1/chat/stream";
     if (useTools) {
-      endpoint = '/api/v1/chat/agent-stream';
+      endpoint = "/api/v1/chat/agent-stream";
     }
 
     const response = await fetch(`${endpoint}?${params}`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
-      credentials: 'include',
+      credentials: "include",
       body: JSON.stringify(requestBody),
       signal,
     });
@@ -101,13 +109,13 @@ export const streamChat = async (
 
     const reader = response.body?.getReader();
     if (!reader) {
-      throw new Error('No response body reader available');
+      throw new Error("No response body reader available");
     }
 
     const decoder = new TextDecoder();
-    let buffer = '';
+    let buffer = "";
     let hasSearchData = false;
-    let currentEventData = '';
+    let currentEventData = "";
 
     const processEvent = (dataRaw: string) => {
       const data = dataRaw;
@@ -120,35 +128,50 @@ export const streamChat = async (
         // Not valid JSON, maybe just string content.
       }
 
-      if (dataTrimmed === '[DONE]') {
+      if (dataTrimmed === "[DONE]") {
         if (hasSearchData && searchOptions?.search_web) {
-          addToSearchHistory(content, searchOptions.search_type || 'general');
+          addToSearchHistory(content, searchOptions.search_type || "general");
         }
         onComplete?.();
-        return 'done';
+        return "done";
       }
 
-      if (dataTrimmed.startsWith('ERROR:')) {
+      if (dataTrimmed.startsWith("ERROR:")) {
         onError?.(dataTrimmed.slice(6));
-        return 'error';
+        return "error";
       }
 
-      if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData)) {
-        if (parsedData.type === 'tool_start' || parsedData.type === 'tool_end') {
+      if (
+        parsedData &&
+        typeof parsedData === "object" &&
+        !Array.isArray(parsedData)
+      ) {
+        if (
+          parsedData.type === "tool_start" ||
+          parsedData.type === "tool_end"
+        ) {
           onToolUpdate?.(parsedData);
-        } else if (parsedData.type === 'content') {
+        } else if (parsedData.type === "content") {
           onChunk?.(parsedData.content);
-        } else if (parsedData.type === 'memory_saved') {
+        } else if (parsedData.type === "metadata") {
+          onMetadata?.(parsedData);
+        } else if (parsedData.type === "memory_saved") {
           onMemorySaved?.(parsedData.content);
-        } else if (parsedData.type === 'error') {
+        } else if (parsedData.type === "error") {
           onError?.(parsedData.content);
-          return 'error';
-        } else if (parsedData.type === 'container' && Array.isArray(parsedData.children)) {
+          return "error";
+        } else if (
+          parsedData.type === "container" &&
+          Array.isArray(parsedData.children)
+        ) {
           onChunk?.(JSON.stringify(parsedData));
         } else {
           // Fallback for generative UI in standard chat (legacy check)
           const jsonString = JSON.stringify(parsedData);
-          if (jsonString.includes('"type":"container"') && jsonString.includes('search_results')) {
+          if (
+            jsonString.includes('"type":"container"') &&
+            jsonString.includes("search_results")
+          ) {
             hasSearchData = true;
             onChunk?.(jsonString);
           }
@@ -158,7 +181,7 @@ export const streamChat = async (
         onChunk?.(data);
       }
 
-      return 'continue';
+      return "continue";
     };
 
     while (true) {
@@ -167,75 +190,79 @@ export const streamChat = async (
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
 
       for (let i = 0; i < lines.length; i += 1) {
         const rawLine = lines[i];
-        const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
+        const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine;
 
-        if (line === '') {
+        if (line === "") {
           const nextRaw = lines[i + 1];
           const nextLine = nextRaw
-            ? (nextRaw.endsWith('\r') ? nextRaw.slice(0, -1) : nextRaw)
+            ? nextRaw.endsWith("\r")
+              ? nextRaw.slice(0, -1)
+              : nextRaw
             : undefined;
 
           const nextLooksLikeEvent =
             nextLine === undefined ||
-            nextLine.startsWith('data:') ||
-            nextLine.startsWith(':') ||
-            nextLine.startsWith('id:') ||
-            nextLine.startsWith('event:') ||
-            nextLine.startsWith('retry:');
+            nextLine.startsWith("data:") ||
+            nextLine.startsWith(":") ||
+            nextLine.startsWith("id:") ||
+            nextLine.startsWith("event:") ||
+            nextLine.startsWith("retry:");
 
-          if (currentEventData !== '' && nextLooksLikeEvent) {
+          if (currentEventData !== "" && nextLooksLikeEvent) {
             const status = processEvent(currentEventData);
-            currentEventData = '';
-            if (status === 'done' || status === 'error') {
+            currentEventData = "";
+            if (status === "done" || status === "error") {
               return;
             }
-          } else if (currentEventData !== '') {
+          } else if (currentEventData !== "") {
             // Preserve blank lines inside a chunk (backend doesn't split multiline data per SSE spec).
-            currentEventData += '\n';
+            currentEventData += "\n";
           }
           continue;
         }
 
-        if (line.startsWith('data:')) {
+        if (line.startsWith("data:")) {
           let dataPart = line.slice(5);
-          if (dataPart.startsWith(' ')) dataPart = dataPart.slice(1);
-          if (dataPart === '' && currentEventData === '') {
+          if (dataPart.startsWith(" ")) dataPart = dataPart.slice(1);
+          if (dataPart === "" && currentEventData === "") {
             // Backend can emit a standalone newline chunk as an empty data line.
-            currentEventData = '\n';
+            currentEventData = "\n";
           } else {
-            currentEventData += (currentEventData ? '\n' : '') + dataPart;
+            currentEventData += (currentEventData ? "\n" : "") + dataPart;
           }
-        } else if (line.startsWith(':')) {
+        } else if (line.startsWith(":")) {
           // Comment line in SSE, ignore.
         } else {
           // Non-standard continuation without "data:" prefix (backend may emit raw newlines).
-          currentEventData += (currentEventData ? '\n' : '') + line;
+          currentEventData += (currentEventData ? "\n" : "") + line;
         }
       }
     }
 
-    if (currentEventData !== '') {
+    if (currentEventData !== "") {
       processEvent(currentEventData);
     }
   } catch (error) {
-    console.error('Streaming error:', error);
-    onError?.(error instanceof Error ? error.message : 'Unknown error occurred');
+    console.error("Streaming error:", error);
+    onError?.(
+      error instanceof Error ? error.message : "Unknown error occurred",
+    );
   }
 };
 
 export const transcribeAudio = async (audioBlob: Blob): Promise<string> => {
   const formData = new FormData();
-  formData.append('audio', audioBlob, 'audio.wav');
+  formData.append("audio", audioBlob, "audio.wav");
 
-  const response = await fetch('/api/v1/chat/transcribe', {
-    method: 'POST',
+  const response = await fetch("/api/v1/chat/transcribe", {
+    method: "POST",
     body: formData,
-    credentials: 'include',
+    credentials: "include",
   });
 
   if (!response.ok) {
@@ -247,19 +274,36 @@ export const transcribeAudio = async (audioBlob: Blob): Promise<string> => {
   return data.text;
 };
 
-export const uploadFile = async (file: File, sessionId: number): Promise<any> => {
+export const uploadFile = async (
+  file: File,
+  sessionId: number,
+): Promise<any> => {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append("file", file);
 
   const response = await fetch(`/api/v1/chat/upload?session_id=${sessionId}`, {
-    method: 'POST',
+    method: "POST",
     body: formData,
-    credentials: 'include',
+    credentials: "include",
   });
 
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(`Upload failed: ${response.status} - ${errorText}`);
+  }
+
+  return response.json();
+};
+
+export const getDocumentStatus = async (
+  documentId: number,
+): Promise<{ document_id: number; status: string; filename: string }> => {
+  const response = await fetch(`/api/v1/chat/documents/${documentId}/status`, {
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to get document status: ${response.status}`);
   }
 
   return response.json();

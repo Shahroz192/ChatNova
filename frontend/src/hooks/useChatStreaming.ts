@@ -57,14 +57,16 @@ export const useChatStreaming = (
               tool: toolUpdate.tool,
               input: toolUpdate.input,
               status: "running",
+              id: toolUpdate.tool_call_id,
             });
           } else if (toolUpdate.type === "tool_end") {
-            const runningIdx = tools
-              .map((t) => t.status)
-              .lastIndexOf("running");
-            if (runningIdx !== -1) {
-              tools[runningIdx] = {
-                ...tools[runningIdx],
+            const toolIdx = toolUpdate.tool_call_id
+              ? tools.findIndex((t) => t.id === toolUpdate.tool_call_id)
+              : tools.map((t) => t.status).lastIndexOf("running");
+
+            if (toolIdx !== -1) {
+              tools[toolIdx] = {
+                ...tools[toolIdx],
                 output: toolUpdate.output,
                 status: "completed",
               };
@@ -92,6 +94,7 @@ export const useChatStreaming = (
         file_type: string;
       }[] = [],
       clearInput?: () => void,
+      sessionIdOverride?: number,
     ) => {
       if (!messageContent.trim() && (!images || images.length === 0)) return;
       if (isStreaming) return;
@@ -99,7 +102,7 @@ export const useChatStreaming = (
       setLoading(true);
 
       try {
-        let sessionId = currentSessionId;
+        let sessionId = sessionIdOverride ?? currentSessionId;
         if (!sessionId) {
           sessionId = await createSession();
           if (!sessionId) throw new Error("Failed to create session");
@@ -159,6 +162,18 @@ export const useChatStreaming = (
           },
           (toolUpdate) => applyToolUpdate(tempMessage.id, toolUpdate),
           (fact) => showSuccess("Memory Saved", fact),
+          (metadata) => {
+            if (metadata.message_id) {
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === tempMessage.id
+                    ? { ...msg, id: metadata.message_id }
+                    : msg,
+                ),
+              );
+              setStreamingMessageId(metadata.message_id);
+            }
+          },
           controller.signal,
         );
       } catch (error) {
@@ -287,6 +302,18 @@ export const useChatStreaming = (
           },
           (toolUpdate) => applyToolUpdate(message.id, toolUpdate),
           (fact) => showSuccess("Memory Saved", fact),
+          (metadata) => {
+            if (metadata.message_id) {
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === message.id
+                    ? { ...msg, id: metadata.message_id }
+                    : msg,
+                ),
+              );
+              setStreamingMessageId(metadata.message_id);
+            }
+          },
           controller.signal,
         );
       } catch (error) {

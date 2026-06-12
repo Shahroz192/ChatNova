@@ -6,7 +6,7 @@ export const useChatModels = () => {
   const [models, setModels] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState(() => {
     const saved = localStorage.getItem("selectedModel");
-    return saved || "gemini-2.0-flash";
+    return saved || "";
   });
   const { error: showError } = useToast();
 

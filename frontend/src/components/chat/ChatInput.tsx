@@ -1,4 +1,10 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   Send,
   Search,
@@ -10,10 +16,10 @@ import {
   Plus,
   X,
   FileText,
-  ChevronDown
-} from 'lucide-react';
-import type { WebSearchOptions } from '../../types/search';
-import { transcribeAudio } from '../../utils/api';
+  ChevronDown,
+} from "lucide-react";
+import type { WebSearchOptions } from "../../types/search";
+import { transcribeAudio } from "../../utils/api";
 
 interface ChatInputProps {
   input: string;
@@ -21,6 +27,7 @@ interface ChatInputProps {
   sendMessage: (images?: string[]) => void;
   loading: boolean;
   isUploadingDocs?: boolean;
+  isProcessingDocs?: boolean;
   searchOptions?: WebSearchOptions;
   onSearchOptionsChange?: (options: WebSearchOptions) => void;
   searchSuggestions?: string[];
@@ -28,14 +35,17 @@ interface ChatInputProps {
   recentSearches?: string[];
   onRecentSearchSelect?: (query: string) => void;
   selectedModel: string;
-  onFileUpload: (file: File) => void;
+  onFileUpload: (file: File, clientId: string) => void;
+  pendingDocuments?: { clientId: string; name: string; isUploading: boolean; processingStatus?: string }[];
+  onFileRemove?: (clientId: string) => void;
   models?: string[];
   useTools?: boolean;
   onUseToolsChange?: (use: boolean) => void;
   onModelSelect?: (model: string) => void;
+  processingDocCount?: number;
 }
 
-type RecordingState = 'idle' | 'recording' | 'processing';
+type RecordingState = "idle" | "recording" | "processing";
 
 const ChatInput: React.FC<ChatInputProps> = ({
   input,
@@ -43,6 +53,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   sendMessage,
   loading,
   isUploadingDocs = false,
+  isProcessingDocs = false,
   searchOptions = { search_web: false },
   onSearchOptionsChange,
   searchSuggestions = [],
@@ -51,6 +62,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
   onRecentSearchSelect,
   selectedModel,
   onFileUpload,
+  pendingDocuments = [],
+  onFileRemove,
   models = [],
   useTools = false,
   onUseToolsChange,
@@ -59,11 +72,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showCommands, setShowCommands] = useState(false);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
-  const [commandFilter, setCommandFilter] = useState('');
-  const [recordingState, setRecordingState] = useState<RecordingState>('idle');
+  const [commandFilter, setCommandFilter] = useState("");
+  const [recordingState, setRecordingState] = useState<RecordingState>("idle");
   const [recordingTime, setRecordingTime] = useState(0);
-  const [pendingImages, setPendingImages] = useState<{ name: string, data: string }[]>([]);
-  const [pendingDocs, setPendingDocs] = useState<{ name: string }[]>([]);
+  const [pendingImages, setPendingImages] = useState<
+    { name: string; data: string }[]
+  >([]);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -71,69 +85,87 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const isGemini = useMemo(() => selectedModel.toLowerCase().includes('gemini'), [selectedModel]);
+  const isGemini = useMemo(
+    () => selectedModel.toLowerCase().includes("gemini"),
+    [selectedModel],
+  );
 
   const handleWebSearchToggle = useCallback(() => {
     if (onSearchOptionsChange) {
       onSearchOptionsChange({
         ...searchOptions,
-        search_web: !searchOptions.search_web
+        search_web: !searchOptions.search_web,
       });
     }
   }, [onSearchOptionsChange, searchOptions]);
 
-  const commands = useMemo(() => [
-    {
-      id: 'search',
-      name: `Search: ${searchOptions.search_web ? 'ON' : 'OFF'}`,
-      icon: <Globe size={14} />,
-      action: () => handleWebSearchToggle()
-    },
-    {
-      id: 'tools',
-      name: `Tools: ${useTools ? 'ON' : 'OFF'}`,
-      icon: <FileText size={14} />,
-      action: () => onUseToolsChange?.(!useTools)
-    }
-  ], [searchOptions.search_web, useTools, onUseToolsChange, handleWebSearchToggle]);
+  const commands = useMemo(
+    () => [
+      {
+        id: "search",
+        name: `Search: ${searchOptions.search_web ? "ON" : "OFF"}`,
+        icon: <Globe size={14} />,
+        action: () => handleWebSearchToggle(),
+      },
+      {
+        id: "tools",
+        name: `Tools: ${useTools ? "ON" : "OFF"}`,
+        icon: <FileText size={14} />,
+        action: () => onUseToolsChange?.(!useTools),
+      },
+    ],
+    [
+      searchOptions.search_web,
+      useTools,
+      onUseToolsChange,
+      handleWebSearchToggle,
+    ],
+  );
 
   const filteredCommands = useMemo(() => {
     if (!commandFilter) return commands;
-    return commands.filter(c => c.name.toLowerCase().includes(commandFilter.toLowerCase()));
+    return commands.filter((c) =>
+      c.name.toLowerCase().includes(commandFilter.toLowerCase()),
+    );
   }, [commands, commandFilter]);
 
   const formatModelName = useCallback((name: string) => {
-    if (!name) return 'Model';
-    
+    if (!name) return "Model";
+
     // Exact mapping for the problematic IDs
     const mappings: Record<string, string> = {
-      'qwen-3-235b-a22b-instruct-2507': 'Qwen',
-      'qwen-3-235b-a22b-thinking-2507': 'Qwen Thinking',
-      'moonshotai/kimi-k2-instruct-0905': 'Kimi',
+      "qwen-3-235b-a22b-instruct-2507": "Qwen",
+      "qwen-3-235b-a22b-thinking-2507": "Qwen Thinking",
+      "moonshotai/kimi-k2-instruct-0905": "Kimi",
     };
 
     if (mappings[name]) return mappings[name];
 
     // Normalize and clean model names
     const modelId = name.toLowerCase();
-    
-    if (modelId.includes('qwen')) {
-      return modelId.includes('thinking') ? 'Qwen Thinking' : 'Qwen';
+
+    if (modelId.includes("qwen")) {
+      return modelId.includes("thinking") ? "Qwen Thinking" : "Qwen";
     }
-    if (modelId.includes('kimi')) return 'Kimi';
-    if (modelId.includes('gpt-4o')) return 'GPT-4o';
-    if (modelId.includes('claude')) return 'Claude';
-    if (modelId.includes('gemini')) return 'Gemini';
-    
+    if (modelId.includes("kimi")) return "Kimi";
+    if (modelId.includes("gpt-4o")) return "GPT-4o";
+    if (modelId.includes("claude")) return "Claude";
+    if (modelId.includes("gemini")) return "Gemini";
+
     // Fallback: remove common suffixes and take the last part
-    const clean = name.split('/').pop()?.split(':')[0]?.replace(/-instruct.*$|-thinking.*$|-3-235b.*$/i, '') || name;
+    const clean =
+      name
+        .split("/")
+        .pop()
+        ?.split(":")[0]
+        ?.replace(/-instruct.*$|-thinking.*$|-3-235b.*$/i, "") || name;
     return clean.charAt(0).toUpperCase() + clean.slice(1);
   }, []);
 
   const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   }, []);
 
   useEffect(() => {
@@ -144,37 +176,45 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = "auto";
       const scrollHeight = textareaRef.current.scrollHeight;
       textareaRef.current.style.height = `${Math.min(scrollHeight, 200)}px`;
-      
+
       // Toggle overflow based on content height
       if (scrollHeight > 200) {
-        textareaRef.current.style.overflowY = 'auto';
+        textareaRef.current.style.overflowY = "auto";
       } else {
-        textareaRef.current.style.overflowY = 'hidden';
+        textareaRef.current.style.overflowY = "hidden";
       }
     }
   }, [input]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSuggestionClick = useCallback((suggestion: string) => {
-    if (onSuggestionSelect) {
-      onSuggestionSelect(suggestion);
-    }
-    setShowSuggestions(false);
-  }, [onSuggestionSelect]);
+  const handleSuggestionClick = useCallback(
+    (suggestion: string) => {
+      if (onSuggestionSelect) {
+        onSuggestionSelect(suggestion);
+      }
+      setShowSuggestions(false);
+    },
+    [onSuggestionSelect],
+  );
 
-  const handleRecentSearchClick = useCallback((query: string) => {
-    if (onRecentSearchSelect) {
-      onRecentSearchSelect(query);
-    }
-    setShowSuggestions(false);
-  }, [onRecentSearchSelect]);
+  const handleRecentSearchClick = useCallback(
+    (query: string) => {
+      if (onRecentSearchSelect) {
+        onRecentSearchSelect(query);
+      }
+      setShowSuggestions(false);
+    },
+    [onRecentSearchSelect],
+  );
 
   const toggleRecording = useCallback(async () => {
-    if (recordingState === 'idle') {
+    if (recordingState === "idle") {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
         const mediaRecorder = new MediaRecorder(stream);
         mediaRecorderRef.current = mediaRecorder;
         chunksRef.current = [];
@@ -186,32 +226,36 @@ const ChatInput: React.FC<ChatInputProps> = ({
         };
 
         mediaRecorder.onstop = async () => {
-          setRecordingState('processing');
-          const audioBlob = new Blob(chunksRef.current, { type: 'audio/wav' });
+          setRecordingState("processing");
+          const audioBlob = new Blob(chunksRef.current, { type: "audio/wav" });
           try {
             const text = await transcribeAudio(audioBlob);
-            setInput((prev: string) => prev ? `${prev} ${text}` : text);
+            setInput((prev: string) => (prev ? `${prev} ${text}` : text));
           } catch (error) {
-            console.error('Transcription error:', error);
+            console.error("Transcription error:", error);
           } finally {
-            setRecordingState('idle');
+            setRecordingState("idle");
             setRecordingTime(0);
-            mediaRecorder.stream.getTracks().forEach(track => { track.stop(); });
+            mediaRecorder.stream.getTracks().forEach((track) => {
+              track.stop();
+            });
           }
         };
 
         mediaRecorder.start();
-        setRecordingState('recording');
+        setRecordingState("recording");
         timerRef.current = setInterval(() => {
-          setRecordingTime(prev => prev + 1);
+          setRecordingTime((prev) => prev + 1);
         }, 1000);
       } catch (error) {
-        console.error('Error accessing microphone:', error);
+        console.error("Error accessing microphone:", error);
       }
-    } else if (recordingState === 'recording') {
+    } else if (recordingState === "recording") {
       mediaRecorderRef.current?.stop();
       if (timerRef.current) clearInterval(timerRef.current);
-      mediaRecorderRef.current?.stream.getTracks().forEach(track => { track.stop(); });
+      mediaRecorderRef.current?.stream.getTracks().forEach((track) => {
+        track.stop();
+      });
     }
   }, [recordingState, setInput]);
 
@@ -219,91 +263,112 @@ const ChatInput: React.FC<ChatInputProps> = ({
     fileInputRef.current?.click();
   }, []);
 
-  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  const handleFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const isImage = file.type.startsWith('image/');
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const isImage = file.type.startsWith("image/");
 
-      if (isImage) {
-        if (!isGemini) {
-          alert("Images are only supported for Gemini models. Please switch model to upload images.");
-          continue;
+        if (isImage) {
+          if (!isGemini) {
+            alert(
+              "Images are only supported for Gemini models. Please switch model to upload images.",
+            );
+            continue;
+          }
+
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const base64 = e.target?.result as string;
+            setPendingImages((prev) => [
+              ...prev,
+              { name: file.name, data: base64 },
+            ]);
+          };
+          reader.readAsDataURL(file);
+        } else {
+          const clientId =
+            globalThis.crypto?.randomUUID?.() ??
+            `${file.name}-${Date.now()}-${i}`;
+          onFileUpload(file, clientId);
         }
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const base64 = e.target?.result as string;
-          setPendingImages(prev => [...prev, { name: file.name, data: base64 }]);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        // Document
-        setPendingDocs(prev => [...prev, { name: file.name }]);
-        onFileUpload(file);
       }
-    }
 
-    // Reset input
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  }, [isGemini, onFileUpload]);
+      // Reset input
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    },
+    [isGemini, onFileUpload],
+  );
 
   const removeImage = useCallback((index: number) => {
-    setPendingImages(prev => prev.filter((_, i) => i !== index));
+    setPendingImages((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  const removeDoc = useCallback((index: number) => {
-    setPendingDocs(prev => prev.filter((_, i) => i !== index));
-  }, []);
+  const removeDoc = useCallback(
+    (clientId: string) => {
+      onFileRemove?.(clientId);
+    },
+    [onFileRemove],
+  );
 
   const handleSendMessage = useCallback(() => {
     if (isUploadingDocs) {
       alert("Documents are still uploading. Please wait a moment.");
       return;
     }
-    const images = pendingImages.map(img => img.data);
+    if (isProcessingDocs) {
+      alert("Documents are still being processed. Please wait a moment.");
+      return;
+    }
+    const images = pendingImages.map((img) => img.data);
     sendMessage(images);
     setPendingImages([]);
-    setPendingDocs([]);
-  }, [pendingImages, sendMessage, isUploadingDocs]);
+  }, [pendingImages, sendMessage, isUploadingDocs, isProcessingDocs]);
 
-  const handleTextareaChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    setInput(value);
+  const handleTextareaChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const value = e.target.value;
+      setInput(value);
 
-    if (value.startsWith('/')) {
-      setShowCommands(true);
-      setCommandFilter(value.slice(1));
-      setShowSuggestions(false);
-      setShowModelDropdown(false);
-    } else {
-      setShowCommands(false);
-      setShowSuggestions(value.length > 0);
-    }
-  }, [setInput]);
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      if (showCommands && filteredCommands.length > 0) {
-        e.preventDefault();
-        filteredCommands[0].action();
+      if (value.startsWith("/")) {
+        setShowCommands(true);
+        setCommandFilter(value.slice(1));
+        setShowSuggestions(false);
+        setShowModelDropdown(false);
+      } else {
         setShowCommands(false);
-        return;
+        setShowSuggestions(value.length > 0);
       }
-      e.preventDefault();
-      handleSendMessage();
-    }
-    if (e.key === 'Escape') {
-      setShowSuggestions(false);
-      setShowCommands(false);
-      setShowModelDropdown(false);
-    }
-  }, [handleSendMessage, showCommands, filteredCommands]);
+    },
+    [setInput],
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        if (showCommands && filteredCommands.length > 0) {
+          e.preventDefault();
+          filteredCommands[0].action();
+          setShowCommands(false);
+          return;
+        }
+        e.preventDefault();
+        handleSendMessage();
+      }
+      if (e.key === "Escape") {
+        setShowSuggestions(false);
+        setShowCommands(false);
+        setShowModelDropdown(false);
+      }
+    },
+    [handleSendMessage, showCommands, filteredCommands],
+  );
 
   const handleFocus = useCallback(() => {
-    if (input.startsWith('/')) {
+    if (input.startsWith("/")) {
       setShowCommands(true);
     } else {
       setShowSuggestions(true);
@@ -321,21 +386,39 @@ const ChatInput: React.FC<ChatInputProps> = ({
   return (
     <div className="chat-input-wrapper">
       {/* Attachment Preview */}
-      {(pendingImages.length > 0 || pendingDocs.length > 0) ? (
+      {pendingImages.length > 0 || pendingDocuments.length > 0 ? (
         <div className="attachment-preview-container">
           {pendingImages.map((img, index) => (
             <div key={`img-${index}`} className="attachment-preview-item">
-              <img src={img.data} alt={img.name} className="attachment-thumbnail" />
-                <button type="button" className="remove-attachment" onClick={() => removeImage(index)}>
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
-            {pendingDocs.map((doc, index) => (
-              <div key={`doc-${index}`} className="attachment-preview-item doc-item">
-                <FileText size={20} className="icon-muted" />
-                <span className="doc-name">{doc.name}</span>
-                <button type="button" className="remove-attachment" onClick={() => removeDoc(index)}>
+              <img
+                src={img.data}
+                alt={img.name}
+                className="attachment-thumbnail"
+              />
+              <button
+                type="button"
+                className="remove-attachment"
+                onClick={() => removeImage(index)}
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+          {pendingDocuments.map((doc) => (
+            <div
+              key={doc.clientId}
+              className="attachment-preview-item doc-item"
+            >
+              <FileText size={20} className="icon-muted" />
+              <span className="doc-name">
+                {doc.name}
+                {doc.isUploading ? " (Uploading...)" : ""}
+              </span>
+              <button
+                type="button"
+                className="remove-attachment"
+                onClick={() => removeDoc(doc.clientId)}
+              >
                 <X size={12} />
               </button>
             </div>
@@ -344,13 +427,17 @@ const ChatInput: React.FC<ChatInputProps> = ({
       ) : null}
       {isUploadingDocs ? (
         <div className="text-muted small mb-2">Uploading documents…</div>
+      ) : isProcessingDocs ? (
+        <div className="text-muted small mb-2">Processing documents…</div>
       ) : null}
 
-      {recordingState !== 'idle' ? (
+      {recordingState !== "idle" ? (
         <div className="recording-indicator">
           <div className="recording-pulse"></div>
           <span className="recording-text">
-            {recordingState === 'processing' ? 'Transcribing...' : `Recording ${formatTime(recordingTime)}`}
+            {recordingState === "processing"
+              ? "Transcribing..."
+              : `Recording ${formatTime(recordingTime)}`}
           </span>
         </div>
       ) : null}
@@ -377,10 +464,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
           </div>
         )}
 
-        {showSuggestions && !showCommands && (searchSuggestions.length > 0 || recentSearches.length > 0) ? (
-          <div
-            className="search-suggestions-container"
-          >
+        {showSuggestions &&
+        !showCommands &&
+        (searchSuggestions.length > 0 || recentSearches.length > 0) ? (
+          <div className="search-suggestions-container">
             {/* Search suggestions */}
             {searchSuggestions.length > 0 ? (
               <div className="suggestions-group">
@@ -418,7 +505,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
         ) : null}
 
         {/* Unified Input Area */}
-        <div className={`modern-input-box ${searchOptions.search_web ? 'search-mode' : ''} ${recordingState === 'recording' ? 'recording-active' : ''}`}>
+        <div
+          className={`modern-input-box ${searchOptions.search_web ? "search-mode" : ""} ${recordingState === "recording" ? "recording-active" : ""}`}
+        >
           <textarea
             ref={textareaRef}
             className="modern-textarea"
@@ -428,8 +517,12 @@ const ChatInput: React.FC<ChatInputProps> = ({
             onKeyDown={handleKeyDown}
             onFocus={handleFocus}
             onBlur={handleBlur}
-            placeholder={recordingState === 'processing' ? 'Transcribing...' : 'Ask anything...'}
-            disabled={recordingState === 'processing'}
+            placeholder={
+              recordingState === "processing"
+                ? "Transcribing..."
+                : "Ask anything..."
+            }
+            disabled={recordingState === "processing"}
             autoComplete="off"
           />
 
@@ -449,7 +542,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
               <input
                 type="file"
                 ref={fileInputRef}
-                style={{ display: 'none' }}
+                style={{ display: "none" }}
                 multiple
                 onChange={handleFileChange}
                 accept=".pdf,.docx,.doc,.txt,.md,.png,.jpg,.jpeg,.webp"
@@ -465,12 +558,18 @@ const ChatInput: React.FC<ChatInputProps> = ({
                 >
                   <span className="model-name-text text-truncate">
                     {loading ? (
-                      <span className="thinking-text-indicator">Thinking...</span>
+                      <span className="thinking-text-indicator">
+                        Thinking...
+                      </span>
                     ) : (
                       formatModelName(selectedModel)
                     )}
                   </span>
-                  <ChevronDown size={14} strokeWidth={2.5} className={`dropdown-chevron ${showModelDropdown ? 'active' : ''}`} />
+                  <ChevronDown
+                    size={14}
+                    strokeWidth={2.5}
+                    className={`dropdown-chevron ${showModelDropdown ? "active" : ""}`}
+                  />
                 </button>
 
                 {showModelDropdown && (
@@ -478,7 +577,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                     {models.map((model) => (
                       <button
                         key={model}
-                        className={`model-option ${selectedModel === model ? 'active' : ''}`}
+                        className={`model-option ${selectedModel === model ? "active" : ""}`}
                         onClick={() => {
                           onModelSelect?.(model);
                           setShowModelDropdown(false);
@@ -493,7 +592,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
               <div className="onboarding-anchor">
                 <button
-                  className={`action-icon-btn ${searchOptions.search_web ? 'active' : ''}`}
+                  className={`action-icon-btn ${searchOptions.search_web ? "active" : ""}`}
                   onClick={handleWebSearchToggle}
                   title="Toggle web search"
                   type="button"
@@ -507,13 +606,17 @@ const ChatInput: React.FC<ChatInputProps> = ({
               {/* Voice Input (Near Send) */}
               <div className="onboarding-anchor">
                 <button
-                  className={`action-icon-btn mic-btn ${recordingState === 'recording' ? 'recording' : ''}`}
+                  className={`action-icon-btn mic-btn ${recordingState === "recording" ? "recording" : ""}`}
                   onClick={toggleRecording}
-                  title={recordingState === 'idle' ? 'Start recording' : 'Stop recording'}
+                  title={
+                    recordingState === "idle"
+                      ? "Start recording"
+                      : "Stop recording"
+                  }
                   type="button"
-                  disabled={recordingState === 'processing'}
+                  disabled={recordingState === "processing"}
                 >
-                  {recordingState === 'recording' ? (
+                  {recordingState === "recording" ? (
                     <Square size={18} strokeWidth={2} />
                   ) : (
                     <Mic size={18} strokeWidth={2} />
@@ -525,12 +628,22 @@ const ChatInput: React.FC<ChatInputProps> = ({
               <div className="onboarding-anchor">
                 <button
                   onClick={handleSendMessage}
-                  disabled={loading || isUploadingDocs || (!input.trim() && pendingImages.length === 0) || recordingState === 'processing'}
+                  disabled={
+                    loading ||
+                    isUploadingDocs ||
+                    isProcessingDocs ||
+                    (!input.trim() && pendingImages.length === 0) ||
+                    recordingState === "processing"
+                  }
                   className="send-icon-btn"
                   title="Send message"
                 >
                   {loading ? (
-                    <Loader size={18} strokeWidth={2.5} className="animate-spin" />
+                    <Loader
+                      size={18}
+                      strokeWidth={2.5}
+                      className="animate-spin"
+                    />
                   ) : (
                     <Send size={18} strokeWidth={2.5} />
                   )}
@@ -540,7 +653,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
           </div>
         </div>
       </div>
-
     </div>
   );
 };

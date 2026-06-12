@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ListGroup } from "react-bootstrap";
-import api, { getSearchHistory } from "../../utils/api";
+import api, { getSearchHistory, getDocumentStatus } from "../../utils/api";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "../../contexts/ToastContext";
 import ChatInput from "./ChatInput";
@@ -18,7 +18,16 @@ import "../../styles/ChatMessages.css";
 import "../../styles/ChatInput.css";
 import "../../styles/ChatUtils.css";
 
-interface ChatProps { }
+interface ChatProps {}
+
+interface PendingDocumentAttachment {
+  clientId: string;
+  id: number | null;
+  filename: string;
+  file_type: string;
+  isUploading: boolean;
+  processingStatus: "pending" | "processing" | "completed" | "failed";
+}
 
 const Chat: React.FC<ChatProps> = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -29,15 +38,15 @@ const Chat: React.FC<ChatProps> = () => {
   });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const currentSessionIdRef = useRef<number | null>(null);
+  const sessionCreationRef = useRef<Promise<number> | null>(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sessionIdFromUrl = searchParams.get("session");
   const { error: showError } = useToast();
 
-  const [pendingDocumentIds, setPendingDocumentIds] = useState<number[]>([]);
-  const [isUploadingDocs, setIsUploadingDocs] = useState(false);
   const [pendingDocuments, setPendingDocuments] = useState<
-    { id: number; filename: string; file_type: string }[]
+    PendingDocumentAttachment[]
   >([]);
 
   const [searchOptions, setSearchOptions] = useState<WebSearchOptions>(() => {
@@ -51,15 +60,22 @@ const Chat: React.FC<ChatProps> = () => {
     }
     return {
       search_web: false,
-      search_type: 'general',
+      search_type: "general",
       max_results: 10,
       include_snippets: true,
-      safe_search: true
+      safe_search: true,
     };
   });
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const [activeContextMenu, setActiveContextMenu] = useState<{ id: number, type: 'user' | 'assistant' } | null>(null);
+  const [activeContextMenu, setActiveContextMenu] = useState<{
+    id: number;
+    type: "user" | "assistant";
+  } | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const isUploadingDocs = pendingDocuments.some((doc) => doc.isUploading);
+  const isProcessingDocs = pendingDocuments.some(
+    (doc) => doc.processingStatus === "pending" || doc.processingStatus === "processing",
+  );
 
   // Custom Hooks
   const {
@@ -75,11 +91,7 @@ const Chat: React.FC<ChatProps> = () => {
     deleteSession,
   } = useChatSessions(sessionIdFromUrl);
 
-  const {
-    models,
-    selectedModel,
-    setSelectedModel
-  } = useChatModels();
+  const { models, selectedModel, setSelectedModel } = useChatModels();
 
   const {
     isStreaming,
@@ -88,7 +100,7 @@ const Chat: React.FC<ChatProps> = () => {
     loading,
     sendMessage: streamSendMessage,
     regenerateResponse,
-    cancelStreaming
+    cancelStreaming,
   } = useChatStreaming(
     setMessages,
     currentSessionId,
@@ -96,7 +108,7 @@ const Chat: React.FC<ChatProps> = () => {
     searchOptions,
     useTools,
     createSession,
-    fetchSessions
+    fetchSessions,
   );
 
   // Fetch search history on mount
@@ -104,7 +116,7 @@ const Chat: React.FC<ChatProps> = () => {
     const fetchHistory = async () => {
       try {
         const history = await getSearchHistory();
-        setRecentSearches(history.map(item => item.query));
+        setRecentSearches(history.map((item) => item.query));
       } catch (error) {
         console.error("Failed to fetch search history:", error);
       }
@@ -118,115 +130,72 @@ const Chat: React.FC<ChatProps> = () => {
     inputRef.current = input;
   }, [input]);
 
-  const buildVersionedMessages = useCallback((rawMessages: Message[]) => {
-    const result: Message[] = [];
-    const byKey = new Map<string, Message>();
-    const MAX_VERSION_GAP_MS = 2 * 60 * 1000;
+  useEffect(() => {
+    currentSessionIdRef.current = currentSessionId;
+  }, [currentSessionId]);
 
-    rawMessages.forEach((msg) => {
-      const docIds = (msg.documents || []).map(doc => doc.id).sort((a, b) => a - b);
-      const imagesKey = msg.images ? JSON.stringify(msg.images) : "";
-      const key = `${msg.content}||${imagesKey}||${JSON.stringify(docIds)}||${msg.model || ""}`;
+  const ensureSessionId = useCallback(async () => {
+    if (currentSessionIdRef.current) {
+      return currentSessionIdRef.current;
+    }
 
-      const lastBase = result.length ? result[result.length - 1] : null;
-      const isAdjacentMatch = lastBase
-        ? (() => {
-          const lastDocIds = (lastBase.documents || []).map(doc => doc.id).sort((a, b) => a - b);
-          const lastImagesKey = lastBase.images ? JSON.stringify(lastBase.images) : "";
-          const lastKey = `${lastBase.content}||${lastImagesKey}||${JSON.stringify(lastDocIds)}||${lastBase.model || ""}`;
-          if (lastKey !== key) return false;
-          const lastTime = new Date(lastBase.created_at).getTime();
-          const currentTime = new Date(msg.created_at).getTime();
-          return Math.abs(currentTime - lastTime) <= MAX_VERSION_GAP_MS;
-        })()
-        : false;
+    if (!sessionCreationRef.current) {
+      sessionCreationRef.current = createSession().finally(() => {
+        sessionCreationRef.current = null;
+      });
+    }
 
-      if (!byKey.has(key) || !isAdjacentMatch) {
-        const base: Message = { ...msg };
-        if (base.response) {
-          base.response_versions = base.response_versions?.length
-            ? base.response_versions
-            : [{
-              id: base.id,
-              response: base.response,
-              created_at: base.created_at,
-              model: base.model,
-            }];
-        }
-        byKey.set(key, base);
-        result.push(base);
-      } else {
-        const base = byKey.get(key)!;
-        const versions = base.response_versions ? [...base.response_versions] : [];
-        if (base.response && versions.length === 0) {
-          versions.push({
-            id: base.id,
-            response: base.response,
-            created_at: base.created_at,
-            model: base.model,
-          });
-        }
-        if (msg.response) {
-          versions.push({
-            id: msg.id,
-            response: msg.response,
-            created_at: msg.created_at,
-            model: msg.model,
-          });
-        }
-        base.response_versions = versions;
-        if (msg.response) {
-          base.response = msg.response;
-        }
-      }
-    });
+    const sessionId = await sessionCreationRef.current;
+    currentSessionIdRef.current = sessionId;
+    return sessionId;
+  }, [createSession]);
 
-    result.forEach((msg) => {
-      if (msg.response_versions && msg.response_versions.length > 1) {
-        msg.response_versions.sort(
-          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  const loadHistory = useCallback(
+    async (sessionId: number) => {
+      try {
+        const response = await api.get(
+          `/chat/history?session_id=${sessionId}&newest_first=false`,
         );
-        msg.response = msg.response_versions[msg.response_versions.length - 1].response;
+        setMessages(response.data.data);
+      } catch (error) {
+        showError("Loading Error", "Failed to load chat history.");
+        console.error("Failed to load history", error);
       }
-    });
+    },
+    [showError],
+  );
 
-    return result;
-  }, []);
-
-  const loadHistory = useCallback(async (sessionId: number) => {
-    try {
-      const response = await api.get(
-        `/chat/history?session_id=${sessionId}&newest_first=false`,
-      );
-      setMessages(buildVersionedMessages(response.data.data));
-    } catch (error) {
-      showError("Loading Error", "Failed to load chat history.");
-      console.error("Failed to load history", error);
-    }
-  }, [buildVersionedMessages, showError]);
-
-  const loadSessionById = useCallback(async (sessionId: number) => {
-    try {
-      const response = await api.get(`/sessions/${sessionId}`);
-      if (response.data) {
-        setCurrentSessionId(sessionId);
-        await loadHistory(sessionId);
-        return true;
+  const loadSessionById = useCallback(
+    async (sessionId: number) => {
+      try {
+        const response = await api.get(`/sessions/${sessionId}`);
+        if (response.data) {
+          setCurrentSessionId(sessionId);
+          await loadHistory(sessionId);
+          return true;
+        }
+      } catch (error) {
+        console.error("Failed to load session", error);
+        return false;
       }
-    } catch (error) {
-      console.error("Failed to load session", error);
       return false;
-    }
-    return false;
-  }, [setCurrentSessionId, loadHistory]);
+    },
+    [setCurrentSessionId, loadHistory],
+  );
 
-  const handleSessionSelect = useCallback((sessionId: number) => {
-    navigate(`/chat?session=${sessionId}`);
-  }, [navigate]);
+  const handleSessionSelect = useCallback(
+    (sessionId: number) => {
+      navigate(`/chat?session=${sessionId}`);
+    },
+    [navigate],
+  );
 
-  const handleDeleteSession = useCallback(async (sessionId: number) => {
-    await deleteSession(sessionId, () => setMessages([]));
-  }, [deleteSession]);
+  const handleDeleteSession = useCallback(
+    async (sessionId: number) => {
+      await deleteSession(sessionId, () => setMessages([]));
+    },
+    [deleteSession],
+  );
 
   useEffect(() => {
     const handleSessionFromUrl = async () => {
@@ -246,38 +215,102 @@ const Chat: React.FC<ChatProps> = () => {
     };
     const timer = setTimeout(handleSessionFromUrl, 100);
     return () => clearTimeout(timer);
-  }, [sessionIdFromUrl, currentSessionId, navigate, showError, loadSessionById]);
+  }, [
+    sessionIdFromUrl,
+    currentSessionId,
+    navigate,
+    showError,
+    loadSessionById,
+  ]);
 
-  const sendMessage = useCallback(async (images?: string[], overrideContent?: string) => {
-    const content = overrideContent ?? input;
+  useEffect(() => {
+    if (!activeContextMenu) return;
 
-    // Add to recent searches if web search is enabled
-    if (searchOptions.search_web && content.trim()) {
-      setRecentSearches(prev => {
-        const filtered = prev.filter(q => q !== content.trim());
-        return [content.trim(), ...filtered].slice(0, 10);
-      });
-    }
-
-    const currentDocIds = [...pendingDocumentIds];
-    setPendingDocumentIds([]);
-    const currentDocuments = [...pendingDocuments];
-    setPendingDocuments([]);
-
-    await streamSendMessage(
-      content,
-      images,
-      currentDocIds,
-      currentDocuments,
-      () => {
-        if (!overrideContent) setInput("");
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest(".message-context-menu")) {
+        return;
       }
-    );
-  }, [input, pendingDocumentIds, pendingDocuments, searchOptions.search_web, streamSendMessage]);
+      setActiveContextMenu(null);
+    };
 
-  const handleSearchOptionsChange = useCallback((newOptions: WebSearchOptions) => {
-    setSearchOptions(newOptions);
-  }, []);
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [activeContextMenu]);
+
+  const sendMessage = useCallback(
+    async (images?: string[], overrideContent?: string) => {
+      const content = overrideContent ?? input;
+
+      if (!selectedModel) {
+        showError(
+          "Model Error",
+          "Please wait for models to load or select a model.",
+        );
+        return;
+      }
+
+      // Check if any documents are still processing
+      const processingDocs = pendingDocuments.filter(
+        (doc) => doc.processingStatus === "pending" || doc.processingStatus === "processing"
+      );
+      if (processingDocs.length > 0) {
+        showError(
+          "Documents Processing",
+          `Please wait for ${processingDocs.length} document(s) to finish processing before sending your message.`,
+        );
+        return;
+      }
+
+      // Add to recent searches if web search is enabled
+      if (searchOptions.search_web && content.trim()) {
+        setRecentSearches((prev) => {
+          const filtered = prev.filter((q) => q !== content.trim());
+          return [content.trim(), ...filtered].slice(0, 10);
+        });
+      }
+
+      const sessionId = await ensureSessionId();
+      const currentDocuments = pendingDocuments
+        .filter((doc) => doc.id !== null && !doc.isUploading && doc.processingStatus === "completed")
+        .map((doc) => ({
+          id: doc.id as number,
+          filename: doc.filename,
+          file_type: doc.file_type,
+        }));
+      const currentDocIds = currentDocuments.map((doc) => doc.id);
+      setPendingDocuments([]);
+
+      await streamSendMessage(
+        content,
+        images,
+        currentDocIds,
+        currentDocuments,
+        () => {
+          if (!overrideContent) setInput("");
+        },
+        sessionId,
+      );
+    },
+    [
+      ensureSessionId,
+      input,
+      pendingDocuments,
+      selectedModel,
+      searchOptions.search_web,
+      streamSendMessage,
+      showError,
+    ],
+  );
+
+  const handleSearchOptionsChange = useCallback(
+    (newOptions: WebSearchOptions) => {
+      setSearchOptions(newOptions);
+    },
+    [],
+  );
 
   const handleSuggestionSelect = useCallback((suggestion: string) => {
     setInput(suggestion);
@@ -285,8 +318,8 @@ const Chat: React.FC<ChatProps> = () => {
 
   const handleRecentSearchSelect = useCallback((query: string) => {
     setInput(query);
-    setRecentSearches(prev => {
-      const filtered = prev.filter(q => q !== query);
+    setRecentSearches((prev) => {
+      const filtered = prev.filter((q) => q !== query);
       return [query, ...filtered].slice(0, 10);
     });
   }, []);
@@ -306,46 +339,127 @@ const Chat: React.FC<ChatProps> = () => {
     setActiveContextMenu(null);
   }, []);
 
-  const handleDeleteMessage = useCallback(async (messageId: number) => {
-    try {
-      await api.delete(`/chat/history/${messageId}`);
-      setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
-      setActiveContextMenu(null);
-    } catch (error) {
-      showError("Delete Error", "Failed to delete message");
-    }
-  }, [showError]);
-
-  const handleFileUpload = useCallback(async (file: File) => {
-    try {
-      setIsUploadingDocs(true);
-      let sessionId = currentSessionId;
-      if (!sessionId) {
-        sessionId = await createSession();
+  const handleDeleteMessage = useCallback(
+    async (messageId: number) => {
+      try {
+        await api.delete(`/chat/history/${messageId}`);
+        setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+        setActiveContextMenu(null);
+      } catch (error) {
+        showError("Delete Error", "Failed to delete message");
       }
+    },
+    [showError],
+  );
 
-      if (sessionId) {
-        const { uploadFile } = await import("../../utils/api");
-        const docRecord = await uploadFile(file, sessionId);
-        if (docRecord && docRecord.id) {
-          setPendingDocumentIds(prev => [...prev, docRecord.id]);
-          setPendingDocuments(prev => [
-            ...prev,
-            {
-              id: docRecord.id,
-              filename: docRecord.filename,
-              file_type: docRecord.file_type,
-            },
-          ]);
+  const activePollingRef = useRef<Map<string, boolean>>(new Map());
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      activePollingRef.current.clear();
+    };
+  }, []);
+
+  const pollDocumentStatus = useCallback(async (documentId: number, clientId: string) => {
+    if (activePollingRef.current.has(clientId)) return; // Already polling this doc
+    activePollingRef.current.set(clientId, true);
+
+    const maxAttempts = 60;
+    let attempts = 0;
+
+    while (attempts < maxAttempts && isMountedRef.current) {
+      try {
+        const status = await getDocumentStatus(documentId);
+
+        if (!isMountedRef.current) break;
+
+        setPendingDocuments((prev) =>
+          prev.map((doc) =>
+            doc.clientId === clientId
+              ? {
+                  ...doc,
+                  processingStatus: status.status as "pending" | "processing" | "completed" | "failed",
+                }
+              : doc,
+          ),
+        );
+
+        if (status.status === "completed" || status.status === "failed") {
+          break;
         }
+      } catch (error) {
+        if (!isMountedRef.current) break;
+        console.error("Error polling document status:", error);
       }
-    } catch (error) {
-      console.error("Upload Error", error);
-      showError("Upload Error", "Failed to upload file");
-    } finally {
-      setIsUploadingDocs(false);
+
+      attempts++;
+      if (attempts < maxAttempts && isMountedRef.current) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
     }
-  }, [currentSessionId, showError, createSession]);
+
+    activePollingRef.current.delete(clientId);
+  }, []);
+
+  const handleFileUpload = useCallback(
+    async (file: File, clientId: string) => {
+      setPendingDocuments((prev) => [
+        ...prev,
+        {
+          clientId,
+          id: null,
+          filename: file.name,
+          file_type: file.type || "application/octet-stream",
+          isUploading: true,
+          processingStatus: "pending",
+        },
+      ]);
+
+      try {
+        const sessionId = await ensureSessionId();
+
+        if (sessionId) {
+          const { uploadFile } = await import("../../utils/api");
+          const docRecord = await uploadFile(file, sessionId);
+          if (docRecord && docRecord.id) {
+            setPendingDocuments((prev) =>
+              prev.map((doc) =>
+                doc.clientId === clientId
+                  ? {
+                      ...doc,
+                      id: docRecord.id,
+                      filename: docRecord.filename,
+                      file_type: docRecord.file_type,
+                      isUploading: false,
+                      processingStatus: docRecord.processing_status || "pending",
+                    }
+                  : doc,
+              ),
+            );
+
+            // Start polling for document processing status
+            pollDocumentStatus(docRecord.id, clientId);
+          }
+        }
+      } catch (error) {
+        setPendingDocuments((prev) =>
+          prev.filter((doc) => doc.clientId !== clientId),
+        );
+        console.error("Upload Error", error);
+        showError("Upload Error", "Failed to upload file");
+      }
+    },
+    [ensureSessionId, showError, pollDocumentStatus],
+  );
+
+  const handleFileRemove = useCallback((clientId: string) => {
+    activePollingRef.current.delete(clientId); // Cancel active polling for this doc
+    setPendingDocuments((prev) =>
+      prev.filter((doc) => doc.clientId !== clientId),
+    );
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("useTools", useTools.toString());
@@ -385,8 +499,7 @@ const Chat: React.FC<ChatProps> = () => {
         {messages.length === 0 ? (
           <div className="welcome-overlay">
             <h2 className="h3 fw-bold welcome-title">
-              Chat Smarter,
-              Innovate Faster
+              Chat Smarter, Innovate Faster
             </h2>
           </div>
         ) : null}
@@ -399,7 +512,9 @@ const Chat: React.FC<ChatProps> = () => {
                   msg={msg}
                   streamingMessageId={streamingMessageId}
                   isStreaming={isStreaming}
-                  streamingResponse={msg.id === streamingMessageId ? streamingResponse : ""}
+                  streamingResponse={
+                    msg.id === streamingMessageId ? streamingResponse : ""
+                  }
                   activeContextMenu={activeContextMenu}
                   setActiveContextMenu={setActiveContextMenu}
                   handleCopyMessage={handleCopyMessage}
@@ -420,6 +535,7 @@ const Chat: React.FC<ChatProps> = () => {
             sendMessage={sendMessage}
             loading={loading}
             isUploadingDocs={isUploadingDocs}
+            isProcessingDocs={isProcessingDocs}
             searchOptions={searchOptions}
             onSearchOptionsChange={handleSearchOptionsChange}
             searchSuggestions={[]}
@@ -428,6 +544,13 @@ const Chat: React.FC<ChatProps> = () => {
             onRecentSearchSelect={handleRecentSearchSelect}
             selectedModel={selectedModel}
             onFileUpload={handleFileUpload}
+            pendingDocuments={pendingDocuments.map((doc) => ({
+              clientId: doc.clientId,
+              name: doc.filename,
+              isUploading: doc.isUploading,
+              processingStatus: doc.processingStatus,
+            }))}
+            onFileRemove={handleFileRemove}
             models={models}
             useTools={useTools}
             onUseToolsChange={setUseTools}
