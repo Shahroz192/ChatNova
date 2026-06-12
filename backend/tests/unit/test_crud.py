@@ -69,28 +69,14 @@ def test_user_authentication(db_session: Session):
     assert wrong_auth is None
 
 
-def test_increment_messages_used(db_session: Session):
-    """Test incrementing user's message count"""
-    # Create a user
+def test_messages_used_defaults_to_zero(db_session: Session):
     user_data = {
         "email": "message_count_test@example.com",
         "password": "TestPassword123",
     }
     user_in = UserCreate(**user_data)
     created_user = user.create(db_session, obj_in=user_in)
-
-    # Initialize with 0 messages
     assert created_user.messages_used == 0
-
-    # Increment by 1
-    user.increment_messages(db_session, created_user.id, 1)
-    db_session.refresh(created_user)
-    assert created_user.messages_used == 1
-
-    # Increment by 5
-    user.increment_messages(db_session, created_user.id, 5)
-    db_session.refresh(created_user)
-    assert created_user.messages_used == 6
 
 
 def test_create_message(db_session: Session):

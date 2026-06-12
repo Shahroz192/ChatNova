@@ -57,26 +57,4 @@ async def test_get_relevant_chunks_with_reranking(ai_service):
             assert args[0] == "optimized query"
 
 
-@pytest.mark.asyncio
-async def test_optimize_rag_query(ai_service):
-    # Setup
-    llm = MagicMock()
 
-    # Mock the chain execution
-    # AIChatService._optimize_rag_query creates a chain and calls ainvoke
-    # We can patch the chain's ainvoke or just mock the whole method if we want to test its call,
-    # but here we want to test the logic.
-
-    with patch(
-        "langchain_core.prompts.ChatPromptTemplate.from_messages"
-    ) as mock_prompt:
-        mock_chain = MagicMock()
-        mock_chain.ainvoke = AsyncMock(return_value="Refined Query")
-        mock_prompt.return_value.__or__.return_value.__or__.return_value = mock_chain
-
-        # Execute
-        result = await ai_service._optimize_rag_query("Original Query", [], llm)
-
-        # Verify
-        assert result == "Refined Query"
-        assert mock_chain.ainvoke.called

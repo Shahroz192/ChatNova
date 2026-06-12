@@ -136,4 +136,31 @@ describe('ChatInput Component', () => {
     const sendButton = screen.getByTitle(/Send message/i);
     expect(sendButton).toBeDisabled();
   });
+
+  it('removes pending documents by client id', () => {
+    const onFileRemove = vi.fn();
+    render(
+      <ChatInput
+        input=""
+        setInput={vi.fn()}
+        sendMessage={vi.fn()}
+        loading={false}
+        selectedModel="gemini-2.0-flash"
+        onFileUpload={vi.fn()}
+        pendingDocuments={[
+          { clientId: 'doc-a', name: 'alpha.pdf', isUploading: false },
+          { clientId: 'doc-b', name: 'beta.pdf', isUploading: true },
+        ]}
+        onFileRemove={onFileRemove}
+      />
+    );
+
+    expect(screen.getByText('alpha.pdf')).toBeInTheDocument();
+    expect(screen.getByText('beta.pdf (Uploading...)')).toBeInTheDocument();
+
+    const removeButtons = document.querySelectorAll('.doc-item .remove-attachment');
+    fireEvent.click(removeButtons[0]);
+
+    expect(onFileRemove).toHaveBeenCalledWith('doc-a');
+  });
 });

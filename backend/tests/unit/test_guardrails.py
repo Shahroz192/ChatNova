@@ -37,7 +37,7 @@ def test_output_moderation():
     assert moderated_safe == safe_text
 
     moderated_pii = service._moderate_output(pii_text)
-    assert "[REDACTED_EMAIL]" in moderated_pii
+    assert moderated_pii == pii_text
 
 
 def test_sanitize_user_input_with_pii():

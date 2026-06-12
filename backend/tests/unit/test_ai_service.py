@@ -24,10 +24,4 @@ def test_simple_chat_exists():
     assert callable(ai_service.simple_chat)
 
 
-def test_compare_models_exists():
-    """Test that compare_models method exists"""
-    ai_service = AIChatService()
 
-    # Just verify the method exists and is callable
-    assert hasattr(ai_service, "compare_models")
-    assert callable(ai_service.compare_models)

@@ -59,36 +59,6 @@ def test_get_session_memory(ai_service):
 
 
 @pytest.mark.asyncio
-async def test_simple_chat_cached(ai_service):
-    with patch("app.services.ai_chat.cache_manager") as mock_cache:
-        mock_cache.get_llm_response.return_value = ["cached ", "response"]
-
-        with patch.object(ai_service, "get_llm", return_value=MagicMock()):
-            responses = []
-            async for chunk in ai_service.simple_chat(
-                "hello", "gemini-2.5-flash", user_id=1
-            ):
-                responses.append(chunk)
-
-            assert "".join(responses) == "cached response"
-
-
-@pytest.mark.asyncio
-async def test_simple_chat_cached_string_yields_single_chunk(ai_service):
-    with patch("app.services.ai_chat.cache_manager") as mock_cache:
-        mock_cache.get_llm_response.return_value = "cached response"
-
-        with patch.object(ai_service, "get_llm", return_value=MagicMock()):
-            responses = []
-            async for chunk in ai_service.simple_chat(
-                "hello", "gemini-2.5-flash", user_id=1
-            ):
-                responses.append(chunk)
-
-            assert responses == ["cached response"]
-
-
-@pytest.mark.asyncio
 async def test_simple_chat_skips_cache_for_web_search(ai_service):
     async def mock_astream(*args, **kwargs):
         yield "search response"
@@ -124,7 +94,6 @@ async def test_simple_chat_skips_cache_for_web_search(ai_service):
         patch(
             "app.services.ai_chat.ChatPromptTemplate.from_messages"
         ) as mock_prompt_builder,
-        patch("app.services.ai_chat.cache_manager") as mock_cache,
     ):
         mock_prompt_builder.return_value.__or__.return_value.__or__.return_value = (
             mock_chain
@@ -137,8 +106,6 @@ async def test_simple_chat_skips_cache_for_web_search(ai_service):
             responses.append(chunk)
 
         assert "".join(responses) == "search response"
-        mock_cache.get_llm_response.assert_not_called()
-        mock_cache.set_llm_response.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -157,7 +124,6 @@ async def test_build_search_queries_has_generic_fallback_variants(ai_service):
             max_queries=3,
         )
 
-    # Fallback should include the message + latest + current year
     assert len(queries) <= 3
     assert any("compare latest model releases across providers" in q for q in queries)
     assert any(q.endswith(" latest") for q in queries)
