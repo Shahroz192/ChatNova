@@ -13,9 +13,8 @@ def test_sanitize_user_input():
 
 @pytest.fixture
 def ai_service():
-    with patch("app.services.ai_chat.MCPClient.from_config_file"):
-        service = AIChatService()
-        return service
+    service = AIChatService()
+    return service
 
 
 def test_get_provider_key(ai_service):

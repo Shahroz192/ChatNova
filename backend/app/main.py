@@ -23,10 +23,8 @@ except Exception as e:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     web_search_service.start()
     yield
-    # Shutdown
     web_search_service.shutdown()
 
 

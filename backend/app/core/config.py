@@ -1,11 +1,6 @@
 import logging
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
-import os
-
-
-_current_dir = os.path.dirname(os.path.abspath(__file__))
-mcp_path = os.path.join(_current_dir, "../mcp.json")
 
 
 class Settings(BaseSettings):

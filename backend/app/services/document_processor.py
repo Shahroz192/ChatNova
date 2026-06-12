@@ -1,7 +1,7 @@
 from typing import List
 import fitz  # PyMuPDF
 from docx import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
 class DocumentProcessor:

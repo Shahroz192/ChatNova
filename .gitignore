@@ -68,3 +68,6 @@ Untitled
 # Mypy cache
 .mypy_cache/
 
+# Lock files
+uv.lock
+
