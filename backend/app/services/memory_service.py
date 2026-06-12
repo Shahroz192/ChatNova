@@ -1,5 +1,5 @@
 import logging
-from typing import Any, List
+from typing import Any, List, Optional
 from sqlalchemy.orm import Session
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -54,8 +54,16 @@ class MemoryService:
         message: str,
         user_id: int,
         llm: Any,
+        db: Optional[Session] = None,
     ) -> List[str]:
-        """Extract permanent facts from a user message and save them to memory."""
+        """Extract permanent facts from a user message and save them to memory.
+
+        Args:
+            message: The user message to extract facts from.
+            user_id: The user ID to associate memories with.
+            llm: The LLM instance to use for extraction.
+            db: Optional existing DB session. If not provided, a new SessionLocal is opened.
+        """
         saved_facts = []
 
         extract_prompt = ChatPromptTemplate.from_messages(
@@ -79,20 +87,25 @@ class MemoryService:
 
             facts = [f.strip("- ").strip() for f in result.split("\n") if f.strip()]
 
-            with SessionLocal() as db:
-                # Get existing memories to avoid duplicates
+            session_to_use = db or SessionLocal()
+            try:
                 existing_memories = memory_crud.get_by_user(
-                    db, user_id=user_id, limit=100
+                    session_to_use, user_id=user_id, limit=100
                 )
                 existing_contents = [m.content.lower() for m in existing_memories]
 
                 for fact in facts:
                     if fact.lower() not in existing_contents and fact != "NONE":
                         memory_crud.create_with_user(
-                            db, obj_in=MemoryCreate(content=fact), user_id=user_id
+                            session_to_use,
+                            obj_in=MemoryCreate(content=fact),
+                            user_id=user_id,
                         )
                         saved_facts.append(fact)
                         logging.info(f"Saved new memory for user {user_id}: {fact}")
+            finally:
+                if db is None:
+                    session_to_use.close()
 
             return saved_facts
 

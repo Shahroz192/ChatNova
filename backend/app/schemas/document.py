@@ -20,6 +20,7 @@ class DocumentUpdate(BaseModel):
 class Document(DocumentBase):
     id: int
     user_id: int
+    processing_status: str = "pending"  # pending, processing, completed, failed
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

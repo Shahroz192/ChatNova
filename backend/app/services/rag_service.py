@@ -46,6 +46,7 @@ class RAGService:
         limit: int = 5,
         llm: Optional[Any] = None,
         chat_history: Optional[List[Any]] = None,
+        document_ids: Optional[List[int]] = None,
     ) -> Dict[str, Any]:
         """Retrieve and rerank relevant document chunks for the current query and session."""
         try:
@@ -71,6 +72,9 @@ class RAGService:
             query_filter = sa.or_(
                 *[DocumentChunk.content.ilike(f"%{term}%") for term in search_terms]
             )
+            document_filter = []
+            if document_ids:
+                document_filter.append(SessionDocument.id.in_(document_ids))
 
             if has_vector:
                 from app.services.embedding_service import EmbeddingService
@@ -88,6 +92,7 @@ class RAGService:
                         .filter(
                             SessionDocument.session_id == session_id,
                             SessionDocument.user_id == user_id,
+                            *document_filter,
                         )
                         .order_by(
                             DocumentChunk.embedding.cosine_distance(query_embedding)
@@ -103,6 +108,7 @@ class RAGService:
                         .filter(
                             SessionDocument.session_id == session_id,
                             SessionDocument.user_id == user_id,
+                            *document_filter,
                         )
                         .filter(query_filter)
                         .limit(candidate_limit // 2)
@@ -124,6 +130,7 @@ class RAGService:
                         .filter(
                             SessionDocument.session_id == session_id,
                             SessionDocument.user_id == user_id,
+                            *document_filter,
                         )
                         .filter(query_filter)
                         .limit(candidate_limit)
@@ -136,6 +143,7 @@ class RAGService:
                     .filter(
                         SessionDocument.session_id == session_id,
                         SessionDocument.user_id == user_id,
+                        *document_filter,
                     )
                     .filter(query_filter)
                     .limit(candidate_limit)
@@ -150,6 +158,7 @@ class RAGService:
                     .filter(
                         SessionDocument.session_id == session_id,
                         SessionDocument.user_id == user_id,
+                        *document_filter,
                     )
                     .order_by(DocumentChunk.created_at.desc())
                     .limit(limit)
@@ -159,8 +168,33 @@ class RAGService:
             if not candidates:
                 return {"text": "", "sources": []}
 
-            # 3. Rerank Candidates
-            chunks = rerank_service.rerank(optimized_query, candidates, top_n=limit)
+            # 3. Rerank Candidates. Pull a wider set, then keep coverage across files
+            reranked_candidates = rerank_service.rerank(
+                optimized_query, candidates, top_n=max(limit * 2, len(document_ids or []))
+            )
+
+            chunks = []
+            covered_docs = set()
+
+            # First pass: prefer at least one chunk from each document when possible.
+            for chunk in reranked_candidates:
+                if chunk.document_id in covered_docs:
+                    continue
+                chunks.append(chunk)
+                covered_docs.add(chunk.document_id)
+                if len(chunks) >= limit:
+                    break
+
+            # Second pass: fill any remaining slots by relevance.
+            if len(chunks) < limit:
+                selected_chunk_ids = {chunk.id for chunk in chunks}
+                for chunk in reranked_candidates:
+                    if chunk.id in selected_chunk_ids:
+                        continue
+                    chunks.append(chunk)
+                    selected_chunk_ids.add(chunk.id)
+                    if len(chunks) >= limit:
+                        break
 
             context_parts = []
             sources = []
@@ -178,7 +212,8 @@ class RAGService:
             return {
                 "text": "\n\n### DOCUMENT CONTEXT (RAG)\n"
                 "Use the following information from the user's uploaded files to answer their question. "
-                "If the answer is found here, prioritize it.\n\n"
+                "If the answer is found here, prioritize it. "
+                f"Attached files for this turn: {', '.join(sorted({chunk.document.filename for chunk in chunks}))}.\n\n"
                 + "\n---\n".join(context_parts),
                 "sources": sources,
             }

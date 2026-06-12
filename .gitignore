@@ -46,3 +46,25 @@ pnpm-debug.log*
 
 # Local env files
 .env*.local
+
+# Runtime uploaded files
+backend/uploads/
+
+# Generated design docs and temp files
+DESIGN.html
+Untitled
+
+# Editor / local config
+.codex
+.config/
+
+# Python egg dists
+*.egg
+
+# SQLite databases (used in local dev/testing)
+*.db
+*.sqlite3
+
+# Mypy cache
+.mypy_cache/
+

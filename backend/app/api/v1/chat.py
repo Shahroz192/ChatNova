@@ -1,16 +1,12 @@
-import asyncio
-import gzip
 import json
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, AsyncGenerator, Dict, Optional
 
 from app import crud
 from app.api.deps import get_current_active_user, get_db
 from app.core.input_validation import InputSanitizer
-from app.core.profiler import request_profiler
-from app.crud.document import chunk as chunk_crud
 from app.crud.document import document as document_crud
 from app.models.user import User
 from app.schemas.document import Document as DocumentSchema
@@ -22,9 +18,9 @@ from app.schemas.session import (
     ChatSessionUpdate,
 )
 from app.services.ai_chat import ai_service
-from app.services.document_processor import DocumentProcessor
-from app.services.embedding_service import EmbeddingService
+from app.services.document_task_service import process_document_task
 from app.services.session_service import session_service
+from app.utils.pagination import compute_pagination_meta
 from fastapi import (
     APIRouter,
     BackgroundTasks,
@@ -38,9 +34,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from starlette.responses import FileResponse
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 router = APIRouter()
 
@@ -51,9 +45,58 @@ def _validate_session_ownership(db: Session, session_id: int, user_id: int) -> N
         raise HTTPException(status_code=404, detail="Session not found")
 
 
+# ---------------------------------------------------------------------------
+# Shared SSE helpers
+# ---------------------------------------------------------------------------
+def _format_sse_data(chunk: str) -> str:
+    """Format data as a Server-Sent Event line."""
+    lines = chunk.split("\n")
+    return "".join(f"data: {line}\n" for line in lines) + "\n"
+
+
+def _update_session_title_if_needed(
+    db: Session,
+    session_id: int,
+    user_message: str,
+    max_title_len: int = 60,
+) -> None:
+    """Update a 'New Chat' session title to the first user message."""
+    if not session_id:
+        return
+    session_obj = crud.session.get(db, id=session_id)
+    if session_obj and (
+        session_obj.title == "New Chat"
+        or not session_obj.title
+        or session_obj.title.strip() == ""
+    ):
+        new_title = user_message[:max_title_len]
+        if len(user_message) > max_title_len:
+            new_title += "..."
+        crud.session.update(
+            db, db_obj=session_obj, obj_in=ChatSessionUpdate(title=new_title)
+        )
+
+
+async def _extract_memories_events(
+    message: str,
+    user_id: int,
+    model: str,
+    db: Optional[Session] = None,
+) -> AsyncGenerator[str, None]:
+    """Extract memories and yield SSE-formatted events."""
+    try:
+        saved_facts = await ai_service.extract_and_save_memories(
+            message, user_id, model, db=db
+        )
+        for fact in saved_facts:
+            event = json.dumps({"type": "memory_saved", "content": fact})
+            yield _format_sse_data(event)
+    except Exception as e:
+        logging.error(f"Failed to process memories: {e}")
+
+
 # Session Management Endpoints
 @router.post("/sessions", response_model=ChatSession)
-@request_profiler.profile_endpoint("/sessions", "POST")
 def create_session(
     session_in: ChatSessionCreate,
     db: Session = Depends(get_db),
@@ -69,7 +112,6 @@ def create_session(
 
 
 @router.get("/sessions", response_model=ChatSessionPagination)
-@request_profiler.profile_endpoint("/sessions", "GET")
 def get_user_sessions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -94,30 +136,17 @@ def get_user_sessions(
         search=search,
     )
 
-    # Get total count for pagination metadata (with search filter if provided)
-    total_count = crud.session.count_by_user(db, user_id=current_user.id, search=search)
-
-    # Calculate pagination metadata
-    has_more = (skip + limit) < total_count
-    current_page = (skip // limit) + 1
-    total_pages = (total_count + limit - 1) // limit
+    total_count = crud.session.count_by_user(
+        db, user_id=current_user.id, search=search
+    )
 
     return ChatSessionPagination(
         data=sessions,
-        meta={
-            "total": total_count,
-            "page": current_page,
-            "per_page": limit,
-            "total_pages": total_pages,
-            "has_more": has_more,
-            "skip": skip,
-            "limit": limit,
-        },
+        meta=compute_pagination_meta(skip, limit, total_count),
     )
 
 
 @router.get("/sessions/{session_id}", response_model=ChatSession)
-@request_profiler.profile_endpoint("/sessions/{session_id}", "GET")
 def get_session(
     session_id: int,
     db: Session = Depends(get_db),
@@ -133,7 +162,6 @@ def get_session(
 
 
 @router.put("/sessions/{session_id}", response_model=ChatSession)
-@request_profiler.profile_endpoint("/sessions/{session_id}", "PUT")
 def update_session(
     session_id: int,
     session_update: ChatSessionUpdate,
@@ -152,7 +180,6 @@ def update_session(
 
 
 @router.delete("/sessions/{session_id}")
-@request_profiler.profile_endpoint("/sessions/{session_id}", "DELETE")
 def delete_session(
     session_id: int,
     db: Session = Depends(get_db),
@@ -168,7 +195,6 @@ def delete_session(
 
 
 @router.get("/sessions/{session_id}/messages", response_model=MessagePagination)
-@request_profiler.profile_endpoint("/sessions/{session_id}/messages", "GET")
 def get_session_messages(
     session_id: int,
     db: Session = Depends(get_db),
@@ -191,32 +217,17 @@ def get_session_messages(
         db, session_id, current_user, skip=skip, limit=limit, newest_first=newest_first
     )
 
-    # Get total count for pagination metadata
     total_count = crud.message.count_by_user(
         db, user_id=current_user.id, session_id=session_id
     )
 
-    # Calculate pagination metadata
-    has_more = (skip + limit) < total_count
-    current_page = (skip // limit) + 1
-    total_pages = (total_count + limit - 1) // limit
-
     return MessagePagination(
         data=messages,
-        meta={
-            "total": total_count,
-            "page": current_page,
-            "per_page": limit,
-            "total_pages": total_pages,
-            "has_more": has_more,
-            "skip": skip,
-            "limit": limit,
-        },
+        meta=compute_pagination_meta(skip, limit, total_count),
     )
 
 
 @router.delete("/sessions/{session_id}/messages")
-@request_profiler.profile_endpoint("/sessions/{session_id}/messages", "DELETE")
 def delete_session_messages(
     session_id: int,
     db: Session = Depends(get_db),
@@ -243,7 +254,6 @@ def delete_session_messages(
 
 
 @router.post("/chat", response_model=Message)
-@request_profiler.profile_endpoint("/chat", "POST")
 async def chat(
     message_in: MessageCreate,
     background_tasks: BackgroundTasks,
@@ -270,6 +280,7 @@ async def chat(
         session_id,
         message_in.search_web,
         images=message_in.images,
+        document_ids=message_in.document_ids,
     ):
         response += chunk
     msg = crud.message.create(
@@ -280,23 +291,10 @@ async def chat(
         session_id=session_id,
     )
 
-    # If this is a new session or the session has "New Chat" as title, update it with the first message
-    if session_id:
-        session_obj = crud.session.get(db, id=session_id)
-        if session_obj and (
-            session_obj.title == "New Chat"
-            or not session_obj.title
-            or session_obj.title.strip() == ""
-        ):
-            # Truncate title to 60 characters to match frontend
-            new_title = message_in.content[:60]
-            if len(message_in.content) > 60:
-                new_title += "..."
-            crud.session.update(
-                db, db_obj=session_obj, obj_in=ChatSessionUpdate(title=new_title)
-            )
+    # Update session title from 'New Chat' to the first message if needed
+    _update_session_title_if_needed(db, session_id, message_in.content)
 
-    # Extract memories from the user message synchronously
+    # Extract memories from the user message
     saved_memories = []
     try:
         saved_memories = await ai_service.extract_and_save_memories(
@@ -312,8 +310,7 @@ async def chat(
 
 
 @router.post("/chat-with-tools", response_model=Message)
-@request_profiler.profile_endpoint("/chat-with-tools", "POST")
-def chat_with_tools(
+async def chat_with_tools(
     message_in: MessageCreate,
     background_tasks: BackgroundTasks,
     session_id: Optional[int] = Query(
@@ -329,10 +326,8 @@ def chat_with_tools(
     if session_id is not None:
         _validate_session_ownership(db, session_id, current_user.id)
 
-    response = asyncio.run(
-        ai_service.agent_chat(
-            message_in.content, message_in.model, current_user.id, db, session_id
-        )
+    response = await ai_service.agent_chat(
+        message_in.content, message_in.model, current_user.id, db, session_id
     )
     msg = crud.message.create(
         db,
@@ -342,32 +337,16 @@ def chat_with_tools(
         session_id=session_id,
     )
 
-    # If this is a new session or the session has "New Chat" as title, update it with the first message
-    if session_id:
-        session_obj = crud.session.get(db, id=session_id)
-        if session_obj and (
-            session_obj.title == "New Chat"
-            or not session_obj.title
-            or session_obj.title.strip() == ""
-        ):
-            # Truncate title to 60 characters to match frontend
-            new_title = message_in.content[:60]
-            if len(message_in.content) > 60:
-                new_title += "..."
-            crud.session.update(
-                db, db_obj=session_obj, obj_in=ChatSessionUpdate(title=new_title)
-            )
+    # Update session title from 'New Chat' to the first message if needed
+    _update_session_title_if_needed(db, session_id, message_in.content)
 
-    # Extract memories from the user message synchronously
+    # Extract memories from the user message
     saved_memories = []
     try:
-        # Since this endpoint is def (sync), we use asyncio.run to call the async extract method
-        saved_memories = asyncio.run(
-            ai_service.extract_and_save_memories(
-                message_in.content,
-                current_user.id,
-                message_in.model,
-            )
+        saved_memories = await ai_service.extract_and_save_memories(
+            message_in.content,
+            current_user.id,
+            message_in.model,
         )
     except Exception as e:
         logger.error(f"Failed to extract memories in chat-with-tools: {e}")
@@ -377,7 +356,6 @@ def chat_with_tools(
 
 
 @router.post("/chat/stream")
-@request_profiler.profile_endpoint("/chat/stream", "POST")
 def chat_stream(
     message_in: MessageCreate,
     background_tasks: BackgroundTasks,
@@ -389,48 +367,28 @@ def chat_stream(
 ):
     """
     Stream AI response in real-time using Server-Sent Events.
-    Optionally associate with a session for conversation context.
+    All content chunks are wrapped in JSON for clean multiline handling.
     """
     if session_id is not None:
         _validate_session_ownership(db, session_id, current_user.id)
 
-    def _format_sse_data(chunk: str) -> str:
-        # SSE requires each line to be prefixed with "data: "
-        # Preserve empty lines by emitting an empty data field.
-        lines = chunk.split("\n")
-        return "".join(f"data: {line}\n" for line in lines) + "\n"
-
     async def stream_response():
+        msg = None
+        full_response = ""
         try:
-            # Create message record first
             msg = crud.message.create(
                 db,
                 obj_in=message_in,
-                response="",  # Empty initial response
+                response="",
                 user_id=current_user.id,
                 session_id=session_id,
             )
+            yield _format_sse_data(
+                json.dumps({"type": "metadata", "message_id": msg.id})
+            )
 
-            # If this is a new session or the session has "New Chat" as title, update it with the first message
-            if session_id:
-                session_obj = crud.session.get(db, id=session_id)
-                if session_obj and (
-                    session_obj.title == "New Chat"
-                    or not session_obj.title
-                    or session_obj.title.strip() == ""
-                ):
-                    # Truncate title to 60 characters to match frontend
-                    new_title = message_in.content[:60]
-                    if len(message_in.content) > 60:
-                        new_title += "..."
-                    crud.session.update(
-                        db,
-                        db_obj=session_obj,
-                        obj_in=ChatSessionUpdate(title=new_title),
-                    )
+            _update_session_title_if_needed(db, session_id, message_in.content)
 
-            # Stream the AI response
-            full_response = ""
             async for chunk in ai_service.simple_chat(
                 message_in.content,
                 message_in.model,
@@ -439,33 +397,35 @@ def chat_stream(
                 session_id,
                 message_in.search_web,
                 images=message_in.images,
+                document_ids=message_in.document_ids,
             ):
                 full_response += chunk
-
-                # Send chunk to client
-                yield _format_sse_data(chunk)
-
-            # Update the message with the complete response
-            crud.message.update(db, db_obj=msg, obj_in={"response": full_response})
-
-            # Extract memories and yield notification events
-            try:
-                saved_facts = await ai_service.extract_and_save_memories(
-                    message_in.content,
-                    current_user.id,
-                    message_in.model,
+                # Wrap in JSON so multiline content doesn't break SSE boundaries
+                yield _format_sse_data(
+                    json.dumps({"type": "content", "content": chunk})
                 )
-                for fact in saved_facts:
-                    memory_event = json.dumps({"type": "memory_saved", "content": fact})
-                    yield _format_sse_data(memory_event)
-            except Exception as e:
-                logging.error(f"Failed to process memories in stream: {e}")
 
-            # Send completion signal
+            if msg:
+                crud.message.update(db, db_obj=msg, obj_in={"response": full_response})
+
+            # Yield memory events
+            async for mem_event in _extract_memories_events(
+                message_in.content, current_user.id, message_in.model, db
+            ):
+                yield mem_event
+
             yield "data: [DONE]\n\n"
 
         except Exception as e:
+            logging.error(f"Streaming error: {e}")
             yield f"data: ERROR: {str(e)}\n\n"
+        finally:
+            if msg and not full_response.strip():
+                try:
+                    crud.message.remove(db, id=msg.id)
+                    logging.info(f"Cleaned up empty/failed message record {msg.id}")
+                except Exception as cleanup_err:
+                    logging.error(f"Failed to cleanup message {msg.id}: {cleanup_err}")
 
     return StreamingResponse(
         stream_response(),
@@ -473,14 +433,12 @@ def chat_stream(
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "Cache-Control",
         },
     )
 
 
 @router.post("/chat/agent-stream")
-@request_profiler.profile_endpoint("/chat/agent-stream", "POST")
 def chat_agent_stream(
     message_in: MessageCreate,
     background_tasks: BackgroundTasks,
@@ -497,37 +455,23 @@ def chat_agent_stream(
     if session_id is not None:
         _validate_session_ownership(db, session_id, current_user.id)
 
-    def _format_sse_data(chunk: str) -> str:
-        lines = chunk.split("\n")
-        return "".join(f"data: {line}\n" for line in lines) + "\n"
-
     async def stream_response():
+        msg = None
+        full_response = ""
         try:
             msg = crud.message.create(
                 db,
                 obj_in=message_in,
-                response="",  # Empty initial response
+                response="",
                 user_id=current_user.id,
                 session_id=session_id,
             )
+            yield _format_sse_data(
+                json.dumps({"type": "metadata", "message_id": msg.id})
+            )
 
-            if session_id:
-                session_obj = crud.session.get(db, id=session_id)
-                if session_obj and (
-                    session_obj.title == "New Chat"
-                    or not session_obj.title
-                    or session_obj.title.strip() == ""
-                ):
-                    new_title = message_in.content[:60]
-                    if len(message_in.content) > 60:
-                        new_title += "..."
-                    crud.session.update(
-                        db,
-                        db_obj=session_obj,
-                        obj_in=ChatSessionUpdate(title=new_title),
-                    )
+            _update_session_title_if_needed(db, session_id, message_in.content)
 
-            full_response = ""
             async for chunk in ai_service.agent_chat_stream(
                 message_in.content,
                 message_in.model,
@@ -544,26 +488,31 @@ def chat_agent_stream(
                 except (json.JSONDecodeError, Exception):
                     pass
 
-            crud.message.update(db, db_obj=msg, obj_in={"response": full_response})
+            if msg:
+                crud.message.update(db, db_obj=msg, obj_in={"response": full_response})
 
-            # Extract memories and yield notification events
-            try:
-                saved_facts = await ai_service.extract_and_save_memories(
-                    message_in.content,
-                    current_user.id,
-                    message_in.model,
-                )
-                for fact in saved_facts:
-                    memory_event = json.dumps({"type": "memory_saved", "content": fact})
-                    yield _format_sse_data(memory_event)
-            except Exception as e:
-                logging.error(f"Failed to process memories in agent stream: {e}")
+            async for mem_event in _extract_memories_events(
+                message_in.content, current_user.id, message_in.model, db
+            ):
+                yield mem_event
 
             yield "data: [DONE]\n\n"
 
         except Exception as e:
+            logging.error(f"Agent streaming error: {e}")
             error_event = json.dumps({"type": "error", "content": str(e)})
             yield f"data: {error_event}\n\n"
+        finally:
+            if msg and not full_response.strip():
+                try:
+                    crud.message.remove(db, id=msg.id)
+                    logging.info(
+                        f"Cleaned up empty/failed agent message record {msg.id}"
+                    )
+                except Exception as cleanup_err:
+                    logging.error(
+                        f"Failed to cleanup agent message {msg.id}: {cleanup_err}"
+                    )
 
     return StreamingResponse(
         stream_response(),
@@ -571,14 +520,12 @@ def chat_agent_stream(
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "Cache-Control",
         },
     )
 
 
 @router.get("/chat/history", response_model=MessagePagination)
-@request_profiler.profile_endpoint("/chat/history", "GET")
 def get_chat_history(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -619,6 +566,20 @@ def get_chat_history(
     # Apply field filtering if specified
     if fields:
         selected_fields = [f.strip() for f in fields.split(",")]
+        # Ensure mandatory fields for Message schema are always included
+        # to avoid validation errors, unless we switch to a different schema.
+        mandatory_fields = [
+            "id",
+            "content",
+            "response",
+            "model",
+            "user_id",
+            "created_at",
+        ]
+        for field in mandatory_fields:
+            if field not in selected_fields:
+                selected_fields.append(field)
+
         filtered_messages = []
         for msg in messages:
             filtered_msg = {
@@ -629,71 +590,13 @@ def get_chat_history(
             filtered_messages.append(filtered_msg)
         messages = filtered_messages
 
-    # Calculate pagination metadata
-    has_more = (skip + limit) < total_count
-    current_page = (skip // limit) + 1
-    total_pages = (total_count + limit - 1) // limit
-
     return MessagePagination(
         data=messages,
-        meta={
-            "total": total_count,
-            "page": current_page,
-            "per_page": limit,
-            "total_pages": total_pages,
-            "has_more": has_more,
-            "skip": skip,
-            "limit": limit,
-        },
+        meta=compute_pagination_meta(skip, limit, total_count),
     )
-
-
-@router.get("/chat/history/stream", response_class=StreamingResponse)
-@request_profiler.profile_endpoint("/chat/history/stream", "GET")
-def stream_chat_history(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
-    limit: int = Query(50, ge=1, le=100, description="Number of records to return"),
-    newest_first: bool = Query(
-        True, description="Order by newest first (true) or oldest first (false)"
-    ),
-    compress: bool = Query(False, description="Compress response with gzip"),
-):
-    """
-    Stream chat history for the current user.
-    Useful for large datasets where client handles decompression.
-    """
-    messages = crud.message.get_by_user(
-        db, user_id=current_user.id, skip=skip, limit=limit, newest_first=newest_first
-    )
-
-    def generate():
-        # Send messages as JSON lines
-        for msg in messages:
-            msg_dict = msg.__dict__
-            # Remove SQLAlchemy internal attributes
-            msg_dict = {k: v for k, v in msg_dict.items() if not k.startswith("_")}
-
-            line = json.dumps(msg_dict) + "\n"
-
-            if compress:
-                yield gzip.compress(line.encode("utf-8"))
-            else:
-                yield line.encode("utf-8")
-
-    if compress:
-        return StreamingResponse(
-            generate(),
-            media_type="application/x-ndjson",
-            headers={"Content-Encoding": "gzip"},
-        )
-    else:
-        return StreamingResponse(generate(), media_type="application/x-ndjson")
 
 
 @router.delete("/chat/history")
-@request_profiler.profile_endpoint("/chat/history", "DELETE")
 def delete_chat_history(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -715,7 +618,6 @@ def delete_chat_history(
 
 
 @router.delete("/chat/history/{message_id}")
-@request_profiler.profile_endpoint("/chat/history/{message_id}", "DELETE")
 def delete_chat_message(
     message_id: int,
     db: Session = Depends(get_db),
@@ -746,7 +648,6 @@ def delete_chat_message(
 
 
 @router.post("/chat/models/test", response_model=Dict[str, Any])
-@request_profiler.profile_endpoint("/chat/models/test", "POST")
 async def test_ai_models(
     test_input: str = Query(
         "Hello, how are you?", description="Test input for all models"
@@ -781,7 +682,6 @@ async def test_ai_models(
 
 
 @router.post("/chat/models/test/{provider}")
-@request_profiler.profile_endpoint("/chat/models/test/{provider}", "POST")
 async def test_provider_key(
     provider: str,
     request: Dict[str, Any],
@@ -823,7 +723,6 @@ async def test_provider_key(
 
 
 @router.get("/chat/models", response_model=Dict[str, Any])
-@request_profiler.profile_endpoint("/chat/models", "GET")
 def get_available_models(
     db: Session = Depends(get_db),
     current_user: User = Depends(
@@ -839,51 +738,7 @@ def get_available_models(
     }
 
 
-async def process_document_task(
-    file_path: str, document_id: int, user_id: int, db_session_factory: Any
-):
-    """Background task to process, chunk, and index a document."""
-    db = db_session_factory()
-    try:
-        doc_record = document_crud.get(db, id=document_id)
-        if not doc_record:
-            return
-
-        text = DocumentProcessor.extract_text(file_path, doc_record.file_type)
-        if not text:
-            logging.warning(f"No text extracted from {file_path}")
-            return
-
-        chunks = DocumentProcessor.chunk_text(text)
-
-        from app.models.document import has_vector
-
-        embeddings = None
-        if has_vector:
-            embedding_service = EmbeddingService(user_id, db)
-            embeddings = await embedding_service.embed_chunks(chunks)
-
-        for i, content in enumerate(chunks):
-            chunk_data = {
-                "document_id": document_id,
-                "content": content,
-            }
-            if embeddings and i < len(embeddings):
-                chunk_data["embedding"] = embeddings[i]
-
-            chunk_crud.create(
-                db,
-                obj_in=chunk_data,
-            )
-        logging.info(f"Processed document {document_id}: {len(chunks)} chunks indexed.")
-    except Exception as e:
-        logging.error(f"Error processing document {document_id}: {e}")
-    finally:
-        db.close()
-
-
 @router.post("/chat/upload", response_model=DocumentSchema)
-@request_profiler.profile_endpoint("/chat/upload", "POST")
 async def upload_file(
     background_tasks: BackgroundTasks,
     session_id: int = Query(...),
@@ -957,8 +812,28 @@ def preview_document(
     )
 
 
+@router.get("/chat/documents/{document_id}/status")
+def get_document_status(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Get the processing status of a document.
+    Returns: pending, processing, completed, or failed
+    """
+    doc_record = document_crud.get(db, id=document_id)
+    if not doc_record or doc_record.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    return {
+        "document_id": document_id,
+        "status": doc_record.processing_status,
+        "filename": doc_record.filename,
+    }
+
+
 @router.post("/chat/transcribe")
-@request_profiler.profile_endpoint("/chat/transcribe", "POST")
 def transcribe_audio(
     audio: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -967,12 +842,27 @@ def transcribe_audio(
     """
     Transcribe audio using Groq's Whisper model.
     Accepts an audio file and returns the transcribed text.
+    Max file size: 25MB to prevent DOS.
     """
+    MAX_AUDIO_SIZE = 25 * 1024 * 1024  # 25MB
     try:
+        # Check Content-Length before reading to avoid buffering huge files
+        if audio.size and audio.size > MAX_AUDIO_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Audio file too large. Maximum size is {MAX_AUDIO_SIZE // (1024 * 1024)}MB.",
+            )
         audio_content = audio.file.read()
+        if len(audio_content) > MAX_AUDIO_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Audio file too large. Maximum size is {MAX_AUDIO_SIZE // (1024 * 1024)}MB.",
+            )
         transcription = ai_service.transcribe_audio(
             audio_content, audio.filename or "audio.wav", user_id=current_user.id, db=db
         )
         return {"text": transcription}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")

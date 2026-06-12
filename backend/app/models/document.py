@@ -52,6 +52,9 @@ class SessionDocument(Base):
     message_id = Column(
         Integer, ForeignKey("messages.id", ondelete="SET NULL"), nullable=True
     )
+    processing_status = Column(
+        String, nullable=False, server_default="pending"
+    )  # pending, processing, completed, failed
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     session = relationship("ChatSession", back_populates="documents")

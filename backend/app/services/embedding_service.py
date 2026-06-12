@@ -1,15 +1,25 @@
-from typing import List
+from typing import List, Optional
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from sqlalchemy.orm import Session
 
 
 class EmbeddingService:
-    def __init__(self, user_id: int, db: Session):
+    def __init__(
+        self,
+        user_id: int,
+        db: Session,
+        api_key: Optional[str] = None,
+    ):
         self.user_id = user_id
         self.db = db
-        from app.services.ai_chat import ai_service
 
-        self.api_key = ai_service.get_provider_key("Google", user_id, db)
+        if api_key:
+            self.api_key = api_key
+        else:
+            # Legacy fallback: resolve the API key through the AI service.
+            from app.services.ai_chat import ai_service
+
+            self.api_key = ai_service.get_provider_key("Google", user_id, db)
 
     def get_embeddings(self) -> GoogleGenerativeAIEmbeddings:
         if not self.api_key:
