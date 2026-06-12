@@ -9,7 +9,19 @@ from app.models.user import User
 
 class ChatSessionService:
     def __init__(self):
-        pass
+        self._clear_session_memory_callback = None
+
+    def configure(self, clear_session_memory_callback):
+        """Configure the session service with dependencies.
+
+        Called after all module imports are resolved (in ``main.py``)
+        to avoid circular imports.
+
+        Args:
+            clear_session_memory_callback: Callable(session_id) to clear
+                in-memory session state when a session is deleted.
+        """
+        self._clear_session_memory_callback = clear_session_memory_callback
 
     def create_session(
         self, db: Session, user: User, title: str, description: Optional[str] = None
@@ -111,6 +123,14 @@ class ChatSessionService:
             return False
 
         session_crud.remove(db, id=session_id)
+
+        # Clean up in-memory session cache to prevent memory leaks
+        if self._clear_session_memory_callback:
+            try:
+                self._clear_session_memory_callback(session_id)
+            except Exception:
+                pass
+
         return True
 
     def get_session_messages(
@@ -142,7 +162,10 @@ class ChatSessionService:
                 "content": msg.content,
                 "response": msg.response,
                 "model": msg.model,
+                "user_id": msg.user_id,
                 "created_at": msg.created_at,
+                "images": msg.images,
+                "documents": msg.documents,
             }
             for msg in messages
         ]

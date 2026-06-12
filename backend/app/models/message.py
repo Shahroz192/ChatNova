@@ -20,5 +20,3 @@ class Message(Base):
 
     session = relationship("ChatSession", back_populates="messages")
     documents = relationship("SessionDocument", back_populates="message")
-
-    __table_args__ = {"mysql_engine": "InnoDB"}

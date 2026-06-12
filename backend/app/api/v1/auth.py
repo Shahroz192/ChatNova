@@ -7,7 +7,7 @@ from app import crud
 from app.schemas.user import User, UserCreate
 from app.api.deps import get_db
 from app.core.security import create_access_token
-from app.core.profiler import request_profiler
+
 from app.utils.cookies import set_auth_cookie
 from app.core.config import settings
 
@@ -17,7 +17,6 @@ router = APIRouter()
 
 
 @router.post("/register", response_model=User)
-@request_profiler.profile_endpoint("/register", "POST")
 @limiter.limit("50/minute" if settings.ENVIRONMENT == "testing" else "5/minute")
 def register(request: Request, user_in: UserCreate, db: Session = Depends(get_db)):
     db_user = crud.user.get_by_email(db, email=user_in.email)
@@ -27,7 +26,6 @@ def register(request: Request, user_in: UserCreate, db: Session = Depends(get_db
 
 
 @router.post("/login")
-@request_profiler.profile_endpoint("/login", "POST")
 @limiter.limit("50/minute" if settings.ENVIRONMENT == "testing" else "5/minute")
 def login(
     request: Request,
@@ -54,7 +52,6 @@ def login(
 
 
 @router.post("/logout")
-@request_profiler.profile_endpoint("/logout", "POST")
 def logout(response: Response, request: Request, db: Session = Depends(get_db)):
     """Logout user and blacklist current token."""
     from app.utils.cookies import clear_auth_cookie
@@ -84,7 +81,6 @@ def logout(response: Response, request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/logout-all")
-@request_profiler.profile_endpoint("/logout-all", "POST")
 def logout_all_sessions(
     response: Response, request: Request, db: Session = Depends(get_db)
 ):

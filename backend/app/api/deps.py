@@ -1,14 +1,65 @@
+import time
 from fastapi import Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.crud.user import user
 from app.core.security import verify_token
 from app.models.user import User
-from app.core.cache import cache_manager
+
+_USER_CACHE_TTL = 600
+_user_cache: dict[str, tuple[float, dict]] = {}
+
+
+def _get_cached_user(user_id: int) -> User | None:
+    entry = _user_cache.get(f"user:{user_id}")
+    if entry is None:
+        return None
+    cached_at, user_dict = entry
+    if time.time() - cached_at > _USER_CACHE_TTL:
+        del _user_cache[f"user:{user_id}"]
+        return None
+    return _user_from_dict(user_dict)
+
+
+def _set_cached_user(user_obj: User) -> None:
+    _user_cache[f"user:{user_obj.id}"] = (
+        time.time(),
+        _user_to_dict(user_obj),
+    )
+
+
+def _user_to_dict(user_obj: User) -> dict:
+    return {
+        "id": user_obj.id,
+        "email": user_obj.email,
+        "hashed_password": user_obj.hashed_password,
+        "is_active": user_obj.is_active,
+        "messages_used": user_obj.messages_used,
+        "custom_instructions": user_obj.custom_instructions,
+    }
+
+
+def _user_from_dict(d: dict) -> User:
+    user_obj = User(
+        id=d["id"],
+        email=d["email"],
+        hashed_password=d["hashed_password"],
+    )
+    user_obj.is_active = d.get("is_active", True)
+    user_obj.messages_used = d.get("messages_used", 0)
+    user_obj.custom_instructions = d.get("custom_instructions")
+    return user_obj
+
+
+def invalidate_user_cache(user_id: int) -> None:
+    _user_cache.pop(f"user:{user_id}", None)
+
+
+def clear_user_cache() -> None:
+    _user_cache.clear()
 
 
 def get_token_from_cookie(request: Request) -> str:
-    """Extract token from the access_token cookie."""
     token = request.cookies.get("access_token")
     if not token:
         raise HTTPException(
@@ -22,54 +73,24 @@ def get_token_from_cookie(request: Request) -> str:
 def get_current_user(
     db: Session = Depends(get_db), token: str = Depends(get_token_from_cookie)
 ) -> User:
-    user_id = verify_token(token, db)  # Pass db session for blacklist check
+    user_id = verify_token(token, db)
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token or token has been revoked",
         )
 
-    # Try to get user from cache first
-    cache_key = f"user:{user_id}"
-    cached_user_data = cache_manager.cache.get(cache_key)
+    cached = _get_cached_user(user_id)
+    if cached is not None:
+        return cached
 
-    if cached_user_data:
-        # Convert cached user data back to User object
-        import json
-        from datetime import datetime
-
-        user_dict = json.loads(cached_user_data)
-        if user_dict.get("created_at"):
-            user_dict["created_at"] = datetime.fromisoformat(user_dict["created_at"])
-        return User(**user_dict)
-    else:
-        # Get user from database
-        user_obj = user.get(db, id=user_id)
-        if not user_obj:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-            )
-
-        # Cache the user data for 10 minutes to reduce database lookups
-        import json
-
-        cache_manager.cache.set(
-            cache_key,
-            json.dumps(
-                {
-                    "id": user_obj.id,
-                    "email": user_obj.email,
-                    "is_active": user_obj.is_active,
-                    "messages_used": user_obj.messages_used,
-                    "custom_instructions": user_obj.custom_instructions,
-                    "created_at": user_obj.created_at.isoformat()
-                    if user_obj.created_at
-                    else None,
-                }
-            ),
-            600,  # 10 minutes TTL
+    user_obj = user.get(db, id=user_id)
+    if not user_obj:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
+    _set_cached_user(user_obj)
     return user_obj
 
 

@@ -8,17 +8,15 @@ from slowapi.errors import RateLimitExceeded
 from app.api.v1 import auth, chat, users, memories, search
 from app.database import engine, Base
 from app.core.config import settings
-from app.core.db_profiler import setup_db_profiling
-from app.core.memory_profiler import memory_profiler
 from app.core.compression import CompressionMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.services.web_search import web_search_service
-
-memory_profiler.start_tracemalloc()
+from app.services.session_service import session_service
+from app.services.ai_chat import ai_service
+session_service.configure(ai_service.clear_session_memory)
 
 try:
     Base.metadata.create_all(bind=engine)
-    setup_db_profiling(engine)
 except Exception as e:
     logging.error(f"Database connection failed: {e}. Make sure PostgreSQL is running.")
 

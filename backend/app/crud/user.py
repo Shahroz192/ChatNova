@@ -11,7 +11,6 @@ from app.schemas.user import (
     UserMCPServerUpdate,
     UserUpdate,
 )
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 
@@ -58,31 +57,6 @@ class CRUDUser(CRUDBase[User, UserCreate, UserUpdate]):
         if not user or not verify_password(password, user.hashed_password):
             return None
         return user
-
-    def increment_messages(self, db: Session, user_id: int, increment: int = 1):
-        # More efficient atomic update
-        db.query(User).filter(User.id == user_id).update(
-            {User.messages_used: User.messages_used + increment},
-            synchronize_session=False,
-        )
-        db.commit()
-
-    def get_user_with_message_count(
-        self, db: Session, user_id: int
-    ) -> tuple[Optional[User], int]:
-        """
-        Get user with their total message count in a single query
-        """
-        from app.models.message import Message
-
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            return None, 0
-
-        message_count = (
-            db.query(func.count(Message.id)).filter(Message.user_id == user_id).scalar()
-        )
-        return user, message_count
 
 
 user = CRUDUser(User)
