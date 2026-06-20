@@ -18,6 +18,7 @@ from app.schemas.session import (
     ChatSessionUpdate,
 )
 from app.services.ai_chat import ai_service
+from app.services.llm_service import llm_service
 from app.services.document_task_service import process_document_task
 from app.services.session_service import session_service
 from app.utils.pagination import compute_pagination_meta
@@ -726,7 +727,7 @@ async def test_ai_models(
     Test all available AI models with a single input and return their responses.
     Helpful for comparing model outputs and performance.
     """
-    available_models = ai_service.get_available_models(current_user.id, db)
+    available_models = llm_service.get_available_models(current_user.id, db)
     results = {}
 
     for model in available_models:
@@ -773,7 +774,7 @@ async def test_provider_key(
     if not model_name:
         raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
 
-    llm = ai_service.get_llm_by_provider(provider, api_key)
+    llm = llm_service.get_llm_by_provider(provider, api_key)
     if not llm:
         raise HTTPException(
             status_code=400, detail=f"Failed to initialize {provider} client"
@@ -800,8 +801,8 @@ def get_available_models(
     Get list of available AI models.
     """
     return {
-        "models": ai_service.get_available_models(current_user.id, db),
-        "total": len(ai_service.get_available_models(current_user.id, db)),
+        "models": llm_service.get_available_models(current_user.id, db),
+        "total": len(llm_service.get_available_models(current_user.id, db)),
     }
 
 

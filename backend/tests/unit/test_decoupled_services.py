@@ -42,7 +42,7 @@ async def test_ai_chat_service_delegates_to_memory_service():
     user_id = 1
     message = "Fact about me"
 
-    with patch.object(service, "get_llm", return_value=AsyncMock()) as mock_get_llm:
+    with patch("app.services.ai_chat.llm_service.get_llm", return_value=AsyncMock()) as mock_get_llm:
         with patch(
             "app.services.memory_service.memory_service.extract_and_save_memories",
             new_callable=AsyncMock,

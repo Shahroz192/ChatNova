@@ -1,27 +1,8 @@
-"""
-Tests for the AI service functionality
-"""
-
-from app.services.ai_chat import AIChatService
-
+from unittest.mock import MagicMock, patch
+from app.services.llm_service import LLMService
 
 def test_get_available_models():
-    """Test getting available models with mocked AI service"""
-    ai_service = AIChatService()
-
-    # Test without user context (should return models that have env vars)
-    # Since we're mocking, we just check that the method runs without error
-    models = ai_service.get_available_models()
-    assert isinstance(models, list)
-
-
-def test_simple_chat_exists():
-    """Test that simple_chat method exists"""
-    ai_service = AIChatService()
-
-    # Just verify the method exists and is callable
-    assert hasattr(ai_service, "simple_chat")
-    assert callable(ai_service.simple_chat)
-
-
-
+    service = LLMService()
+    with patch.object(service, "get_provider_key", side_effect=lambda p, u, d: "key" if p == "Google" else None):
+        models = service.get_available_models(1, MagicMock())
+        assert "gemini-2.5-flash" in models

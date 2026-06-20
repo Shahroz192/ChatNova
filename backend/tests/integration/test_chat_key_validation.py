@@ -6,7 +6,7 @@ def test_validate_provider_key_success(authenticated_client: TestClient):
     """Test validating a provider key using a mock to avoid real API calls."""
 
     # Mock the ai_service to avoid real network calls and key validation logic in LLM
-    with patch("app.api.v1.chat.ai_service.get_llm_by_provider") as mock_get_llm:
+    with patch("app.services.llm_service.LLMService.get_llm_by_provider") as mock_get_llm:
         # Setup mock LLM
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = "Success response"
@@ -36,7 +36,7 @@ def test_validate_provider_key_no_decryption_error(authenticated_client: TestCli
     'Invalid key format' error (which came from decrypt_api_key).
     """
 
-    with patch("app.api.v1.chat.ai_service.get_llm_by_provider") as mock_get_llm:
+    with patch("app.services.llm_service.LLMService.get_llm_by_provider") as mock_get_llm:
         mock_llm = MagicMock()
         mock_llm.invoke.side_effect = Exception("LLM API Error")
         mock_get_llm.return_value = mock_llm

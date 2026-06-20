@@ -158,7 +158,7 @@ def test_chat_endpoint(client: TestClient, db_session: Session):
         # Also need to ensure get_llm returns something or is bypassed
         # and get_available_models includes the model
         with patch(
-            "app.api.v1.chat.ai_service.get_available_models",
+            "app.api.v1.chat.llm_service.get_available_models",
             return_value=["gemini-2.5-flash"],
         ):
             response = client.post("/api/v1/chat", json=chat_data)

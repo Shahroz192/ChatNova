@@ -8,7 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from app.api.v1 import auth, chat, users, memories, search
 from app.database import engine, Base
 from app.core.config import settings
-from app.core.compression import CompressionMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from app.core.security_headers import SecurityHeadersMiddleware
 from app.services.web_search import web_search_service
 from app.services.session_service import session_service
@@ -38,7 +38,7 @@ else:
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-app.add_middleware(CompressionMiddleware)
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 
 app.add_middleware(SecurityHeadersMiddleware)
 
