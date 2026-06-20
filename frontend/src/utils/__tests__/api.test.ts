@@ -90,6 +90,56 @@ describe('api utility', () => {
       expect(onComplete).toHaveBeenCalled();
     });
 
+    it('routes generated UI events to the UI callback', async () => {
+      const onChunk = vi.fn();
+      const onComplete = vi.fn();
+      const onUI = vi.fn();
+      const uiPayload = {
+        type: 'container',
+        children: [{ type: 'custom', props: { html: '<html></html>' } }],
+      };
+
+      const mockStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            new TextEncoder().encode(
+              `data: ${JSON.stringify({ type: 'ui', data: uiPayload })}\n\n`,
+            ),
+          );
+          controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
+          controller.close();
+        },
+      });
+
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          body: mockStream,
+        }),
+      );
+
+      await streamChat(
+        'line chart',
+        'model-id',
+        undefined,
+        { search_web: false },
+        false,
+        undefined,
+        onChunk,
+        onComplete,
+        vi.fn(),
+        vi.fn(),
+        vi.fn(),
+        vi.fn(),
+        onUI,
+      );
+
+      expect(onUI).toHaveBeenCalledWith(uiPayload);
+      expect(onChunk).not.toHaveBeenCalled();
+      expect(onComplete).toHaveBeenCalled();
+    });
+
     it('handles errors in stream', async () => {
       const onError = vi.fn();
 
@@ -115,6 +165,45 @@ describe('api utility', () => {
       );
 
       expect(onError).toHaveBeenCalledWith(expect.stringContaining('500'));
+    });
+
+    it('reports incomplete streams as errors', async () => {
+      const onComplete = vi.fn();
+      const onError = vi.fn();
+
+      const mockStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(
+            new TextEncoder().encode(
+              `data: ${JSON.stringify({ type: 'metadata', message_id: 1 })}\n\n`,
+            ),
+          );
+          controller.close();
+        },
+      });
+
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          body: mockStream,
+        }),
+      );
+
+      await streamChat(
+        'hello',
+        'model-id',
+        undefined,
+        { search_web: true },
+        false,
+        undefined,
+        vi.fn(),
+        onComplete,
+        onError,
+      );
+
+      expect(onComplete).not.toHaveBeenCalled();
+      expect(onError).toHaveBeenCalledWith('Response stream ended before completion');
     });
   });
 });

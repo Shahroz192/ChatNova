@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { CheckCircle, XCircle, X } from 'lucide-react';
+import { CheckCircle, XCircle, X } from '@phosphor-icons/react';
 
 interface NotificationProps {
   type: 'success' | 'error';

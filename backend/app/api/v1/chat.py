@@ -54,6 +54,31 @@ def _format_sse_data(chunk: str) -> str:
     return "".join(f"data: {line}\n" for line in lines) + "\n"
 
 
+def _extract_ui_marker(chunk: str) -> Optional[Dict[str, Any]]:
+    """Extract generated UI payload from the internal stream marker."""
+    marker_start = "__GEN_UI__"
+    marker_end = "__END_UI__"
+    if not chunk.startswith(marker_start):
+        return None
+
+    end_idx = chunk.find(marker_end)
+    if end_idx == -1:
+        return None
+
+    ui_json_str = chunk[len(marker_start) : end_idx]
+    try:
+        ui_data = json.loads(ui_json_str)
+    except json.JSONDecodeError:
+        logger.warning("Generated UI marker contained invalid JSON")
+        return None
+
+    if not isinstance(ui_data, dict):
+        logger.warning("Generated UI marker payload was not an object")
+        return None
+
+    return ui_data
+
+
 def _update_session_title_if_needed(
     db: Session,
     session_id: int,
@@ -85,14 +110,18 @@ async def _extract_memories_events(
 ) -> AsyncGenerator[str, None]:
     """Extract memories and yield SSE-formatted events."""
     try:
+        logger.info(f"[MEMORY] Starting memory extraction for user {user_id}...")
         saved_facts = await ai_service.extract_and_save_memories(
             message, user_id, model, db=db
         )
+        logger.info(f"[MEMORY] Extraction complete: {len(saved_facts)} facts saved")
         for fact in saved_facts:
             event = json.dumps({"type": "memory_saved", "content": fact})
             yield _format_sse_data(event)
     except Exception as e:
-        logging.error(f"Failed to process memories: {e}")
+        logger.error(f"[MEMORY] Failed to process memories: {e}")
+        import traceback
+        logger.error(f"[MEMORY] Traceback:\n{traceback.format_exc()}")
 
 
 # Session Management Endpoints
@@ -272,6 +301,7 @@ async def chat(
         _validate_session_ownership(db, session_id, current_user.id)
 
     response = ""
+    ui_data = None
     async for chunk in ai_service.simple_chat(
         message_in.content,
         message_in.model,
@@ -282,6 +312,10 @@ async def chat(
         images=message_in.images,
         document_ids=message_in.document_ids,
     ):
+        extracted_ui = _extract_ui_marker(chunk)
+        if extracted_ui is not None:
+            ui_data = extracted_ui
+            continue
         response += chunk
     msg = crud.message.create(
         db,
@@ -290,6 +324,8 @@ async def chat(
         user_id=current_user.id,
         session_id=session_id,
     )
+    if ui_data is not None:
+        msg = crud.message.update(db, db_obj=msg, obj_in={"ui_data": ui_data})
 
     # Update session title from 'New Chat' to the first message if needed
     _update_session_title_if_needed(db, session_id, message_in.content)
@@ -356,9 +392,8 @@ async def chat_with_tools(
 
 
 @router.post("/chat/stream")
-def chat_stream(
+async def chat_stream(
     message_in: MessageCreate,
-    background_tasks: BackgroundTasks,
     session_id: Optional[int] = Query(
         None, description="Session ID for conversation context"
     ),
@@ -373,11 +408,14 @@ def chat_stream(
         _validate_session_ownership(db, session_id, current_user.id)
 
     async def stream_response():
+        from app.database import SessionLocal
+
+        stream_db = SessionLocal()
         msg = None
         full_response = ""
         try:
             msg = crud.message.create(
-                db,
+                stream_db,
                 obj_in=message_in,
                 response="",
                 user_id=current_user.id,
@@ -386,46 +424,71 @@ def chat_stream(
             yield _format_sse_data(
                 json.dumps({"type": "metadata", "message_id": msg.id})
             )
+            logger.info(f"[STREAM] Created message {msg.id}, starting simple_chat (search_web={message_in.search_web}, model={message_in.model})")
 
-            _update_session_title_if_needed(db, session_id, message_in.content)
+            _update_session_title_if_needed(stream_db, session_id, message_in.content)
 
+            ui_data = None
+            content_chunks = 0
             async for chunk in ai_service.simple_chat(
                 message_in.content,
                 message_in.model,
                 current_user.id,
-                db,
+                stream_db,
                 session_id,
                 message_in.search_web,
                 images=message_in.images,
                 document_ids=message_in.document_ids,
             ):
+                ui_data_from_marker = _extract_ui_marker(chunk)
+                if ui_data_from_marker is not None:
+                    ui_data = ui_data_from_marker
+                    yield _format_sse_data(
+                        json.dumps({"type": "ui", "data": ui_data})
+                    )
+                    logger.info(f"[STREAM] UI data yielded for message {msg.id}")
+                    continue
                 full_response += chunk
+                content_chunks += 1
                 # Wrap in JSON so multiline content doesn't break SSE boundaries
                 yield _format_sse_data(
                     json.dumps({"type": "content", "content": chunk})
                 )
 
+            logger.info(f"[STREAM] simple_chat completed: total_chunks={content_chunks}, response_len={len(full_response)} for message {msg.id}")
+
             if msg:
-                crud.message.update(db, db_obj=msg, obj_in={"response": full_response})
+                update_data: Dict[str, Any] = {"response": full_response}
+                if ui_data is not None:
+                    update_data["ui_data"] = ui_data
+                crud.message.update(stream_db, db_obj=msg, obj_in=update_data)
+                logger.info(f"[STREAM] Message {msg.id} updated in DB")
 
             # Yield memory events
+            logger.info(f"[STREAM] Extracting memories for message {msg.id}...")
             async for mem_event in _extract_memories_events(
-                message_in.content, current_user.id, message_in.model, db
+                message_in.content, current_user.id, message_in.model, stream_db
             ):
                 yield mem_event
+            logger.info(f"[STREAM] Memories done, yielding [DONE] for message {msg.id}")
 
             yield "data: [DONE]\n\n"
+            logger.info(f"[STREAM] [DONE] yielded for message {msg.id}")
 
         except Exception as e:
-            logging.error(f"Streaming error: {e}")
+            logger.error(f"[STREAM] Streaming error: {e}")
+            import traceback
+            logger.error(f"[STREAM] Traceback:\n{traceback.format_exc()}")
             yield f"data: ERROR: {str(e)}\n\n"
         finally:
-            if msg and not full_response.strip():
-                try:
-                    crud.message.remove(db, id=msg.id)
-                    logging.info(f"Cleaned up empty/failed message record {msg.id}")
-                except Exception as cleanup_err:
-                    logging.error(f"Failed to cleanup message {msg.id}: {cleanup_err}")
+            try:
+                if msg and not full_response.strip():
+                    crud.message.remove(stream_db, id=msg.id)
+                    logger.info(f"[STREAM] Cleaned up empty/failed message record {msg.id}")
+            except Exception as cleanup_err:
+                logger.error(f"[STREAM] Failed to cleanup message {msg.id}: {cleanup_err}")
+            finally:
+                stream_db.close()
 
     return StreamingResponse(
         stream_response(),
@@ -439,9 +502,8 @@ def chat_stream(
 
 
 @router.post("/chat/agent-stream")
-def chat_agent_stream(
+async def chat_agent_stream(
     message_in: MessageCreate,
-    background_tasks: BackgroundTasks,
     session_id: Optional[int] = Query(
         None, description="Session ID for conversation context"
     ),
@@ -456,11 +518,14 @@ def chat_agent_stream(
         _validate_session_ownership(db, session_id, current_user.id)
 
     async def stream_response():
+        from app.database import SessionLocal
+
+        stream_db = SessionLocal()
         msg = None
         full_response = ""
         try:
             msg = crud.message.create(
-                db,
+                stream_db,
                 obj_in=message_in,
                 response="",
                 user_id=current_user.id,
@@ -470,13 +535,13 @@ def chat_agent_stream(
                 json.dumps({"type": "metadata", "message_id": msg.id})
             )
 
-            _update_session_title_if_needed(db, session_id, message_in.content)
+            _update_session_title_if_needed(stream_db, session_id, message_in.content)
 
             async for chunk in ai_service.agent_chat_stream(
                 message_in.content,
                 message_in.model,
                 current_user.id,
-                db,
+                stream_db,
                 session_id,
             ):
                 yield _format_sse_data(chunk)
@@ -489,10 +554,10 @@ def chat_agent_stream(
                     pass
 
             if msg:
-                crud.message.update(db, db_obj=msg, obj_in={"response": full_response})
+                crud.message.update(stream_db, db_obj=msg, obj_in={"response": full_response})
 
             async for mem_event in _extract_memories_events(
-                message_in.content, current_user.id, message_in.model, db
+                message_in.content, current_user.id, message_in.model, stream_db
             ):
                 yield mem_event
 
@@ -503,16 +568,18 @@ def chat_agent_stream(
             error_event = json.dumps({"type": "error", "content": str(e)})
             yield f"data: {error_event}\n\n"
         finally:
-            if msg and not full_response.strip():
-                try:
-                    crud.message.remove(db, id=msg.id)
+            try:
+                if msg and not full_response.strip():
+                    crud.message.remove(stream_db, id=msg.id)
                     logging.info(
                         f"Cleaned up empty/failed agent message record {msg.id}"
                     )
-                except Exception as cleanup_err:
-                    logging.error(
-                        f"Failed to cleanup agent message {msg.id}: {cleanup_err}"
-                    )
+            except Exception as cleanup_err:
+                logging.error(
+                    f"Failed to cleanup agent message {msg.id}: {cleanup_err}"
+                )
+            finally:
+                stream_db.close()
 
     return StreamingResponse(
         stream_response(),
@@ -698,7 +765,7 @@ async def test_provider_key(
     # Get a model for this provider
     provider_models = {
         "Google": "gemini-2.5-flash",
-        "Cerebras": "qwen-3-235b-a22b-instruct-2507",
+        "Cerebras": "zai-glm-4.7",
         "Groq": "moonshotai/kimi-k2-instruct-0905",
     }
 

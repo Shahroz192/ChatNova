@@ -11,6 +11,7 @@
     "coverage": "vitest run --coverage"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
     "@testing-library/user-event": "^14.6.1",
@@ -19,27 +20,26 @@
     "@types/react-syntax-highlighter": "^15.5.13",
     "@vitejs/plugin-react": "^5.0.4",
     "@vitest/coverage-v8": "^4.0.16",
-    "baseline-browser-mapping": "^2.9.11",
     "jsdom": "^27.4.0",
+    "tailwindcss": "^4.3.1",
     "typescript": "~5.9.3",
     "vite": "^7.1.7",
     "vitest": "^4.0.16"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "axios": "^1.12.2",
-    "bootstrap": "^5.3.8",
     "chart.js": "^4.5.1",
+    "geist": "^1.7.2",
     "lucide-react": "^0.545.0",
     "next-themes": "^0.4.6",
     "qs": "^6.14.0",
     "react": "^19.2.0",
-    "react-bootstrap": "^2.10.10",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.2.0",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.9.4",
     "react-syntax-highlighter": "^16.1.0",
-    "recharts": "^2.15.0",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1"
   },

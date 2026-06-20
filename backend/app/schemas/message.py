@@ -57,11 +57,13 @@ class MessageCreate(MessageBase):
 
 class MessageUpdate(BaseModel):
     response: str
+    ui_data: Optional[Dict[str, Any]] = None
 
 
 class Message(MessageBase):
     id: int
     response: str
+    ui_data: Optional[Dict[str, Any]] = None
     user_id: int
     created_at: datetime
     documents: Optional[List[DocumentSchema]] = None

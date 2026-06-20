@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, CheckCheck, X, Clock } from 'lucide-react';
+import { Check, Checks, X, Clock } from '@phosphor-icons/react';
 
 export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'failed';
 
@@ -16,7 +16,7 @@ const MessageStatus: React.FC<MessageStatusProps> = ({ status, className = '' })
       case 'sent':
         return <Check size={12} className="text-muted" />;
       case 'delivered':
-        return <CheckCheck size={12} className="text-success" />;
+        return <Checks size={12} className="text-success" />;
       case 'failed':
         return <X size={12} className="text-danger" />;
       default:

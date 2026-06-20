@@ -1,179 +1,292 @@
-/* Elite Auth Styling */
+/* ════════════════════════════════════════════════════════════════
+   Auth Pages — Login & Register
+   ════════════════════════════════════════════════════════════════ */
 
 .auth-page-bg {
-  background-color: var(--bg-secondary);
-  background-image: radial-gradient(circle at 50% 0%, rgba(0, 0, 0, 0.03) 0%, transparent 70%);
+  position: fixed;
+  inset: 0;
+  background: var(--bg-secondary, #f5f4f0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 [data-bs-theme="dark"] .auth-page-bg {
-  background-color: var(--bg-primary);
-  background-image: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.03) 0%, transparent 70%);
+  background: #0c0a09;
 }
 
+/* Subtle background pattern */
+.auth-page-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 50%, rgba(0, 0, 0, 0.02) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(0, 0, 0, 0.015) 0%, transparent 50%),
+    radial-gradient(circle at 50% 80%, rgba(0, 0, 0, 0.01) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+[data-bs-theme="dark"] .auth-page-bg::before {
+  background-image:
+    radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.02) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.015) 0%, transparent 50%),
+    radial-gradient(circle at 50% 80%, rgba(255, 255, 255, 0.01) 0%, transparent 50%);
+}
+
+/* ── Card ──────────────────────────────────────────────────────── */
 .register-card {
-  background: var(--bg-primary);
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius-2xl);
-  box-shadow: var(--shadow-xl);
-  padding: var(--space-8) var(--space-8) var(--space-10);
-  max-width: 420px;
-  margin: 0 auto;
   position: relative;
+  background: var(--bg-primary, #ffffff);
+  border: 1px solid var(--border-light, #e8e5df);
+  border-radius: var(--radius-2xl);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04), 0 1px 4px rgba(0, 0, 0, 0.02);
+  padding: 40px 36px 44px;
+  max-width: 400px;
+  width: 100%;
+  animation: authCardIn 0.45s ease-out;
   overflow: hidden;
-  transition: transform var(--transition-normal);
 }
 
+[data-bs-theme="dark"] .register-card {
+  background: var(--glass-bg, rgba(18, 18, 18, 0.82));
+  backdrop-filter: blur(var(--glass-blur, 20px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px));
+  border-color: var(--glass-border, rgba(255, 255, 255, 0.06));
+  box-shadow: var(--glass-shadow, 0 4px 24px rgba(0, 0, 0, 0.3));
+}
+
+/* Gradient accent bar at top */
 .register-card::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, var(--gray-800), var(--gray-400));
+  height: 3px;
+  background: linear-gradient(90deg, var(--gray-800, #292524), var(--gray-400, #a8a29e));
 }
 
-[data-bs-theme="dark"] .register-card {
-  background: var(--bg-secondary);
-  box-shadow: var(--shadow-2xl);
+@keyframes authCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
+/* ── Logo ──────────────────────────────────────────────────────── */
 .register-logo {
   display: flex;
   justify-content: center;
-  margin-bottom: var(--space-8);
-  transform: scale(1.2);
+  margin-bottom: 28px;
 }
 
+.register-logo svg {
+  filter: drop-shadow(0 2px 8px rgba(14, 165, 233, 0.15));
+}
+
+/* ── Title ─────────────────────────────────────────────────────── */
 .register-title {
-  font-family: var(--font-family-display);
-  color: var(--text-primary);
-  font-size: var(--font-size-3xl);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-tight);
-  margin-bottom: var(--space-2);
-  letter-spacing: -0.04em;
+  font-family: var(--font-family-display, 'Satoshi', system-ui, sans-serif);
+  font-size: 1.625rem;
+  font-weight: 700;
+  color: var(--text-primary, #1c1917);
+  letter-spacing: -0.03em;
+  margin: 0 0 4px;
+  line-height: 1.15;
+}
+
+[data-bs-theme="dark"] .register-title {
+  color: var(--text-primary, #e8e5df);
 }
 
 .register-subtitle {
-  color: var(--text-secondary);
-  font-size: var(--font-size-base);
-  margin-bottom: var(--space-8);
-  font-weight: var(--font-weight-light);
+  font-size: 0.9375rem;
+  color: var(--text-tertiary, #a8a29e);
+  margin: 0 0 28px;
+  font-weight: 400;
 }
 
-.register-form .form-group {
-  margin-bottom: var(--space-5);
+/* ── Form ──────────────────────────────────────────────────────── */
+.register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
+.register-form > * + * {
+  margin-top: 20px;
+}
+
+/* ── Labels ────────────────────────────────────────────────────── */
 .register-label {
-  color: var(--text-primary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: var(--space-2);
   display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary, #78716c);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
 }
 
+[data-bs-theme="dark"] .register-label {
+  color: var(--text-secondary, #a8a29e);
+}
+
+/* ── Input wrapper (for password toggle) ────────────────────────── */
+.register-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* ── Inputs ────────────────────────────────────────────────────── */
 .register-input {
   width: 100%;
-  border: 1px solid var(--border-medium);
-  border-radius: var(--radius-lg);
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: var(--font-size-base);
-  padding: var(--space-3) var(--space-4);
-  transition: all var(--transition-fast);
-}
-
-.register-input:focus {
-  outline: none;
-  border-color: var(--primary);
-  background-color: var(--bg-primary);
-  box-shadow: 0 0 0 4px var(--accent-glow);
+  padding: 11px 14px;
+  background: var(--bg-secondary, #f5f4f0);
+  border: 1px solid var(--border-light, #e8e5df);
+  border-radius: var(--radius-md);
+  border-color: var(--border-dark, #a8a29e);
+  background: var(--bg-primary, #ffffff);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.04);
   transform: translateY(-1px);
 }
 
-.register-input::placeholder {
-  color: var(--text-tertiary);
+[data-bs-theme="dark"] .register-input {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary, #e8e5df);
 }
 
+[data-bs-theme="dark"] .register-input:focus {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.04);
+}
+
+.register-input::placeholder {
+  color: var(--text-tertiary, #a8a29e);
+  font-weight: 400;
+}
+
+.register-input:-webkit-autofill,
+.register-input:-webkit-autofill:hover,
+.register-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text-primary, #1c1917);
+  -webkit-box-shadow: 0 0 0 1000px var(--bg-secondary, #f5f4f0) inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+[data-bs-theme="dark"] .register-input:-webkit-autofill,
+[data-bs-theme="dark"] .register-input:-webkit-autofill:hover,
+[data-bs-theme="dark"] .register-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text-primary, #e8e5df);
+  -webkit-box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.04) inset;
+}
+
+/* Input with password toggle — extra padding on right */
+.register-input-wrapper .register-input {
+  padding-right: 44px;
+}
+
+/* ── Password toggle button ─────────────────────────────────────── */
+.password-toggle-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary, #a8a29e);
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary, #78716c);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+[data-bs-theme="dark"] .password-toggle-btn:hover {
+  color: var(--text-secondary, #a8a29e);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ── Hint text ──────────────────────────────────────────────────── */
+.register-hint {
+  font-size: 0.75rem;
+  color: var(--text-tertiary, #a8a29e);
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* ── Button ────────────────────────────────────────────────────── */
 .register-button {
   width: 100%;
-  padding: var(--space-3) var(--space-4);
-  background-color: var(--primary);
-  color: var(--text-inverse);
+  padding: 12px 20px;
+  background: var(--text-primary, #1c1917);
+  color: var(--text-inverse, #fafaf9);
   border: none;
-  border-radius: var(--radius-lg);
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-family: var(--font-family-sans, 'Geist', system-ui, sans-serif);
   cursor: pointer;
-  transition: all var(--transition-fast);
-  box-shadow: var(--shadow-lg);
-  margin-top: var(--space-6);
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
   position: relative;
   overflow: hidden;
+  letter-spacing: -0.01em;
+  line-height: 1.5;
 }
 
 .register-button:hover:not(:disabled) {
-  background-color: var(--primary-hover);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-xl);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
-.register-button:active {
-  transform: translateY(0);
+[data-bs-theme="dark"] .register-button {
+  background: var(--text-primary, #e8e5df);
+  color: var(--text-inverse, #0c0a09);
 }
 
+[data-bs-theme="dark"] .register-button:hover:not(:disabled) {
+  box-shadow: 0 4px 16px rgba(232, 229, 223, 0.12);
+}
+
+.register-button:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.register-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Error message ──────────────────────────────────────────────── */
 .register-error {
-  color: var(--error);
-  font-size: var(--font-size-sm);
-  margin-bottom: var(--space-6);
-  padding: var(--space-3);
-  background-color: rgba(239, 68, 68, 0.1);
-  border-radius: var(--radius-md);
-  border-left: 3px solid var(--error);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.12);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  margin-bottom: 4px;
+  animation: authErrorIn 0.2s ease-out;
 }
 
-.register-link-container {
-  text-align: center;
-  margin-top: var(--space-8);
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-}
-
-.register-link {
-  color: var(--primary);
-  font-weight: var(--font-weight-bold);
-  text-decoration: none;
-  margin-left: var(--space-1);
-  position: relative;
-}
-
-.register-link::after {
-  content: '';
-  position: absolute;
-  width: 100%;
-  height: 1px;
-  bottom: -2px;
-  left: 0;
-  background-color: var(--primary);
-  transform: scaleX(0);
-  transform-origin: bottom right;
-  transition: transform 0.3s ease-out;
-}
-
-.register-link:hover::after {
-  transform: scaleX(1);
-  transform-origin: bottom left;
-}
-
-/* Animations */
-@keyframes slideUpFade {
+@keyframes authErrorIn {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(-4px);
   }
   to {
     opacity: 1;
@@ -181,6 +294,55 @@
   }
 }
 
-.register-card {
-  animation: slideUpFade var(--transition-slow) var(--ease-elastic);
+/* ── Footer link ────────────────────────────────────────────────── */
+.register-link-container {
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #78716c);
+}
+
+[data-bs-theme="dark"] .register-link-container {
+  color: var(--text-secondary, #a8a29e);
+}
+
+.register-link {
+  color: var(--text-primary, #1c1917);
+  font-weight: 600;
+  text-decoration: none;
+  margin-left: 4px;
+  position: relative;
+  transition: color 0.15s ease;
+}
+
+[data-bs-theme="dark"] .register-link {
+  color: var(--text-primary, #e8e5df);
+}
+
+.register-link:hover {
+  color: #2b2b2b;
+}
+
+[data-bs-theme="dark"] .register-link:hover {
+  color: #2b2b2b;
+}
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .register-card {
+    padding: 32px 24px 36px;
+  border-radius: var(--radius-lg);
+  margin: 0 12px;
+  }
+
+  .register-title {
+    font-size: 1.375rem;
+  }
+
+  .register-subtitle {
+    font-size: 0.875rem;
+  }
+
+  .register-input {
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
 }

@@ -14,6 +14,7 @@ class User(Base):
     messages_used = Column(Integer, default=0, index=True)
     custom_instructions = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_logout_all_at = Column(DateTime(timezone=True), nullable=True)
 
     api_keys = relationship(
         "UserAPIKey", back_populates="user", cascade="all, delete-orphan"

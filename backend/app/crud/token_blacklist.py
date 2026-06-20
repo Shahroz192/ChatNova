@@ -49,36 +49,47 @@ class TokenBlacklistCRUD:
         return self.get_by_jti(db, token_jti=token_jti) is not None
 
     def blacklist_user_tokens(
-        self, db: Session, *, user_id: int, reason: str = "security_incident"
+        self,
+        db: Session,
+        *,
+        user_id: int,
+        current_token_jti: Optional[str] = None,
+        current_token_expires_at: Optional[datetime] = None,
+        reason: str = "security_incident",
     ) -> int:
+        """
+        Invalidate all tokens for a user by setting their last_logout_all_at timestamp.
+        Any token issued before this timestamp will be rejected on next use.
+
+        Also blacklists the current token's JTI for immediate effect.
+        """
         from datetime import datetime
+        from app.crud.user import user as user_crud
 
-        current_time = datetime.now(UTC)
-        tokens_to_blacklist = (
-            db.query(TokenBlacklist)
-            .filter(
-                TokenBlacklist.user_id == user_id,
-                (
-                    TokenBlacklist.expires_at > current_time
-                ).self_group() | TokenBlacklist.expires_at.is_(None),
-            )
-            .all()
-        )
+        now = datetime.now(UTC)
 
-        blacklisted_count = 0
-        for token in tokens_to_blacklist:
+        # 1. Set last_logout_all_at on the user — this invalidates ALL existing tokens
+        db_user = user_crud.get(db, id=user_id)
+        if db_user:
+            db_user.last_logout_all_at = now
+            db.add(db_user)
+            db.commit()
+
+        # 2. Blacklist the current token JTI for immediate effect
+        count = 0
+        if current_token_jti:
             self.create_blacklist_entry(
                 db=db,
-                token_jti=f"{token.token_jti}_bulk_{int(current_time.timestamp())}",
+                token_jti=current_token_jti,
                 user_id=user_id,
-                token_content="BULK_BLACKLISTED",
-                token_type=token.token_type,
+                token_content="BULK_INVALIDATED_ALL",
+                token_type="access",
                 reason=reason,
-                expires_at=token.expires_at,
+                expires_at=current_token_expires_at,
             )
-            blacklisted_count += 1
+            count = 1
 
-        return blacklisted_count
+        return count
 
 
 token_blacklist_crud = TokenBlacklistCRUD()

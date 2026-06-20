@@ -76,12 +76,16 @@ class CRUDUserAPIKey(CRUDBase[UserAPIKey, UserAPIKeyCreate, UserAPIKeyUpdate]):
         return db.query(UserAPIKey).filter(UserAPIKey.user_id == user_id).all()
 
     def create(
-        self, db: Session, *, obj_in: UserAPIKeyCreate, user_id: int
+        self, db: Session, *, obj_in: UserAPIKeyCreate | dict, user_id: int
     ) -> UserAPIKey:
+        if isinstance(obj_in, dict):
+            obj_data = obj_in
+        else:
+            obj_data = obj_in.model_dump()
         db_obj = UserAPIKey(
             user_id=user_id,
-            model_name=obj_in.model_name,
-            encrypted_key=obj_in.encrypted_key,
+            model_name=obj_data["model_name"],
+            encrypted_key=obj_data["encrypted_key"],
         )
         db.add(db_obj)
         db.commit()
@@ -89,17 +93,22 @@ class CRUDUserAPIKey(CRUDBase[UserAPIKey, UserAPIKeyCreate, UserAPIKeyUpdate]):
         return db_obj
 
     def update(
-        self, db: Session, *, db_obj: UserAPIKey, obj_in: UserAPIKeyUpdate
+        self, db: Session, *, db_obj: UserAPIKey, obj_in: UserAPIKeyUpdate | dict
     ) -> UserAPIKey:
-        if obj_in.encrypted_key is not None:
-            db_obj.encrypted_key = obj_in.encrypted_key
+        encrypted = (
+            obj_in.get("encrypted_key") if isinstance(obj_in, dict)
+            else obj_in.encrypted_key
+        )
+        if encrypted is not None:
+            db_obj.encrypted_key = encrypted
         db.commit()
         db.refresh(db_obj)
         return db_obj
 
-    def remove(
+    def remove_by_user_and_model(
         self, db: Session, *, user_id: int, model_name: str
     ) -> Optional[UserAPIKey]:
+        """Remove an API key by user ID and model name (string lookup)."""
         obj = (
             db.query(UserAPIKey)
             .filter(UserAPIKey.user_id == user_id, UserAPIKey.model_name == model_name)

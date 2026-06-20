@@ -123,11 +123,10 @@ class UserInstructionsUpdate(BaseModel):
 
 class UserAPIKeyBase(BaseModel):
     model_name: str
-    encrypted_key: str
 
 
 class UserAPIKeyCreate(UserAPIKeyBase):
-    pass
+    api_key: str = Field(description="Raw API key provided by the user (will be encrypted server-side)")
 
 
 class UserAPIKeyUpdate(BaseModel):
@@ -137,8 +136,8 @@ class UserAPIKeyUpdate(BaseModel):
 class UserAPIKey(UserAPIKeyBase):
     id: int
     user_id: int
-    created_at: Optional[datetime]
-    updated_at: Optional[datetime]
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(
         from_attributes=True,

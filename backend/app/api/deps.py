@@ -1,9 +1,10 @@
 import time
+from datetime import UTC
 from fastapi import Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.crud.user import user
-from app.core.security import verify_token
+from app.core.security import verify_token, get_token_issued_at
 from app.models.user import User
 
 _USER_CACHE_TTL = 600
@@ -36,6 +37,7 @@ def _user_to_dict(user_obj: User) -> dict:
         "is_active": user_obj.is_active,
         "messages_used": user_obj.messages_used,
         "custom_instructions": user_obj.custom_instructions,
+        "last_logout_all_at": user_obj.last_logout_all_at,
     }
 
 
@@ -48,6 +50,7 @@ def _user_from_dict(d: dict) -> User:
     user_obj.is_active = d.get("is_active", True)
     user_obj.messages_used = d.get("messages_used", 0)
     user_obj.custom_instructions = d.get("custom_instructions")
+    user_obj.last_logout_all_at = d.get("last_logout_all_at")
     return user_obj
 
 
@@ -80,18 +83,40 @@ def get_current_user(
             detail="Invalid token or token has been revoked",
         )
 
-    cached = _get_cached_user(user_id)
+    parsed_user_id = int(user_id)
+
+    # 1. Check cache first — avoids DB query if user is recently cached
+    cached = _get_cached_user(parsed_user_id)
     if cached is not None:
+        _check_token_not_revoked(cached, token)
         return cached
 
-    user_obj = user.get(db, id=user_id)
+    # 2. Fetch from DB
+    user_obj = user.get(db, id=parsed_user_id)
     if not user_obj:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
+    # 3. Check logout-all revocation against fresh DB record
+    _check_token_not_revoked(user_obj, token)
+
+    # 4. Cache and return
     _set_cached_user(user_obj)
     return user_obj
+
+
+def _check_token_not_revoked(user_obj: User, token: str) -> None:
+    """If the user performed a bulk logout-all, reject any token
+    issued before that timestamp."""
+    if not user_obj.last_logout_all_at:
+        return
+    token_iat = get_token_issued_at(token)
+    if token_iat and token_iat < user_obj.last_logout_all_at.replace(tzinfo=UTC):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked (logout-all was performed)",
+        )
 
 
 def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:

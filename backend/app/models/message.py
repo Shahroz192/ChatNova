@@ -15,6 +15,7 @@ class Message(Base):
     content = Column(Text)
     model = Column(String, index=True)
     response = Column(Text)
+    ui_data = Column(JSON, nullable=True)
     images = Column(JSON, nullable=True)  # List of base64 strings or URLs
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 

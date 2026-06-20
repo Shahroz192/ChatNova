@@ -3,17 +3,37 @@ from unittest.mock import MagicMock
 from app.services.web_search import WebSearchService
 
 
+class FakeExaResult:
+    """Simulates an Exa result object."""
+
+    def __init__(self, title, url, published_date, text=None):
+        self.title = title
+        self.url = url
+        self.published_date = published_date
+        self.text = text
+        self.image = None
+
+
+class FakeExaResponse:
+    """Simulates an Exa search response."""
+
+    def __init__(self, results):
+        self.results = results
+
+
 def test_search_with_metadata_formats_results():
-    service = WebSearchService()
-    service.search_wrapper = MagicMock()
-    service.search_wrapper.results.return_value = [
-        {
-            "title": "Event happened",
-            "body": "Confirmed by source",
-            "link": "https://example.com/event",
-            "date": "2026-02-10",
-        }
-    ]
+    service = WebSearchService(api_key="test-key")
+    service.client = MagicMock()
+    service.client.search.return_value = FakeExaResponse(
+        results=[
+            FakeExaResult(
+                title="Event happened",
+                url="https://example.com/event",
+                published_date="2026-02-10",
+                text="Confirmed by source",
+            )
+        ]
+    )
 
     result = service.search_with_metadata("did event happen")
 
@@ -25,30 +45,43 @@ def test_search_with_metadata_formats_results():
 
 
 def test_search_with_metadata_returns_no_results_status_on_errors():
-    service = WebSearchService()
-    service.search_wrapper = MagicMock()
-    service.search_wrapper.results.side_effect = RuntimeError("provider down")
+    service = WebSearchService(api_key="test-key")
+    service.client = MagicMock()
+    service.client.search.side_effect = RuntimeError("provider down")
 
     result = service.search_with_metadata("failing query")
 
     assert result["had_results"] is False
     assert result["status"] == "no_results"
     assert "No reliable search results were retrieved" in result["formatted_results"]
-    # Single query search (no variants)
-    assert service.search_wrapper.results.call_count == 1
+    assert service.client.search.call_count == 1
+
+
+def test_search_with_metadata_skips_provider_without_api_key():
+    service = WebSearchService(api_key="")
+    service.client = MagicMock()
+
+    result = service.search_with_metadata("latest news")
+
+    assert result["had_results"] is False
+    assert result["status"] == "no_results"
+    assert "EXA_API_KEY is not configured" in result["formatted_results"]
+    service.client.search.assert_not_called()
 
 
 def test_search_with_metadata_deduplicates_across_sources_and_variants():
-    service = WebSearchService()
-    service.search_wrapper = MagicMock()
-    service.search_wrapper.results.return_value = [
-        {
-            "title": "Samsung tri-fold launched",
-            "body": "Launch confirmed",
-            "link": "https://example.com/samsung-trifold",
-            "date": "2026-02-12",
-        }
-    ]
+    service = WebSearchService(api_key="test-key")
+    service.client = MagicMock()
+    service.client.search.return_value = FakeExaResponse(
+        results=[
+            FakeExaResult(
+                title="Samsung tri-fold launched",
+                url="https://example.com/samsung-trifold",
+                published_date="2026-02-12",
+                text="Launch confirmed",
+            )
+        ]
+    )
 
     result = service.search_with_metadata("samsung tri-fold phone launch")
 
@@ -57,16 +90,18 @@ def test_search_with_metadata_deduplicates_across_sources_and_variants():
 
 
 def test_search_many_with_metadata_merges_and_deduplicates():
-    service = WebSearchService()
-    service.search_wrapper = MagicMock()
-    service.search_wrapper.results.return_value = [
-        {
-            "title": "Kimi 2.5 released",
-            "body": "Moonshot announcement",
-            "link": "https://example.com/kimi-2-5",
-            "date": "2026-02-15",
-        }
-    ]
+    service = WebSearchService(api_key="test-key")
+    service.client = MagicMock()
+    service.client.search.return_value = FakeExaResponse(
+        results=[
+            FakeExaResult(
+                title="Kimi 2.5 released",
+                url="https://example.com/kimi-2-5",
+                published_date="2026-02-15",
+                text="Moonshot announcement",
+            )
+        ]
+    )
 
     result = service.search_many_with_metadata(
         ["latest kimi release", "moonshot kimi 2.5"]

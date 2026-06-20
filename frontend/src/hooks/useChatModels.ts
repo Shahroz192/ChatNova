@@ -27,7 +27,7 @@ export const useChatModels = () => {
         if (lowerModel.includes("gemini") || lowerModel.includes("google")) {
           return activeProviders.includes("google");
         }
-        if (lowerModel.includes("qwen") || lowerModel.includes("cerebras")) {
+        if (lowerModel.includes("zai-glm") || lowerModel.includes("cerebras")) {
           return activeProviders.includes("cerebras");
         }
         if (
@@ -49,7 +49,7 @@ export const useChatModels = () => {
         setSelectedModel(filteredModels[0]);
       }
     } catch (error) {
-      showError("Loading Error", "Failed to load AI models.");
+      showError("Failed to load models");
       console.error("Failed to load models", error);
     }
   }, [selectedModel, showError]);

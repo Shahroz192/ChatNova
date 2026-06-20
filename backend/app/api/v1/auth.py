@@ -84,9 +84,14 @@ def logout(response: Response, request: Request, db: Session = Depends(get_db)):
 def logout_all_sessions(
     response: Response, request: Request, db: Session = Depends(get_db)
 ):
-    """Logout user from all sessions by blacklisting all their tokens."""
+    """Logout user from all sessions by invalidating all tokens.
+
+    Sets a `last_logout_all_at` timestamp on the user. Any existing JWT
+    with an `iat` before this timestamp will be rejected on next use.
+    The current session's JTI is also blacklisted for immediate effect.
+    """
     from app.utils.cookies import clear_auth_cookie
-    from app.core.security import verify_token
+    from app.core.security import verify_token, extract_token_jti, get_token_expires_at
 
     token = request.cookies.get("access_token")
     if not token:
@@ -98,13 +103,20 @@ def logout_all_sessions(
 
     from app.crud.token_blacklist import token_blacklist_crud
 
+    current_jti = extract_token_jti(token)
+    current_exp = get_token_expires_at(token)
+
     blacklisted_count = token_blacklist_crud.blacklist_user_tokens(
-        db=db, user_id=int(user_id), reason="logout_all_sessions"
+        db=db,
+        user_id=int(user_id),
+        current_token_jti=current_jti,
+        current_token_expires_at=current_exp,
+        reason="logout_all_sessions",
     )
 
     clear_auth_cookie(response)
     return {
         "success": True,
-        "message": f"Successfully logged out from {blacklisted_count} sessions",
+        "message": "Successfully logged out from all sessions",
         "sessions_terminated": blacklisted_count,
     }

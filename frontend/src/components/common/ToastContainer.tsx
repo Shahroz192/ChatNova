@@ -7,7 +7,7 @@ const ToastContainer: React.FC = () => {
 
   return (
     <div
-      className="toast-container position-fixed top-0 end-0 p-3"
+      className="fixed top-4 right-4 flex flex-col gap-2"
       style={{ zIndex: 1060 }}
     >
       {toasts.map(toast => (

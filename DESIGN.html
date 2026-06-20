@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatNova — System Design</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'base',
+            themeVariables: {
+                background: '#0a0a0a',
+                primaryColor: '#161618',
+                primaryBorderColor: '#2a2a2c',
+                primaryTextColor: '#e8e8e8',
+                lineColor: '#333',
+                secondaryColor: '#111',
+                tertiaryColor: '#1a1a1a',
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '13px',
+            }
+        });
+    </script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; font-size: 16px; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+            background: #0a0a0a;
+            color: #d4d4d4;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 32px; }
+
+        /* Navigation */
+        nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+            background: rgba(10,10,10,.85); backdrop-filter: blur(12px);
+            border-bottom: 1px solid #1a1a1c;
+        }
+        nav .container {
+            display: flex; align-items: center; justify-content: space-between;
+            height: 56px; gap: 24px;
+        }
+        nav .logo { font-weight: 600; font-size: 1rem; color: #e8e8e8; letter-spacing: -.02em; }
+        nav .logo span { color: #666; font-weight: 400; }
+        nav ul { display: flex; list-style: none; gap: 0; }
+        nav ul li a {
+            display: block; padding: 12px 16px;
+            color: #888; text-decoration: none; font-size: .8125rem; font-weight: 500;
+            transition: color .15s; letter-spacing: -.01em;
+        }
+        nav ul li a:hover { color: #e8e8e8; }
+        .content { padding-top: 56px; }
+
+        /* Section headers */
+        section { padding: 72px 0; border-bottom: 1px solid #141416; }
+        section:last-child { border-bottom: none; }
+
+        h2 {
+            font-size: 1.625rem; font-weight: 600; color: #e8e8e8;
+            letter-spacing: -.02em; margin-bottom: 8px;
+        }
+        h2 + p { color: #888; font-size: .9375rem; margin-bottom: 48px; max-width: 640px; }
+        h3 {
+            font-size: 1rem; font-weight: 600; color: #ccc;
+            letter-spacing: -.01em; margin-bottom: 20px;
+        }
+        h4 {
+            font-size: .8125rem; font-weight: 600; color: #999;
+            text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px;
+        }
+
+        /* Hero section */
+        .hero {
+            padding: 120px 0 80px; border-bottom: 1px solid #141416;
+        }
+        .hero h1 {
+            font-size: 3.25rem; font-weight: 700; color: #fff;
+            letter-spacing: -.03em; line-height: 1.1; margin-bottom: 16px;
+        }
+        .hero h1 span { color: #555; }
+        .hero .tagline {
+            font-size: 1.125rem; color: #888;
+            max-width: 600px; margin-bottom: 48px;
+        }
+        .feature-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 2px; background: #141416; border: 1px solid #141416;
+        }
+        .feature-card {
+            background: #0e0e0e; padding: 28px 28px 32px; position: relative;
+        }
+        .feature-card .icon { font-size: 1.5rem; margin-bottom: 16px; display: block; }
+        .feature-card h3 { font-size: .9375rem; font-weight: 600; color: #e8e8e8; margin-bottom: 8px; }
+        .feature-card p { font-size: .8125rem; color: #777; line-height: 1.5; }
+
+        /* Mermaid containers */
+        .diagram {
+            background: #0d0d0d; border: 1px solid #1a1a1c;
+            padding: 32px; margin-bottom: 48px; overflow-x: auto;
+        }
+        .diagram svg { max-width: 100%; height: auto; }
+        .diagram-label {
+            font-size: .6875rem; text-transform: uppercase; letter-spacing: .08em;
+            color: #555; margin-bottom: 16px; font-weight: 600;
+        }
+
+        /* Architecture grid */
+        .layer-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 2px; background: #141416; border: 1px solid #141416; margin-bottom: 48px;
+        }
+        .layer-card {
+            background: #0e0e0e; padding: 24px;
+        }
+        .layer-card h4 { margin-bottom: 16px; }
+        .layer-card ul { list-style: none; }
+        .layer-card ul li {
+            font-size: .8125rem; color: #888; padding: 4px 0;
+            border-bottom: 1px solid #141416; display: flex; align-items: center; gap: 8px;
+        }
+        .layer-card ul li:last-child { border-bottom: none; }
+        .layer-card ul li .tag {
+            display: inline-block; font-size: .625rem; font-weight: 600;
+            padding: 1px 6px; background: #1a1a1c; color: #666; border-radius: 2px;
+            flex-shrink: 0;
+        }
+        .tag.python { background: #1e2a24; color: #4caf7d; }
+        .tag.ts { background: #1e2638; color: #5b8def; }
+        .tag.ai { background: #2a1e2a; color: #9b6fc0; }
+
+        /* Data model */
+        .model-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+            gap: 2px; background: #141416; border: 1px solid #141416; margin-bottom: 48px;
+        }
+        .model-card {
+            background: #0e0e0e; padding: 20px;
+        }
+        .model-card .model-name {
+            font-size: .8125rem; font-weight: 600; color: #e8e8e8;
+            margin-bottom: 12px; font-family: 'JetBrains Mono', monospace;
+        }
+        .model-card .model-fields { list-style: none; }
+        .model-card .model-fields li {
+            font-size: .75rem; color: #777; padding: 3px 0;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .model-card .model-fields li .type {
+            color: #4a8fe0; font-size: .6875rem;
+        }
+        .model-card .rel {
+            font-size: .6875rem; color: #4caf7d; margin-top: 8px; padding-top: 8px;
+            border-top: 1px solid #1a1a1c;
+        }
+
+        /* Tech stack */
+        .tech-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 2px; background: #141416; border: 1px solid #141416;
+        }
+        .tech-item {
+            background: #0e0e0e; padding: 20px 24px;
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .tech-item .tech-name {
+            font-size: .875rem; font-weight: 600; color: #e8e8e8;
+        }
+        .tech-item .tech-desc {
+            font-size: .75rem; color: #777;
+        }
+        .tech-item .tech-ver {
+            font-size: .6875rem; color: #4a8fe0; font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* API table */
+        .api-table {
+            width: 100%; border-collapse: collapse;
+            font-size: .8125rem; margin-bottom: 48px;
+        }
+        .api-table th {
+            text-align: left; padding: 10px 12px;
+            font-weight: 600; color: #999; font-size: .6875rem;
+            text-transform: uppercase; letter-spacing: .06em;
+            border-bottom: 1px solid #1a1a1c;
+        }
+        .api-table td {
+            padding: 8px 12px; border-bottom: 1px solid #141416; color: #aaa;
+            vertical-align: top;
+        }
+        .api-table tr:hover td { background: #0e0e0e; }
+        .api-table .method {
+            display: inline-block; font-weight: 600; font-size: .6875rem;
+            padding: 2px 6px; border-radius: 2px; font-family: 'JetBrains Mono', monospace;
+        }
+        .method.get { background: #1a2638; color: #5b8def; }
+        .method.post { background: #1e2a24; color: #4caf7d; }
+        .method.put { background: #2a261e; color: #d4a04a; }
+        .method.delete { background: #2a1e1e; color: #d44a4a; }
+
+        /* Build section */
+        .build-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 2px; background: #141416; border: 1px solid #141416; margin-bottom: 48px;
+        }
+        .build-card {
+            background: #0e0e0e; padding: 28px;
+        }
+        .build-card h4 { margin-bottom: 12px; }
+        .build-card code {
+            display: block; font-family: 'JetBrains Mono', monospace;
+            font-size: .75rem; color: #ccc; line-height: 1.7;
+            background: #080808; padding: 12px 16px; border: 1px solid #1a1a1c;
+            margin-bottom: 8px;
+        }
+        .build-card .label {
+            font-size: .6875rem; color: #666; margin-bottom: 4px; font-weight: 500;
+        }
+
+        /* Key-value list */
+        .kv-list { list-style: none; margin-bottom: 48px; }
+        .kv-list li {
+            display: flex; gap: 12px; padding: 8px 0;
+            border-bottom: 1px solid #141416; font-size: .8125rem;
+        }
+        .kv-list li .key { color: #999; min-width: 110px; flex-shrink: 0; }
+        .kv-list li .val { color: #bbb; }
+
+        /* Flow steps */
+        .flow-steps {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 2px; background: #141416; border: 1px solid #141416; margin-bottom: 48px;
+            counter-reset: step;
+        }
+        .flow-step {
+            background: #0e0e0e; padding: 24px; position: relative;
+        }
+        .flow-step::before {
+            counter-increment: step; content: "0" counter(step);
+            font-size: .625rem; font-weight: 700; color: #333;
+            letter-spacing: .05em; margin-bottom: 12px; display: block;
+        }
+        .flow-step h4 { margin-bottom: 8px; }
+        .flow-step p { font-size: .75rem; color: #777; line-height: 1.5; }
+
+        /* UI Component grid */
+        .ui-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 2px; background: #141416; border: 1px solid #141416; margin-bottom: 48px;
+        }
+        .ui-card {
+            background: #0e0e0e; padding: 20px; text-align: center;
+        }
+        .ui-card .ui-icon {
+            font-size: 1.75rem; margin-bottom: 8px; display: block;
+        }
+        .ui-card h4 { font-size: .8125rem; margin-bottom: 4px; color: #e8e8e8; }
+        .ui-card p { font-size: .6875rem; color: #777; }
+
+        @media (max-width: 768px) {
+            .container { padding: 0 16px; }
+            .hero h1 { font-size: 2rem; }
+            .build-grid { grid-template-columns: 1fr; }
+            nav ul { display: none; }
+        }
+
+        a { color: #5b8def; }
+        hr { border: none; border-top: 1px solid #141416; margin: 48px 0; }
+    </style>
+</head>
+<body>
+<nav>
+    <div class="container">
+        <div class="logo">ChatNova <span>— System Design</span></div>
+        <ul>
+            <li><a href="#overview">Overview</a></li>
+            <li><a href="#flow">Flow</a></li>
+            <li><a href="#architecture">Architecture</a></li>
+            <li><a href="#models">Data</a></li>
+            <li><a href="#ui">UI</a></li>
+            <li><a href="#stack">Stack</a></li>
+            <li><a href="#build">Build</a></li>
+        </ul>
+    </div>
+</nav>
+
+<div class="content">
+
+<!-- Hero -->
+<section class="hero" id="overview">
+    <div class="container">
+        <h1>ChatNova <span>— Multi-Provider AI Chat Platform</span></h1>
+        <p class="tagline">
+            A unified interface for interacting with Google Gemini, Cerebras, and Groq LLMs.
+            Features Multi-Modal RAG, web search, MCP agents, long-term memory,
+            Generative UI, and audio transcription — all with BYOK security.
+        </p>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <span class="icon">&#9889;</span>
+                <h3>Multi-Provider Orchestration</h3>
+                <p>Seamless switching between Gemini, Cerebras, and Groq via LangChain with unified streaming.</p>
+            </div>
+            <div class="feature-card">
+                <span class="icon">&#128196;</span>
+                <h3>Multi-Modal RAG</h3>
+                <p>Upload PDF, DOCX, TXT, and images for session-bound context with hybrid vector+keyword search and reranking.</p>
+            </div>
+            <div class="feature-card">
+                <span class="icon">&#127760;</span>
+                <h3>Web Search Integration</h3>
+                <p>Real-time DuckDuckGo search with automatic query expansion, image search, and source synthesis.</p>
+            </div>
+            <div class="feature-card">
+                <span class="icon">&#129302;</span>
+                <h3>MCP Agent Support</h3>
+                <p>Model Context Protocol adapters for custom tool execution with real-time SSE streaming of agent actions.</p>
+            </div>
+            <div class="feature-card">
+                <span class="icon">&#128202;</span>
+                <h3>Generative UI</h3>
+                <p>Dynamic charts (bar, line, pie), image galleries, and structured data rendered inline using Recharts.</p>
+            </div>
+            <div class="feature-card">
+                <span class="icon">&#128221;</span>
+                <h3>Long-Term Memory</h3>
+                <p>AI-extracted user facts saved to PostgreSQL, selectively retrieved per conversation for personalized responses.</p>
+            </div>
+            <div class="feature-card">
+                <span class="icon">&#127908;</span>
+                <h3>Audio Transcription</h3>
+                <p>Voice input via Groq Whisper integration with browser MediaRecorder for in-chat speech-to-text.</p>
+            </div>
+            <div class="feature-card">
+                <span class="icon">&#128274;</span>
+                <h3>BYOK Security</h3>
+                <p>User-level API key encryption (Fernet), JWT cookies, token blacklisting, rate limiting, and input sanitization.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- End-to-End Flow -->
+<section id="flow">
+    <div class="container">
+        <h2>System Flow</h2>
+        <p>End-to-end message lifecycle from user input to AI response, showing all subsystems that participate.</p>
+
+        <div class="diagram">
+            <div class="diagram-label">End-to-End Message Flow</div>
+            <pre class="mermaid">
+flowchart TB
+    U[User] -- "types message" --> CI[ChatInput]
+    CI -- "attaches docs/images" --> CHAT[Chat Component]
+    CHAT -- "/chat/stream SSE" --> API[FastAPI /api/v1/chat/stream]
+
+    subgraph Auth [Authentication Layer]
+        AUTH[JWT Cookie Check] --> ACL[Token Blacklist Check]
+        ACL --> RATE[Rate Limiter]
+    end
+
+    API --> AUTH
+
+    subgraph Prep [Request Preparation]
+        PREP1[Create Message in DB] --> PREP2[Load Session History]
+        PREP2 --> PREP3[Fetch Custom Instructions]
+        PREP3 --> PREP4[Fetch Relevant Memories]
+        PREP4 --> PREP5[Fetch RAG Document Chunks]
+    end
+
+    RATE --> Prep
+
+    subgraph Search [Web Search]
+        SW1[Generate Search Queries via LLM]
+        SW1 --> SW2[Parallel DuckDuckGo Search]
+        SW2 --> SW3[Optional Image Search]
+        SW3 --> SW4[Merge & Deduplicate Results]
+    end
+
+    Prep -- "if search_web=true" --> Search
+
+    subgraph LLM [AI Orchestration]
+        direction TB
+        L1[Build System Prompt]
+        L1 --> L2{Standard or Agent?}
+        L2 -- Standard --> L3[LangChain Prompt Template]
+        L3 --> L4[ChatModel.astream]
+        L2 -- Agent --> L5[MCPAgent with Tools]
+        L5 --> L6[Dynamic Tool Execution]
+        L6 --> L7[Stream Tool Events + Text]
+    end
+
+    Search -- "search results" --> LLM
+    Prep -- "context" --> LLM
+
+    subgraph Post [Post-Processing]
+        PP1[Moderate Output]
+        PP1 --> PP2[Extract & Save Memories]
+        PP2 --> PP3[Update Session Title if 'New Chat']
+        PP3 --> PP4[Append Source Citations]
+    end
+
+    LLM -- SSE chunks --> Post
+
+    Post -- "SSE: content / tool_start / tool_end / memory_saved" --> FRONT[Frontend]
+    FRONT -- "renders markdown + charts + galleries" --> U
+    ```
+        </div>
+
+        <h3>Key Flow States</h3>
+        <div class="flow-steps">
+            <div class="flow-step">
+                <h4>Input</h4>
+                <p>User enters text, selects model, toggles web search, attaches files. /commands for search/tools toggle.</p>
+            </div>
+            <div class="flow-step">
+                <h4>Auth</h4>
+                <p>JWT from HTTP cookie verified. Token checked against blacklist. Rate limit enforced (10/min production).</p>
+            </div>
+            <div class="flow-step">
+                <h4>Context Assembly</h4>
+                <p>Session history loaded. Custom instructions fetched. Memories retrieved via LLM relevance filter. RAG chunks via hybrid vector+keyword search + rerank.</p>
+            </div>
+            <div class="flow-step">
+                <h4>Web Search</h4>
+                <p>LLM generates 3 optimized queries. Parallel DuckDuckGo execution. Image search if needed. Results merged and deduplicated.</p>
+            </div>
+            <div class="flow-step">
+                <h4>LLM Streaming</h4>
+                <p>System prompt built with context. Standard or Agent mode. Tokens streamed via SSE as JSON events.</p>
+            </div>
+            <div class="flow-step">
+                <h4>Post-Processing</h4>
+                <p>Output moderated for harmful patterns. Facts extracted and saved to memory. Session title auto-updated. Source citations appended.</p>
+            </div>
+            <div class="flow-step">
+                <h4>Render</h4>
+                <p>Markdown rendered with react-markdown. Generative UI components parsed from JSON. Charts via Recharts. Image gallery for search results.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Architecture -->
+<section id="architecture">
+    <div class="container">
+        <h2>Architecture</h2>
+        <p>ChatNova follows a layered architecture: React SPA frontend communicates with FastAPI backend over REST + SSE. PostgreSQL with pgvector handles persistence and vector search.</p>
+
+        <div class="diagram">
+            <div class="diagram-label">Layered Architecture</div>
+            <pre class="mermaid">
+graph TB
+    subgraph FRONTEND ["Frontend — React 19 / TypeScript / Vite"]
+        ROUTER[React Router] --> PAGES
+        subgraph PAGES ["Pages"]
+            CHAT[Chat]
+            AUTH[Login / Register]
+            SETTINGS[Settings]
+        end
+        CHAT --> COMPS
+        subgraph COMPS ["Components"]
+            CI[ChatInput]
+            CS[ChatSidebar]
+            CM[ChatMessageItem]
+            SK[SkeletonMessage]
+            MRK[MarkdownRenderer]
+            GEN[GenerativeUIRenderer]
+            CHRT[ChartRenderer]
+            IG[ImageGallery]
+            SC[SearchResults]
+            NC[NewsCard]
+        end
+        CHAT --> HOOKS
+        subgraph HOOKS ["Hooks"]
+            HCS[useChatStreaming]
+            HCSESS[useChatSessions]
+            HCM[useChatModels]
+            HT[useTheme]
+        end
+        HOOKS --> API[utils/api.ts - Axios]
+    end
+
+    subgraph BACKEND ["Backend — Python 3.12 / FastAPI"]
+        GATE[FastAPI Gateway]
+        subgraph API_V1 ["API v1"]
+            AUTH_API[auth: /api/v1/auth]
+            CHAT_API[chat: /api/v1]
+            USER_API[users: /api/v1/users]
+            MEM_API[memories: /api/v1/memories]
+            SRC_API[search: /api/v1/search]
+        end
+        GATE --> API_V1
+
+        subgraph SERVICES ["Services"]
+            AIS[ai_chat / AIOrchestrator]
+            SESS[session_service]
+            RAG[rag_service]
+            MEMS[memory_service]
+            WSS[web_search / DuckDuckGo]
+            EMBD[embedding_service]
+            DOCP[document_processor]
+            RNK[rerank_service]
+        end
+        CHAT_API --> SERVICES
+
+        subgraph CORE ["Core"]
+            CFG[config]
+            SEC[security / JWT / Fernet]
+            COMP[compression]
+            SH[security_headers]
+            GUI[generative_ui / UI Schema]
+            IV[input_validation / Sanitizer]
+        end
+        SERVICES --> CORE
+
+        subgraph DATA ["Data Layer"]
+            CRUD[CRUD / Repository Layer]
+            MODELS[SQLAlchemy Models]
+            ALEMBIC[Alembic Migrations]
+        end
+        SERVICES --> CRUD
+        CRUD --> MODELS
+        MODELS --> ALEMBIC
+    end
+
+    API --> GATE
+
+    subgraph DB ["PostgreSQL + pgvector"]
+        USER_T[users]
+        SESS_T[chat_sessions]
+        MSG_T[messages]
+        APIK_T[user_api_keys]
+        MEM_T[user_memories]
+        DOC_T[session_documents]
+        CHK_T[document_chunks / vector]
+        TBL_T[token_blacklist]
+        SCH_T[search_history]
+        MCP_T[user_mcp_servers]
+    end
+    MODELS --> DB
+
+    subgraph EXT ["External"]
+        GOOGLE[Google Gemini API]
+        CEREBRAS[Cerebras API]
+        GROQ[Groq API + Whisper]
+        DDG[DuckDuckGo Search]
+        USER_MCP[User-Configured MCP Servers]
+    end
+    AIS --> EXT
+    WSS --> DDG
+    ```
+        </div>
+
+        <h3>Component Layers</h3>
+        <div class="layer-grid">
+            <div class="layer-card">
+                <h4>Presentation</h4>
+                <ul>
+                    <li><span class="tag ts">TS</span> React 19 + TypeScript 5.9</li>
+                    <li><span class="tag ts">TS</span> Vite 7 build tool</li>
+                    <li><span class="tag ts">TS</span> Bootstrap 5 + React-Bootstrap</li>
+                    <li><span class="tag ts">TS</span> Lucide React icons</li>
+                    <li><span class="tag ts">TS</span> Recharts / Chart.js for charts</li>
+                    <li><span class="tag ts">TS</span> react-markdown + remark-gfm</li>
+                </ul>
+            </div>
+            <div class="layer-card">
+                <h4>API Gateway</h4>
+                <ul>
+                    <li><span class="tag python">PY</span> FastAPI 0.118+</li>
+                    <li><span class="tag python">PY</span> Pydantic V2 validation</li>
+                    <li><span class="tag python">PY</span> SlowAPI rate limiting</li>
+                    <li><span class="tag python">PY</span> SSE streaming responses</li>
+                    <li><span class="tag python">PY</span> CORS / Security headers</li>
+                    <li><span class="tag python">PY</span> Response compression</li>
+                </ul>
+            </div>
+            <div class="layer-card">
+                <h4>AI Orchestration</h4>
+                <ul>
+                    <li><span class="tag python">PY</span> LangChain Core + integrations</li>
+                    <li><span class="tag python">PY</span> Google Generative AI</li>
+                    <li><span class="tag python">PY</span> Cerebras + Groq providers</li>
+                    <li><span class="tag python">PY</span> MCP-Use agent framework</li>
+                    <li><span class="tag python">PY</span> Gemini text-embedding-004</li>
+                    <li><span class="tag python">PY</span> FlashRank reranking</li>
+                </ul>
+            </div>
+            <div class="layer-card">
+                <h4>Data & Services</h4>
+                <ul>
+                    <li><span class="tag python">PY</span> SQLAlchemy 2.0 ORM</li>
+                    <li><span class="tag python">PY</span> Alembic migrations</li>
+                    <li><span class="tag python">PY</span> PostgreSQL + pgvector</li>
+                    <li><span class="tag python">PY</span> PyMuPDF / python-docx</li>
+                    <li><span class="tag python">PY</span> DuckDuckGo search</li>
+                    <li><span class="tag python">PY</span> OAuth2 JWT + bcrypt</li>
+                </ul>
+            </div>
+        </div>
+
+        <h3>API Surface</h3>
+        <table class="api-table">
+            <thead>
+                <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><span class="method post">POST</span></td><td>/api/v1/auth/register</td><td>User registration</td></tr>
+                <tr><td><span class="method post">POST</span></td><td>/api/v1/auth/login</td><td>JWT-based login (HTTP-only cookie)</td></tr>
+                <tr><td><span class="method post">POST</span></td><td>/api/v1/auth/logout</td><td>Blacklist token</td></tr>
+                <tr><td><span class="method post">POST</span></td><td>/api/v1/chat/stream</td><td>SSE streaming chat with context</td></tr>
+                <tr><td><span class="method post">POST</span></td><td>/api/v1/chat/agent-stream</td><td>MCP agent with SSE tool events</td></tr>
+                <tr><td><span class="method post">POST</span></td><td>/api/v1/chat/upload</td><td>Upload document for RAG</td></tr>
+                <tr><td><span class="method post">POST</span></td><td>/api/v1/chat/transcribe</td><td>Audio transcription</td></tr>
+                <tr><td><span class="method get">GET</span></td><td>/api/v1/sessions</td><td>List user sessions</td></tr>
+                <tr><td><span class="method get">GET</span></td><td>/api/v1/sessions/{id}/messages</td><td>Paginated session messages</td></tr>
+                <tr><td><span class="method get">GET</span></td><td>/api/v1/chat/models</td><td>Available models</td></tr>
+                <tr><td><span class="method get">GET</span></td><td>/api/v1/memories</td><td>List user memories</td></tr>
+                <tr><td><span class="method get">GET</span></td><td>/api/v1/users/me</td><td>Current user profile</td></tr>
+                <tr><td><span class="method put">PUT</span></td><td>/api/v1/users/me/api-keys</td><td>Save encrypted API key (BYOK)</td></tr>
+                <tr><td><span class="method delete">DELETE</span></td><td>/api/v1/sessions/{id}</td><td>Delete session + cascade messages/documents</td></tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- Data Models -->
+<section id="models">
+    <div class="container">
+        <h2>Data Models</h2>
+        <p>Ten SQLAlchemy models across 10 PostgreSQL tables, with pgvector extension for embedding storage.</p>
+
+        <div class="diagram">
+            <div class="diagram-label">Entity-Relationship Diagram</div>
+            <pre class="mermaid">
+erDiagram
+    User {
+        int id PK
+        string email UK
+        string hashed_password
+        bool is_active
+        int messages_used
+        string custom_instructions
+        datetime created_at
+    }
+
+    ChatSession {
+        int id PK
+        int user_id FK
+        string title
+        string description
+        datetime created_at
+        datetime updated_at
+    }
+
+    Message {
+        int id PK
+        int user_id FK
+        int session_id FK
+        text content
+        string model
+        text response
+        json images
+        datetime created_at
+    }
+
+    UserAPIKey {
+        int id PK
+        int user_id FK
+        string model_name
+        string encrypted_key
+        datetime created_at
+    }
+
+    UserMCPServer {
+        int id PK
+        int user_id FK
+        string mcp_servers_config
+        datetime created_at
+    }
+
+    UserMemory {
+        int id PK
+        int user_id FK
+        text content
+        datetime created_at
+        datetime last_accessed_at
+    }
+
+    SessionDocument {
+        int id PK
+        string filename
+        string file_type
+        string file_path
+        int session_id FK
+        int user_id FK
+        int message_id FK
+        string processing_status
+        datetime created_at
+    }
+
+    DocumentChunk {
+        int id PK
+        int document_id FK
+        text content
+        vector embedding
+        int page_number
+        datetime created_at
+    }
+
+    SearchHistory {
+        int id PK
+        int user_id FK
+        string query
+        string search_type
+        datetime created_at
+    }
+
+    TokenBlacklist {
+        int id PK
+        string token_jti UK
+        datetime expires_at
+        datetime created_at
+    }
+
+    User ||--o{ ChatSession : owns
+    User ||--o{ UserAPIKey : has
+    User ||--o{ UserMCPServer : configures
+    User ||--o{ UserMemory : remembers
+    User ||--o{ SearchHistory : searches
+    ChatSession ||--o{ Message : contains
+    ChatSession ||--o{ SessionDocument : has
+    SessionDocument ||--o{ DocumentChunk : "chunked into"
+    SessionDocument o{--|| Message : references
+    ```
+        </div>
+
+        <h3>Model Details</h3>
+        <div class="model-grid">
+            <div class="model-card">
+                <div class="model-name">User</div>
+                <ul class="model-fields">
+                    <li>id <span class="type">int PK</span></li>
+                    <li>email <span class="type">string UK</span></li>
+                    <li>hashed_password <span class="type">string</span></li>
+                    <li>is_active <span class="type">bool</span></li>
+                    <li>messages_used <span class="type">int</span></li>
+                    <li>custom_instructions <span class="type">string?</span></li>
+                </ul>
+                <div class="rel">1 owns N sessions, memories, api_keys, mcp_servers</div>
+            </div>
+            <div class="model-card">
+                <div class="model-name">ChatSession</div>
+                <ul class="model-fields">
+                    <li>id <span class="type">int PK</span></li>
+                    <li>user_id <span class="type">int FK</span></li>
+                    <li>title <span class="type">string</span></li>
+                    <li>description <span class="type">text?</span></li>
+                    <li>created_at / updated_at</li>
+                </ul>
+                <div class="rel">1 contains N messages</div>
+            </div>
+            <div class="model-card">
+                <div class="model-name">Message</div>
+                <ul class="model-fields">
+                    <li>id <span class="type">int PK</span></li>
+                    <li>content <span class="type">text</span></li>
+                    <li>model <span class="type">string</span></li>
+                    <li>response <span class="type">text</span></li>
+                    <li>images <span class="type">json?</span></li>
+                </ul>
+                <div class="rel">references Session via session_id FK</div>
+            </div>
+            <div class="model-card">
+                <div class="model-name">SessionDocument</div>
+                <ul class="model-fields">
+                    <li>id <span class="type">int PK</span></li>
+                    <li>filename / file_type / file_path</li>
+                    <li>processing_status <span class="type">enum</span></li>
+                    <li>session_id / user_id <span class="type">FKs</span></li>
+                </ul>
+                <div class="rel">1 document = N chunks (with embeddings)</div>
+            </div>
+            <div class="model-card">
+                <div class="model-name">DocumentChunk</div>
+                <ul class="model-fields">
+                    <li>id <span class="type">int PK</span></li>
+                    <li>content <span class="type">text</span></li>
+                    <li>embedding <span class="type">vector(768)</span></li>
+                    <li>page_number <span class="type">int?</span></li>
+                </ul>
+                <div class="rel">vector column via pgvector extension</div>
+            </div>
+            <div class="model-card">
+                <div class="model-name">UserMemory</div>
+                <ul class="model-fields">
+                    <li>id <span class="type">int PK</span></li>
+                    <li>content <span class="type">text</span></li>
+                    <li>last_accessed_at <span class="type">datetime</span></li>
+                </ul>
+                <div class="rel">LLM-extracted user facts</div>
+            </div>
+            <div class="model-card">
+                <div class="model-name">UserAPIKey</div>
+                <ul class="model-fields">
+                    <li>model_name <span class="type">string</span></li>
+                    <li>encrypted_key <span class="type">string</span></li>
+                </ul>
+                <div class="rel">Fernet-encrypted BYOK</div>
+            </div>
+            <div class="model-card">
+                <div class="model-name">TokenBlacklist</div>
+                <ul class="model-fields">
+                    <li>token_jti <span class="type">string UK</span></li>
+                    <li>expires_at <span class="type">datetime</span></li>
+                </ul>
+                <div class="rel">JWT revocation on logout</div>
+            </div>
+        </div>
+
+        <h3>RAG Data Flow</h3>
+        <div class="diagram">
+            <div class="diagram-label">Document Processing Pipeline</div>
+            <pre class="mermaid">
+flowchart LR
+    UPLOAD[File Upload] --> EXTRACT[Text Extraction]
+    EXTRACT --> CHUNK[RecursiveCharacterTextSplitter<br/>chunk_size=1000, overlap=100]
+    CHUNK --> EMBED[Google text-embedding-004]
+    EMBED --> STORE[pgvector Storage]
+    QUERY[User Query] --> OPT[LLM Query Optimization]
+    OPT --> VS[Vector Search<br/>cosine_distance]
+    OPT --> KW[Keyword Search<br/>ILIKE]
+    VS --> MERGE[Merge & Deduplicate]
+    KW --> MERGE
+    MERGE --> RERANK[FlashRank Reranker]
+    RERANK --> CONTEXT["Inject as DOCUMENT CONTEXT"]
+    ```
+        </div>
+    </div>
+</section>
+
+<!-- UI Components -->
+<section id="ui">
+    <div class="container">
+        <h2>UI Components</h2>
+        <p>React component tree organized by feature domain. All components use functional patterns with hooks and TypeScript interfaces.</p>
+
+        <div class="ui-grid">
+            <div class="ui-card"><span class="ui-icon">&#128172;</span><h4>Chat</h4><p>Main chat orchestrator with sidebar, message list, and input. Routes via /chat?session={id}</p></div>
+            <div class="ui-card"><span class="ui-icon">&#9000;</span><h4>ChatInput</h4><p>Textarea with auto-resize, model selector, /commands, file upload, mic, search toggle</p></div>
+            <div class="ui-card"><span class="ui-icon">&#9776;</span><h4>ChatSidebar</h4><p>Session list with search, pinning, infinite scroll, new session button</p></div>
+            <div class="ui-card"><span class="ui-icon">&#128221;</span><h4>ChatMessageItem</h4><p>Message bubble with context menu, copy/edit/delete, regenerate, version history</p></div>
+            <div class="ui-card"><span class="ui-icon">&#128200;</span><h4>GenerativeUIRenderer</h4><p>Parses JSON UI specs from LLM, renders charts (Recharts), image galleries, news cards</p></div>
+            <div class="ui-card"><span class="ui-icon">&#127912;</span><h4>MarkdownRenderer</h4><p>react-markdown with remark-gfm, syntax highlighting, inline rendering</p></div>
+            <div class="ui-card"><span class="ui-icon">&#128269;</span><h4>SearchResults</h4><p>Inline search result cards with titles, snippets, dates, and links</p></div>
+            <div class="ui-card"><span class="ui-icon">&#127758;</span><h4>ImageGallery</h4><p>Grid of search images with thumbnails, source attribution, and lightbox</p></div>
+            <div class="ui-card"><span class="ui-icon">&#9881;</span><h4>Settings</h4><p>Profile edit, BYOK management, MCP server config, model test, memory management</p></div>
+            <div class="ui-card"><span class="ui-icon">&#127910;</span><h4>Login / Register</h4><p>JWT-based auth forms with error handling and redirect to /chat</p></div>
+            <div class="ui-card"><span class="ui-icon">&#127769;</span><h4>ThemeToggle</h4><p>Dark/light mode with next-themes, system preference detection</p></div>
+            <div class="ui-card"><span class="ui-icon">&#9888;</span><h4>Toast / Modal</h4><p>Context-based notification system and reusable modal shell</p></div>
+        </div>
+
+        <h3>SSE Event Protocol</h3>
+        <p>The streaming protocol uses Server-Sent Events with JSON-encoded data lines. The frontend <code>streamChat</code> function in <code>utils/api.ts</code> handles parsing.</p>
+        <div class="diagram">
+            <div class="diagram-label">Streaming Protocol</div>
+            <pre class="mermaid">
+sequenceDiagram
+    participant F as Frontend
+    participant B as Backend
+
+    F->>B: POST /chat/stream (SSE)
+    Note over B: Create message record in DB
+    B-->>F: data: {"type":"metadata","message_id":42}
+
+    Note over B: Begin LLM streaming
+    loop Token Chunks
+        B-->>F: data: {"type":"content","content":"Hello"}
+        B-->>F: data: {"type":"content","content":" world"}
+    end
+
+    Note over B: Extract memories
+    B-->>F: data: {"type":"memory_saved","content":"User likes Python"}
+    B-->>F: data: [DONE]
+
+    Note over F: Render complete message
+    ```
+        </div>
+
+        <h3>Agent Streaming Events</h3>
+        <p>When using MCP agent mode (<code>/chat/agent-stream</code>), additional event types provide real-time tool visibility:</p>
+        <ul class="kv-list">
+            <li><span class="key">tool_start</span><span class="val">{ "tool": "search", "input": "...", "tool_call_id": "..." }</span></li>
+            <li><span class="key">tool_end</span><span class="val">{ "output": "...", "tool_call_id": "..." }</span></li>
+            <li><span class="key">content</span><span class="val">Text token chunks from LLM</span></li>
+            <li><span class="key">error</span><span class="val">Error message if agent fails</span></li>
+        </ul>
+    </div>
+</section>
+
+<!-- Tech Stack -->
+<section id="stack">
+    <div class="container">
+        <h2>Tech Stack</h2>
+        <p>All dependencies across the full stack, organized by layer.</p>
+
+        <h3>Frontend</h3>
+        <div class="tech-grid" style="margin-bottom:24px">
+            <div class="tech-item"><span class="tech-name">React</span><span class="tech-desc">UI framework</span><span class="tech-ver">19.2</span></div>
+            <div class="tech-item"><span class="tech-name">TypeScript</span><span class="tech-desc">Type safety</span><span class="tech-ver">5.9</span></div>
+            <div class="tech-item"><span class="tech-name">Vite</span><span class="tech-desc">Build tool</span><span class="tech-ver">7.1</span></div>
+            <div class="tech-item"><span class="tech-name">Bootstrap</span><span class="tech-desc">CSS framework</span><span class="tech-ver">5.3</span></div>
+            <div class="tech-item"><span class="tech-name">React-Bootstrap</span><span class="tech-desc">Bootstrap components</span><span class="tech-ver">2.10</span></div>
+            <div class="tech-item"><span class="tech-name">Recharts</span><span class="tech-desc">Chart library</span><span class="tech-ver">2.15</span></div>
+            <div class="tech-item"><span class="tech-name">Chart.js</span><span class="tech-desc">Chart library</span><span class="tech-ver">4.5</span></div>
+            <div class="tech-item"><span class="tech-name">react-router-dom</span><span class="tech-desc">Routing</span><span class="tech-ver">7.9</span></div>
+            <div class="tech-item"><span class="tech-name">Axios</span><span class="tech-desc">HTTP client</span><span class="tech-ver">1.12</span></div>
+            <div class="tech-item"><span class="tech-name">Lucide React</span><span class="tech-desc">Icons</span><span class="tech-ver">0.545</span></div>
+            <div class="tech-item"><span class="tech-name">react-markdown</span><span class="tech-desc">Markdown rendering</span><span class="tech-ver">10.1</span></div>
+            <div class="tech-item"><span class="tech-name">next-themes</span><span class="tech-desc">Theme management</span><span class="tech-ver">0.4</span></div>
+            <div class="tech-item"><span class="tech-name">Vitest</span><span class="tech-desc">Test runner</span><span class="tech-ver">4.0</span></div>
+            <div class="tech-item"><span class="tech-name">pnpm</span><span class="tech-desc">Package manager</span><span class="tech-ver">10.13</span></div>
+        </div>
+
+        <h3>Backend</h3>
+        <div class="tech-grid" style="margin-bottom:24px">
+            <div class="tech-item"><span class="tech-name">Python</span><span class="tech-desc">Runtime</span><span class="tech-ver">3.12+</span></div>
+            <div class="tech-item"><span class="tech-name">FastAPI</span><span class="tech-desc">Web framework</span><span class="tech-ver">0.118</span></div>
+            <div class="tech-item"><span class="tech-name">SQLAlchemy</span><span class="tech-desc">ORM</span><span class="tech-ver">2.0</span></div>
+            <div class="tech-item"><span class="tech-name">LangChain</span><span class="tech-desc">AI orchestration</span><span class="tech-ver">0.3</span></div>
+            <div class="tech-item"><span class="tech-name">Alembic</span><span class="tech-desc">Migrations</span><span class="tech-ver">1.16</span></div>
+            <div class="tech-item"><span class="tech-name">Pydantic</span><span class="tech-desc">Validation</span><span class="tech-ver">2.12</span></div>
+            <div class="tech-item"><span class="tech-name">uv</span><span class="tech-desc">Package manager</span><span class="tech-ver">latest</span></div>
+            <div class="tech-item"><span class="tech-name">pytest</span><span class="tech-desc">Testing</span><span class="tech-ver">8.4</span></div>
+            <div class="tech-item"><span class="tech-name">MCP-Use</span><span class="tech-desc">Agent framework</span><span class="tech-ver">1.3</span></div>
+            <div class="tech-item"><span class="tech-name">SlowAPI</span><span class="tech-desc">Rate limiting</span><span class="tech-ver">0.1</span></div>
+            <div class="tech-item"><span class="tech-name">PyMuPDF</span><span class="tech-desc">PDF extraction</span><span class="tech-ver">1.26</span></div>
+            <div class="tech-item"><span class="tech-name">FlashRank</span><span class="tech-desc">Reranking</span><span class="tech-ver">0.2</span></div>
+        </div>
+
+        <h3>Infrastructure</h3>
+        <div class="tech-grid">
+            <div class="tech-item"><span class="tech-name">PostgreSQL</span><span class="tech-desc">Database</span><span class="tech-ver">16</span></div>
+            <div class="tech-item"><span class="tech-name">pgvector</span><span class="tech-desc">Vector extension</span><span class="tech-ver">0.3</span></div>
+            <div class="tech-item"><span class="tech-name">Docker</span><span class="tech-desc">Containerization</span><span class="tech-ver">Compose</span></div>
+            <div class="tech-item"><span class="tech-name">Groq Whisper</span><span class="tech-desc">Audio transcription</span><span class="tech-ver">large-v3</span></div>
+            <div class="tech-item"><span class="tech-name">Google Gemini</span><span class="tech-desc">LLM + Embeddings</span><span class="tech-ver">2.5 flash</span></div>
+            <div class="tech-item"><span class="tech-name">Cerebras</span><span class="tech-desc">LLM inference</span><span class="tech-ver">Qwen 235B</span></div>
+        </div>
+    </div>
+</section>
+
+<!-- Build -->
+<section id="build">
+    <div class="container">
+        <h2>Build & Run</h2>
+        <p>Two deployment paths: Docker Compose for full stack or local development with services run individually.</p>
+
+        <div class="build-grid">
+            <div class="build-card">
+                <h4>Docker (Full Stack)</h4>
+                <div class="label">Build and start all services</div>
+                <code>docker-compose up --build</code>
+                <div class="label">Services</div>
+                <code>Frontend :5173<br>Backend API :8000<br>Docs :8000/docs</code>
+            </div>
+            <div class="build-card">
+                <h4>Local Development</h4>
+                <div class="label">1. Start database</div>
+                <code>docker-compose up db -d</code>
+                <div class="label">2. Run migrations</div>
+                <code>cd backend && uv run alembic upgrade head</code>
+                <div class="label">3. Start backend</div>
+                <code>uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000</code>
+                <div class="label">4. Start frontend</div>
+                <code>cd frontend && pnpm dev</code>
+            </div>
+        </div>
+
+        <h3>Testing</h3>
+        <div class="build-grid">
+            <div class="build-card">
+                <h4>Backend Tests</h4>
+                <div class="label">All tests with coverage</div>
+                <code>./run_tests_with_coverage.sh</code>
+                <div class="label">Direct pytest</div>
+                <code>cd backend && PYTHONPATH=. uv run pytest</code>
+                <div class="label">Single file</div>
+                <code>PYTHONPATH=. uv run pytest tests/unit/test_ai_service.py</code>
+            </div>
+            <div class="build-card">
+                <h4>Frontend Tests</h4>
+                <div class="label">Watch mode</div>
+                <code>cd frontend && pnpm test</code>
+                <div class="label">CI mode (once)</div>
+                <code>pnpm test -- --run</code>
+                <div class="label">Single file</div>
+                <code>pnpm test -- src/components/chat/__tests__/ChatInput.test.tsx --run</code>
+            </div>
+        </div>
+
+        <h3>Linting & Type Checking</h3>
+        <div class="build-grid">
+            <div class="build-card">
+                <h4>Backend (Ruff)</h4>
+                <code>cd backend && uv run ruff check .</code>
+            </div>
+            <div class="build-card">
+                <h4>Frontend (tsc)</h4>
+                <code>cd frontend && pnpm build</code>
+                <span style="font-size:.6875rem;color:#777;display:block;margin-top:4px">Runs tsc via build script</span>
+            </div>
+        </div>
+
+        <h3>Configuration</h3>
+        <p>Environment variables defined in <code>.env</code> at project root:</p>
+        <ul class="kv-list">
+            <li><span class="key">DATABASE_URL</span><span class="val">PostgreSQL connection string</span></li>
+            <li><span class="key">SECRET_KEY</span><span class="val">JWT signing secret</span></li>
+            <li><span class="key">FERNET_KEY</span><span class="val">API key encryption key (optional)</span></li>
+            <li><span class="key">GOOGLE_API_KEY</span><span class="val">Google Gemini API key (fallback)</span></li>
+            <li><span class="key">CEREBRAS_API_KEY</span><span class="val">Cerebras API key (fallback)</span></li>
+            <li><span class="key">GROQ_API_KEY</span><span class="val">Groq API key (fallback)</span></li>
+            <li><span class="key">CORS_ORIGINS</span><span class="val">Comma-separated allowed origins</span></li>
+        </ul>
+    </div>
+</section>
+
+</div>
+
+<script>
+    // Smooth scroll for nav links
+    document.querySelectorAll('nav a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    });
+</script>
+</body>
+</html>

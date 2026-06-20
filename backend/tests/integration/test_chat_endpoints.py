@@ -1,3 +1,5 @@
+import json
+
 from fastapi.testclient import TestClient
 from app.models.user import User
 from unittest.mock import patch
@@ -145,6 +147,36 @@ def test_create_chat_message(client: TestClient, test_user: User):
         }
         response = client.post("/api/v1/chat", json=message_data)
         assert response.status_code == 200
+
+
+def test_create_chat_message_persists_generated_ui(client: TestClient, test_user: User):
+    """Generated UI markers should be saved as ui_data, not response text."""
+    login_data = {"username": test_user.email, "password": "TestPassword123"}
+    response = client.post("/api/v1/auth/login", data=login_data)
+    assert response.status_code == 200
+
+    ui_data = {
+        "type": "container",
+        "children": [
+            {"type": "custom", "props": {"html": "<html><body>chart</body></html>"}}
+        ],
+    }
+
+    async def mock_simple_chat(*args, **kwargs):
+        yield "Here is the chart."
+        yield f"__GEN_UI__{json.dumps(ui_data)}__END_UI__\n"
+
+    with patch("app.api.v1.chat.ai_service.simple_chat", new=mock_simple_chat):
+        message_data = {
+            "content": "line chart of apple stock in last 10 years",
+            "model": "gemini-2.5-flash",
+        }
+        response = client.post("/api/v1/chat", json=message_data)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["response"] == "Here is the chart."
+    assert data["ui_data"] == ui_data
 
 
 def test_create_chat_message_with_session(client: TestClient, test_user: User):

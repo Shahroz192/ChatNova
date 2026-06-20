@@ -5,7 +5,7 @@ Unit tests for backend CRUD operations
 from sqlalchemy.orm import Session
 from app.crud.user import user, user_api_key, user_mcp_server
 from app.crud.message import message
-from app.schemas.user import UserCreate, UserAPIKeyCreate, UserMCPServerCreate
+from app.schemas.user import UserCreate, UserMCPServerCreate
 from app.schemas.message import MessageCreate
 
 
@@ -226,12 +226,15 @@ def test_create_user_api_key(db_session: Session):
     created_user = user.create(db_session, obj_in=user_in)
 
     # Create an API key for the user
+    # The CRUD create accepts a dict with the encrypted key (encrypted server-side in real flow)
     api_key_data = {
         "model_name": "gpt-3.5-turbo",
-        "encrypted_key": "encrypted_test_key_123",
+        "encrypted_key": "this_is_the_encrypted_form_of_the_key",
     }
     created_api_key = user_api_key.create(
-        db_session, obj_in=UserAPIKeyCreate(**api_key_data), user_id=created_user.id
+        db_session,
+        obj_in=api_key_data,
+        user_id=created_user.id,
     )
 
     assert created_api_key.user_id == created_user.id
@@ -250,10 +253,10 @@ def test_get_user_api_key_by_user_and_model(db_session: Session):
     user_in = UserCreate(**user_data)
     created_user = user.create(db_session, obj_in=user_in)
 
-    # Create an API key for the user
+    # Create an API key for the user (passing dict directly, as the real route handler does)
     api_key_data = {"model_name": "gpt-4", "encrypted_key": "encrypted_test_key_456"}
     user_api_key.create(
-        db_session, obj_in=UserAPIKeyCreate(**api_key_data), user_id=created_user.id
+        db_session, obj_in=api_key_data, user_id=created_user.id
     )
 
     # Retrieve the API key
@@ -264,6 +267,7 @@ def test_get_user_api_key_by_user_and_model(db_session: Session):
     assert retrieved_api_key is not None
     assert retrieved_api_key.user_id == created_user.id
     assert retrieved_api_key.model_name == api_key_data["model_name"]
+    assert retrieved_api_key.encrypted_key == api_key_data["encrypted_key"]
 
 
 def test_create_user_mcp_server(db_session: Session):

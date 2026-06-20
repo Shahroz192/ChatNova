@@ -61,6 +61,7 @@ export const streamChat = async (
   onToolUpdate?: (update: any) => void,
   onMemorySaved?: (fact: string) => void,
   onMetadata?: (metadata: any) => void,
+  onUI?: (uiData: any) => void,
   signal?: AbortSignal,
 ) => {
   try {
@@ -116,6 +117,8 @@ export const streamChat = async (
     let buffer = "";
     let hasSearchData = false;
     let currentEventData = "";
+    let streamCompleted = false;
+    let streamFailed = false;
 
     const processEvent = (dataRaw: string) => {
       const data = dataRaw;
@@ -132,11 +135,13 @@ export const streamChat = async (
         if (hasSearchData && searchOptions?.search_web) {
           addToSearchHistory(content, searchOptions.search_type || "general");
         }
+        streamCompleted = true;
         onComplete?.();
         return "done";
       }
 
       if (dataTrimmed.startsWith("ERROR:")) {
+        streamFailed = true;
         onError?.(dataTrimmed.slice(6));
         return "error";
       }
@@ -158,8 +163,12 @@ export const streamChat = async (
         } else if (parsedData.type === "memory_saved") {
           onMemorySaved?.(parsedData.content);
         } else if (parsedData.type === "error") {
+          streamFailed = true;
           onError?.(parsedData.content);
           return "error";
+        } else if (parsedData.type === "ui") {
+          // Structured output UI from the new backend flow
+          onUI?.(parsedData.data);
         } else if (
           parsedData.type === "container" &&
           Array.isArray(parsedData.children)
@@ -245,7 +254,14 @@ export const streamChat = async (
     }
 
     if (currentEventData !== "") {
-      processEvent(currentEventData);
+      const status = processEvent(currentEventData);
+      if (status === "done" || status === "error") {
+        return;
+      }
+    }
+
+    if (!streamCompleted && !streamFailed) {
+      onError?.("Response stream ended before completion");
     }
   } catch (error) {
     console.error("Streaming error:", error);

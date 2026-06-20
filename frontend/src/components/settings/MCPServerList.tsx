@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Edit2, Trash2, Save, X, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { PencilSimple, Trash, FloppyDisk, X, CheckCircle, WarningCircle, HardDrives } from '@phosphor-icons/react';
 import api from '../../utils/api';
-import Notification from '../common/Notification';
-import '../../styles/MCPServer.css';
 
 interface MCPServer {
   id: number;
@@ -34,7 +32,7 @@ const MCPServerList: React.FC = () => {
         }
       });
       setServers(servers);
-    } catch (error) {
+    } catch {
       setNotification({ type: 'error', message: 'Failed to load servers.' });
     } finally {
       setIsLoading(false);
@@ -47,27 +45,24 @@ const MCPServerList: React.FC = () => {
 
   const validateConfig = useCallback((config: string): boolean => {
     setValidationError('');
-    
+
     if (!config.trim()) {
       setValidationError('Configuration is required');
       return false;
     }
-    
+
     try {
       const parsedConfig = JSON.parse(config);
-      
       if (!parsedConfig.mcpServers || typeof parsedConfig.mcpServers !== 'object') {
         setValidationError('Must contain "mcpServers" object');
         return false;
       }
-      
       if (Object.keys(parsedConfig.mcpServers).length === 0) {
         setValidationError('At least one server must be configured');
         return false;
       }
-      
       return true;
-    } catch (jsonError) {
+    } catch {
       setValidationError('Invalid JSON format');
       return false;
     }
@@ -79,224 +74,218 @@ const MCPServerList: React.FC = () => {
     setValidationError('');
   }, []);
 
-  const handleConfigChange = useCallback((value: string) => {
-    setEditConfig(value);
-    if (validationError && value.trim()) {
-      validateConfig(value);
-    }
-  }, [validationError, validateConfig]);
-
   const handleSaveEdit = useCallback(async () => {
-    if (!validateConfig(editConfig)) {
-      return;
-    }
-    
+    if (!validateConfig(editConfig)) return;
+
     setIsSaving(true);
     try {
-      await api.post('/users/me/mcp-servers', {
-        mcp_servers_config: editConfig,
-      });
-      setNotification({ type: 'success', message: 'Servers updated successfully!' });
+      await api.post('/users/me/mcp-servers', { mcp_servers_config: editConfig });
       setEditingServer(null);
       setValidationError('');
+      setNotification({ type: 'success', message: 'Servers updated successfully!' });
       fetchServers();
     } catch (apiError: any) {
-      const errorMessage = apiError.response?.data?.detail || 'Failed to update servers.';
-      setNotification({ type: 'error', message: errorMessage });
+      setNotification({ type: 'error', message: apiError.response?.data?.detail || 'Failed to update servers.' });
     } finally {
       setIsSaving(false);
     }
   }, [editConfig, validateConfig, fetchServers]);
 
   const handleRemove = useCallback(async () => {
-    const confirmed = window.confirm('Are you sure you want to remove all MCP servers? This action cannot be undone.');
-    if (!confirmed) return;
-    
+    if (!window.confirm('Are you sure you want to remove all MCP servers?')) return;
+
     setIsDeleting(true);
     try {
       await api.delete('/users/me/mcp-servers');
       setNotification({ type: 'success', message: 'Servers removed successfully!' });
       fetchServers();
     } catch (error: any) {
-      const errorMessage = error.response?.data?.detail || 'Failed to remove servers.';
-      setNotification({ type: 'error', message: errorMessage });
+      setNotification({ type: 'error', message: error.response?.data?.detail || 'Failed to remove servers.' });
     } finally {
       setIsDeleting(false);
     }
   }, [fetchServers]);
 
-  const handleCancelEdit = useCallback(() => {
-    setEditingServer(null);
-    setEditConfig('');
-    setValidationError('');
-  }, []);
-
   const handleCloseNotification = useCallback(() => setNotification(null), []);
 
+  if (isLoading) {
+    return (
+      <div style={{ textAlign: 'center', padding: '40px 0' }}>
+        <div style={{
+          width: 24, height: 24,
+          border: '2px solid var(--border-light, #e8e5df)',
+          borderTopColor: 'var(--text-primary, #1c1917)',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+          margin: '0 auto 12px'
+        }} />
+        <p className="settings-hint" style={{ margin: 0 }}>Loading servers...</p>
+      </div>
+    );
+  }
+
+  if (servers.length === 0) {
+    return (
+      <div className="settings-empty">
+        <div className="settings-empty-icon">
+          <HardDrives size={40} weight="light" />
+        </div>
+        <p className="settings-empty-title">No MCP Servers Configured</p>
+        <p className="settings-empty-desc">Add your first server using the button above.</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4">
-      {/* Loading State */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="animate-spin text-blue-500 mcp-server-loader mr-3" size={24} />
-          <span className="text-gray-600 mcp-server-loading-text">Loading servers...</span>
-        </div>
-      ) : servers.length === 0 ? (
-        <div className="text-center py-12 border-2 border-dashed border-secondary-200 mcp-server-empty-state rounded-xl animate-fadeIn">
-          <p className="text-secondary-600 mcp-server-empty-text font-medium mb-1">No MCP Servers Configured</p>
-          <p className="text-sm text-secondary-500 mcp-server-empty-subtext">Add your first server using the form above!</p>
-        </div>
-      ) : (
-        servers.map((server) => (
-          <div key={server.id} className="card mb-lg slide-up">
-             {editingServer === server.id ? (
-                <div className="space-y-4">
-                  <div className="flex items-center mb-2">
-                    <Edit2 size={18} className="text-blue-500 mcp-server-edit-icon mr-2" />
-                    <h4 className="font-semibold text-gray-800 mcp-server-edit-title">Edit Configuration</h4>
-                  </div>
-                  
-                  <textarea
-                    value={editConfig}
-                    onChange={(e) => handleConfigChange(e.target.value)}
-                    className={`form-control font-mono resize-y min-h-[180px] ${
-                      validationError
-                        ? 'border-error-500 focus:ring-error-500 focus:border-error-500'
-                        : 'focus:ring-primary-500 focus:border-primary-500'
-                    } mcp-server-textarea`}
-                    placeholder='{"mcpServers": {"server1": {...}, "server2": {...}}}'
-                    disabled={isSaving}
-                  />
-                  
-                  {/* Validation feedback */}
-                  {validationError ? (
-                    <div className="flex items-center text-error-600 mcp-server-validation-error text-sm">
-                      <AlertCircle size={16} className="mr-1.5" />
-                      {validationError}
-                    </div>
-                  ) : null}
-                  
-                  {!validationError && editConfig.trim() ? (
-                    <div className="flex items-center text-success-600 mcp-server-validation-success text-sm">
-                      <CheckCircle size={16} className="mr-1.5" />
-                      Valid configuration
-                    </div>
-                  ) : null}
-                  
-                  <div className="flex justify-end space-x-3 pt-2">
-                    <button
-                      onClick={handleCancelEdit}
-                      disabled={isSaving}
-                      className="btn btn-secondary flex items-center"
-                    >
-                      <X size={16} className="mr-2" />
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleSaveEdit}
-                      disabled={isSaving || !editConfig.trim() || !!validationError}
-                      className="btn btn-success flex items-center"
-                    >
-                      {isSaving ? (
-                        <>
-                          <Loader2 className="animate-spin mr-2" size={16} />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save size={16} className="mr-2" />
-                          Save Changes
-                        </>
-                      )}
-                    </button>
-                  </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {servers.map((server) => (
+        <div key={server.id} className="settings-server-card">
+          {editingServer === server.id ? (
+            <div style={{ padding: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <PencilSimple size={18} style={{ color: 'var(--text-secondary, #78716c)' }} />
+                <h4 style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary, #1c1917)', margin: 0 }}>
+                  Edit Configuration
+                </h4>
+              </div>
+
+              <textarea
+                value={editConfig}
+                onChange={(e) => {
+                  setEditConfig(e.target.value);
+                  if (validationError && e.target.value.trim()) {
+                    validateConfig(e.target.value);
+                  }
+                }}
+                className="settings-textarea"
+                style={{
+                  minHeight: 180,
+                  fontFamily: 'var(--font-family-mono, monospace)',
+                  fontSize: '0.8125rem',
+                  borderColor: validationError ? 'var(--error, #ef4444)' : undefined,
+                }}
+                disabled={isSaving}
+              />
+
+              {validationError && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, color: 'var(--error, #ef4444)', fontSize: '0.8125rem' }}>
+                  <WarningCircle size={16} weight="bold" />
+                  {validationError}
                 </div>
-              ) : (
-                <div>
-                  <div className="flex justify-between items-start p-4">
-                    <div className="flex-1">
-                      <div className="flex items-center mb-6">
-                        <h4 className="font-semibold text-gray-800 mcp-server-config-title whitespace-nowrap">MCP Server Configuration</h4>
-                      </div>
-                      
-                      <details className="text-sm text-gray-600 mcp-server-details mt-6 group">
-                        <summary className="cursor-pointer py-3 px-4 bg-gray-50 mcp-server-summary rounded-lg inline-flex items-center font-medium transition-colors">
-                          <span className="group-open:hidden">Show Configuration</span>
-                          <span className="hidden group-open:inline">Hide Configuration</span>
-                        </summary>
-                        <pre className="mt-4 p-5 bg-gray-50 mcp-server-config-pre border border-gray-200 rounded-lg text-xs overflow-auto max-h-48 font-mono leading-relaxed">{server.mcp_servers_config}</pre>
-                      </details>
-                      
-                      {server.servers && Object.keys(server.servers).length > 0 ? (
-                        <div className="mt-4 p-3 bg-blue-50 mcp-server-configured-section border border-blue-200 rounded-lg">
-                          <p className="text-sm font-semibold text-blue-900 mcp-server-configured-title mb-2">Configured Servers ({Object.keys(server.servers).length})</p>
-                          <ul className="space-y-1.5">
-                            {Object.keys(server.servers).map(serverName => (
-                              <li key={serverName} className="flex items-center text-sm text-blue-800 mcp-server-configured-item">
-                                <span className="w-1.5 h-1.5 bg-blue-500 mcp-server-configured-dot rounded-full mr-2"></span>
-                                <code className="font-mono text-xs bg-blue-100 mcp-server-configured-code px-2 py-0.5 rounded">{serverName}</code>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null}
-                    </div>
-                    
-                    <div className="flex flex-col items-end space-y-3 ml-6">
-                      <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm ${
-                        server.status === 'connected' 
-                          ? 'bg-green-100 text-green-800 mcp-server-status-connected border border-green-200' 
-                          : server.status === 'loading' 
-                          ? 'bg-yellow-100 text-yellow-800 mcp-server-status-loading border border-yellow-200' 
-                          : 'bg-red-100 text-red-800 mcp-server-status-error border border-red-200'
-                      }`}>
-                        {server.status === 'connected' ? <CheckCircle size={14} className="mr-1" /> : null}
-                        {server.status === 'error' ? <AlertCircle size={14} className="mr-1" /> : null}
-                        {server.status.charAt(0).toUpperCase() + server.status.slice(1)}
+              )}
+
+              {!validationError && editConfig.trim() && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, color: 'var(--accent, #059669)', fontSize: '0.8125rem' }}>
+                  <CheckCircle size={16} weight="bold" />
+                  Valid configuration
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+                <button
+                  onClick={() => { setEditingServer(null); setValidationError(''); }}
+                  disabled={isSaving}
+                  className="settings-btn settings-btn-secondary"
+                >
+                  <X size={16} />
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEdit}
+                  disabled={isSaving || !editConfig.trim() || !!validationError}
+                  className="settings-btn settings-btn-success"
+                >
+                  {isSaving ? 'Saving...' : <><FloppyDisk size={16} /> Save Changes</>}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="settings-server-header">
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h4 style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary, #1c1917)', margin: '0 0 4px' }}>
+                  MCP Server Configuration
+                </h4>
+
+                <details className="settings-server-details" style={{ marginTop: 8 }}>
+                  <summary className="settings-server-summary">
+                    <HardDrives size={14} />
+                    Show Configuration
+                  </summary>
+                  <div className="settings-server-config">
+                    <pre className="settings-server-pre">{server.mcp_servers_config}</pre>
+                  </div>
+                </details>
+
+                {server.servers && Object.keys(server.servers).length > 0 && (
+                  <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {Object.keys(server.servers).map(serverName => (
+                      <span
+                        key={serverName}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          padding: '4px 10px',
+                          background: 'rgba(5, 150, 105, 0.08)',
+                          color: 'var(--accent, #059669)',
+                          borderRadius: 'var(--radius-xs)',
+                          fontSize: '0.75rem',
+                          fontWeight: 500,
+                          fontFamily: 'var(--font-family-mono, monospace)',
+                        }}
+                      >
+                        {serverName}
                       </span>
-                      
-                      <div className="flex flex-col space-y-2 w-full">
-                        <button
-                          onClick={() => handleEdit(server)}
-                          disabled={isDeleting}
-                          className="btn btn-primary flex items-center justify-center"
-                        >
-                          <Edit2 size={16} className="mr-2" />
-                          Edit
-                        </button>
-                        <button
-                          onClick={handleRemove}
-                          disabled={isDeleting}
-                          className="btn btn-error flex items-center justify-center"
-                        >
-                          {isDeleting ? (
-                            <>
-                              <Loader2 className="animate-spin mr-2" size={16} />
-                              Removing...
-                            </>
-                          ) : (
-                            <>
-                              <Trash2 size={16} className="mr-2" />
-                              Remove
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
+                    ))}
                   </div>
+                )}
+              </div>
+
+              <div className="settings-server-meta">
+                <span className={`settings-badge ${
+                  server.status === 'connected' ? 'settings-badge-success' :
+                  server.status === 'loading' ? 'settings-badge-warning' : 'settings-badge-error'
+                }`}>
+                  {server.status === 'connected' && <CheckCircle size={12} weight="bold" />}
+                  {server.status === 'error' && <WarningCircle size={12} weight="bold" />}
+                  {server.status.charAt(0).toUpperCase() + server.status.slice(1)}
+                </span>
+                <div className="settings-server-actions">
+                  <button
+                    onClick={() => handleEdit(server)}
+                    disabled={isDeleting}
+                    className="settings-btn settings-btn-primary"
+                    style={{ justifyContent: 'center' }}
+                  >
+                    <PencilSimple size={14} />
+                    Edit
+                  </button>
+                  <button
+                    onClick={handleRemove}
+                    disabled={isDeleting}
+                    className="settings-btn settings-btn-danger"
+                    style={{ justifyContent: 'center' }}
+                  >
+                    {isDeleting ? 'Removing...' : <><Trash size={14} /> Remove</>}
+                  </button>
                 </div>
-             )}
-           </div>
-         ))
-       )}
-      
-      {notification ? (
-        <Notification
-          type={notification.type}
-          message={notification.message}
-          onClose={handleCloseNotification}
-        />
-      ) : null}
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {notification && (
+        <div
+          className={`settings-alert ${notification.type === 'success' ? 'settings-alert-success' : 'settings-alert-error'}`}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+        >
+          <span>{notification.message}</span>
+          <button onClick={handleCloseNotification} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

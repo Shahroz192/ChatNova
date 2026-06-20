@@ -1,5 +1,5 @@
 import React from 'react';
-import { Copy, RotateCcw, Edit, Trash2 } from 'lucide-react';
+import { Copy, ArrowCounterClockwise, PencilSimple, Trash } from '@phosphor-icons/react';
 import type { Message } from '../../types/chat';
 
 interface MessageContextMenuProps {
@@ -41,7 +41,7 @@ const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
             className="context-menu-item edit"
             onClick={() => handleAction(() => handleEditMessage(message))}
           >
-            <Edit size={16} />
+            <PencilSimple size={16} />
             Edit Message
           </button>
           <div className="context-menu-separator"></div>
@@ -54,7 +54,7 @@ const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
             className="context-menu-item regenerate"
             onClick={() => handleAction(() => handleRegenerateResponse(message))}
           >
-            <RotateCcw size={16} />
+            <ArrowCounterClockwise size={16} />
             Regenerate Response
           </button>
           <div className="context-menu-separator"></div>
@@ -75,7 +75,7 @@ const MessageContextMenu: React.FC<MessageContextMenuProps> = ({
         className="context-menu-item delete-item"
         onClick={() => handleAction(() => handleDeleteMessage(message.id))}
       >
-        <Trash2 size={16} />
+        <Trash size={16} />
         Delete Message
       </button>
     </div>

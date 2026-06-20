@@ -129,6 +129,21 @@ export const useChatStreaming = (
         const controller = new AbortController();
         setStreamingAbortController(controller);
 
+        // Safety timeout: abort the stream if no response within 90s
+        const streamTimeout = setTimeout(() => {
+          if (!controller.signal.aborted) {
+            controller.abort();
+            showError("Response timed out. Please try again.");
+            resetStreamingState();
+          }
+        }, 90_000);
+
+        // Clear the timeout when stream completes
+        const clearStreamTimeout = () => clearTimeout(streamTimeout);
+
+        // Use a ref to track the real message ID (avoids stale closure issues)
+        const activeMsgIdRef = { current: tempMessage.id };
+
         await streamChat(
           messageContent,
           selectedModel,
@@ -138,10 +153,11 @@ export const useChatStreaming = (
           images,
           handleStreamChunk,
           () => {
+            clearStreamTimeout();
             const finalResponse = streamingResponseRef.current;
             setMessages((prev) =>
               prev.map((msg) =>
-                msg.id === tempMessage.id
+                msg.id === activeMsgIdRef.current
                   ? { ...msg, response: finalResponse, status: "sent" as const }
                   : msg,
               ),
@@ -150,35 +166,53 @@ export const useChatStreaming = (
             fetchSessions();
           },
           (error) => {
+            clearStreamTimeout();
             setMessages((prev) =>
               prev.map((msg) =>
-                msg.id === tempMessage.id
+                msg.id === activeMsgIdRef.current
                   ? { ...msg, status: "failed" as const }
                   : msg,
               ),
             );
-            showError("Message Error", `Failed to send message: ${error}`);
+            showError(`Failed to send: ${error}`);
             resetStreamingState();
           },
-          (toolUpdate) => applyToolUpdate(tempMessage.id, toolUpdate),
-          (fact) => showSuccess("Memory Saved", fact),
+          (toolUpdate) => applyToolUpdate(activeMsgIdRef.current, toolUpdate),
+          () => showSuccess(`Memory saved`),
           (metadata) => {
             if (metadata.message_id) {
               setMessages((prev) =>
                 prev.map((msg) =>
-                  msg.id === tempMessage.id
+                  msg.id === activeMsgIdRef.current
                     ? { ...msg, id: metadata.message_id }
                     : msg,
                 ),
               );
+              activeMsgIdRef.current = metadata.message_id;
               setStreamingMessageId(metadata.message_id);
             }
           },
+          (uiData) => {
+            // Store validated UI data from structured output on the message
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === activeMsgIdRef.current
+                  ? { ...msg, ui_data: uiData }
+                  : msg,
+              ),
+            );
+          },
           controller.signal,
         );
+        clearStreamTimeout();
       } catch (error) {
         console.error("Failed to send message", error);
-        showError("Message Error", "Failed to send message. Please try again.");
+        // Don't show error toast if it was a timeout (already handled above)
+        if (error instanceof DOMException && error.name === "AbortError") {
+          // Timeout already showed its own error, just clean up
+        } else {
+          showError("Failed to send message");
+        }
       } finally {
         setLoading(false);
       }
@@ -249,6 +283,8 @@ export const useChatStreaming = (
         const controller = new AbortController();
         setStreamingAbortController(controller);
 
+        const activeMsgIdRef = { current: message.id };
+
         await streamChat(
           message.content,
           message.model ?? selectedModel,
@@ -295,32 +331,40 @@ export const useChatStreaming = (
               ),
             );
             showError(
-              "Message Error",
-              `Failed to regenerate response: ${error}`,
+              `Failed to regenerate: ${error}`,
             );
             resetStreamingState();
           },
           (toolUpdate) => applyToolUpdate(message.id, toolUpdate),
-          (fact) => showSuccess("Memory Saved", fact),
+          () => showSuccess(`Memory saved`),
           (metadata) => {
             if (metadata.message_id) {
               setMessages((prev) =>
                 prev.map((msg) =>
-                  msg.id === message.id
+                  msg.id === activeMsgIdRef.current
                     ? { ...msg, id: metadata.message_id }
                     : msg,
                 ),
               );
+              activeMsgIdRef.current = metadata.message_id;
               setStreamingMessageId(metadata.message_id);
             }
+          },
+          (uiData) => {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === activeMsgIdRef.current
+                  ? { ...msg, ui_data: uiData }
+                  : msg,
+              ),
+            );
           },
           controller.signal,
         );
       } catch (error) {
         console.error("Failed to regenerate response", error);
         showError(
-          "Message Error",
-          "Failed to regenerate response. Please try again.",
+          "Failed to regenerate response",
         );
       } finally {
         setLoading(false);

@@ -1,18 +1,27 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { ListGroup } from "react-bootstrap";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import {
+  MagnifyingGlass,
+  FileText,
+  Code,
+  ChartBar,
+  Lightbulb,
+  BookOpen,
+  ArrowRight,
+} from "@phosphor-icons/react";
+
 import api, { getSearchHistory, getDocumentStatus } from "../../utils/api";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "../../contexts/ToastContext";
 import ChatInput from "./ChatInput";
 import ChatSidebar from "./ChatSidebar";
 import ChatMessageItem from "./ChatMessageItem";
+import SettingsModal from "../settings/SettingsModal";
 import type { Message } from "../../types/chat";
 import type { WebSearchOptions } from "../../types/search";
 import { useChatSessions } from "../../hooks/useChatSessions";
 import { useChatModels } from "../../hooks/useChatModels";
 import { useChatStreaming } from "../../hooks/useChatStreaming";
 
-import "../../styles/ChatVariables.css";
 import "../../styles/ChatBase.css";
 import "../../styles/ChatMessages.css";
 import "../../styles/ChatInput.css";
@@ -67,11 +76,63 @@ const Chat: React.FC<ChatProps> = () => {
     };
   });
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [activeContextMenu, setActiveContextMenu] = useState<{
     id: number;
     type: "user" | "assistant";
   } | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  const suggestionCards = useMemo(() => [
+    {
+      icon: MagnifyingGlass,
+      title: "Research & Summarize",
+      desc: "Research any topic and get a concise summary",
+      prompt: "Research and summarize the latest developments in ",
+    },
+    {
+      icon: FileText,
+      title: "Write & Create",
+      desc: "Draft emails, stories, or creative content",
+      prompt: "Help me write ",
+    },
+    {
+      icon: Code,
+      title: "Code & Debug",
+      desc: "Get help with code, debugging, and architecture",
+      prompt: "Help me debug this code: ",
+    },
+    {
+      icon: ChartBar,
+      title: "Analyze Data",
+      desc: "Analyze data, create charts, and visualize insights",
+      prompt: "Analyze this data and show me a visualization: ",
+    },
+    {
+      icon: Lightbulb,
+      title: "Brainstorm Ideas",
+      desc: "Generate creative ideas and solutions",
+      prompt: "Help me brainstorm ideas for ",
+    },
+    {
+      icon: BookOpen,
+      title: "Learn & Explain",
+      desc: "Get clear explanations of complex topics",
+      prompt: "Explain ",
+    },
+  ], []);
+
+  const handleSuggestionClick = useCallback((prompt: string) => {
+    setInput(prompt);
+    requestAnimationFrame(() => {
+      const textarea = document.querySelector('.modern-textarea') as HTMLTextAreaElement;
+      if (textarea) {
+        textarea.focus();
+        textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+  }, []);
   const isUploadingDocs = pendingDocuments.some((doc) => doc.isUploading);
   const isProcessingDocs = pendingDocuments.some(
     (doc) => doc.processingStatus === "pending" || doc.processingStatus === "processing",
@@ -158,7 +219,7 @@ const Chat: React.FC<ChatProps> = () => {
         );
         setMessages(response.data.data);
       } catch (error) {
-        showError("Loading Error", "Failed to load chat history.");
+        showError("Failed to load history");
         console.error("Failed to load history", error);
       }
     },
@@ -205,8 +266,7 @@ const Chat: React.FC<ChatProps> = () => {
           const success = await loadSessionById(sessionId);
           if (!success) {
             showError(
-              "Session Error",
-              `Session ${sessionId} not found or access denied.`,
+              `Session not found`,
             );
             navigate("/chat", { replace: true });
           }
@@ -346,7 +406,7 @@ const Chat: React.FC<ChatProps> = () => {
         setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
         setActiveContextMenu(null);
       } catch (error) {
-        showError("Delete Error", "Failed to delete message");
+        showError("Failed to delete message");
       }
     },
     [showError],
@@ -448,7 +508,7 @@ const Chat: React.FC<ChatProps> = () => {
           prev.filter((doc) => doc.clientId !== clientId),
         );
         console.error("Upload Error", error);
-        showError("Upload Error", "Failed to upload file");
+        showError("Failed to upload file");
       }
     },
     [ensureSessionId, showError, pollDocumentStatus],
@@ -493,23 +553,44 @@ const Chat: React.FC<ChatProps> = () => {
         onLoadMore={handleLoadMoreSessions}
         hasMore={hasMoreSessions}
         isLoading={isLoadingSessions}
+        onToggleExpanded={setIsSidebarExpanded}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
-      <div className="chat-main-content">
-        {messages.length === 0 ? (
-          <div className="welcome-overlay">
-            <h2 className="h3 fw-bold welcome-title">
-              Chat Smarter, Innovate Faster
-            </h2>
+      <div className={`chat-main-content ${isSidebarExpanded ? 'sidebar-expanded' : ''}`}>
+        <div className={`welcome-overlay ${messages.length > 0 ? 'hidden' : ''} ${isSidebarExpanded ? 'sidebar-expanded' : ''}`}>
+          <div className="welcome-inner">
+            <div className="welcome-cards-grid">
+              {suggestionCards.map((card, i) => {
+                const Icon = card.icon;
+                return (
+                  <button
+                    key={i}
+                    className="welcome-card"
+                    onClick={() => handleSuggestionClick(card.prompt)}
+                  >
+                    <div className="welcome-card-icon">
+                      <Icon size={22} weight="bold" />
+                    </div>
+                    <div className="welcome-card-text">
+                      <span className="welcome-card-title">{card.title}</span>
+                      <span className="welcome-card-desc">{card.desc}</span>
+                    </div>
+                    <ArrowRight size={14} className="welcome-card-arrow" weight="bold" />
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        ) : null}
+        </div>
         <div className="chat-messages-area">
           <div className="p-4">
-            <ListGroup variant="flush">
-              {messages.map((msg) => (
+            <div className="flex flex-col">
+              {messages.map((msg, index) => (
                 <ChatMessageItem
                   key={msg.id}
                   msg={msg}
+                  msgIndex={index}
                   streamingMessageId={streamingMessageId}
                   isStreaming={isStreaming}
                   streamingResponse={
@@ -524,11 +605,11 @@ const Chat: React.FC<ChatProps> = () => {
                   cancelStreaming={cancelStreaming}
                 />
               ))}
-            </ListGroup>
+            </div>
             <div ref={messagesEndRef} />
           </div>
         </div>
-        <div className="chat-input-area">
+        <div className={`chat-input-area ${isSidebarExpanded ? 'sidebar-expanded' : ''}`}>
           <ChatInput
             input={input}
             setInput={setInput}
@@ -558,6 +639,11 @@ const Chat: React.FC<ChatProps> = () => {
           />
         </div>
       </div>
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
     </div>
   );
 };

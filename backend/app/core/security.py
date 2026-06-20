@@ -37,7 +37,8 @@ def create_access_token(
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         )
 
-    to_encode.update({"exp": expire, "jti": token_jti})
+    now = datetime.now(UTC)
+    to_encode.update({"exp": expire, "iat": now, "jti": token_jti})
 
     encoded_jwt = jwt.encode(
         to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
@@ -68,6 +69,20 @@ def verify_token(token: str, db: Session = None):
         return user_id
     except JWTError as e:
         logging.warning(f"JWT validation error: {e}")
+        return None
+
+
+def get_token_issued_at(token: str) -> Optional[datetime]:
+    """Extract the iat (issued at) claim from a token."""
+    try:
+        unverified = jwt.decode(
+            token, settings.SECRET_KEY, options={"verify_signature": False}
+        )
+        iat_timestamp = unverified.get("iat")
+        if iat_timestamp:
+            return datetime.fromtimestamp(iat_timestamp, tz=UTC)
+        return None
+    except (JWTError, ValueError):
         return None
 
 

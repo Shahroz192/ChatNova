@@ -19,7 +19,7 @@ python-dotenv
 httpx
 pydantic
 pydantic-settings
-duckduckgo-search
+exa-py
 pgvector
 langchain-postgres
 pymupdf

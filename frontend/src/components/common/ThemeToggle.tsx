@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo } from 'react';
-import { Moon, Sun, Monitor } from 'lucide-react';
+import { Moon, Sun, Monitor } from '@phosphor-icons/react';
 import { useTheme } from '../../hooks/useTheme';
 
 interface ThemeToggleProps {

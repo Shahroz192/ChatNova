@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { X, FloppyDisk, Trash } from "@phosphor-icons/react";
 import api from "../../utils/api";
-import Notification from "../common/Notification";
-import "../../styles/BYOKForm.css";
 
 const BYOKForm: React.FC = () => {
   const [apiKeys, setApiKeys] = useState<{ [key: string]: string }>({});
@@ -12,11 +11,7 @@ const BYOKForm: React.FC = () => {
     message: string;
   } | null>(null);
 
-  const providers = useMemo(() => [
-    "Google",
-    "Cerebras",
-    "Groq",
-  ], []);
+  const providers = useMemo(() => ["Google", "Cerebras", "Groq"], []);
 
   const fetchAvailableProviders = useCallback(async () => {
     try {
@@ -40,19 +35,11 @@ const BYOKForm: React.FC = () => {
     if (!key) return;
     setIsTesting((prev) => ({ ...prev, [provider]: true }));
     try {
-      await api.post(`/chat/models/test/${provider}`, {
-        api_key: key,
-      });
-      setNotification({
-        type: "success",
-        message: `${provider} API key is valid!`,
-      });
+      await api.post(`/chat/models/test/${provider}`, { api_key: key });
+      setNotification({ type: "success", message: `${provider} API key is valid!` });
     } catch (error: any) {
       const errorMsg = error.response?.data?.detail || error.message || "Unknown error";
-      setNotification({
-        type: "error",
-        message: `Invalid ${provider} API key: ${errorMsg}`,
-      });
+      setNotification({ type: "error", message: `Invalid ${provider} API key: ${errorMsg}` });
     } finally {
       setIsTesting((prev) => ({ ...prev, [provider]: false }));
     }
@@ -62,157 +49,99 @@ const BYOKForm: React.FC = () => {
     const key = apiKeys[provider];
     if (!key) return;
     try {
-      await api.post("/users/me/api-keys", {
-        model_name: provider, // Using 'model_name' field to store provider
-        encrypted_key: key,
-      });
-      setNotification({
-        type: "success",
-        message: `API key for ${provider} saved successfully!`,
-      });
+      await api.post("/users/me/api-keys", { model_name: provider, api_key: key });
+      setNotification({ type: "success", message: `API key for ${provider} saved successfully!` });
       setApiKeys((prev) => ({ ...prev, [provider]: "" }));
       fetchAvailableProviders();
-    } catch (error) {
-      setNotification({
-        type: "error",
-        message: `Failed to save key for ${provider}. Please try again.`,
-      });
+    } catch {
+      setNotification({ type: "error", message: `Failed to save key for ${provider}.` });
     }
   }, [apiKeys, fetchAvailableProviders]);
 
   const handleDeleteKey = useCallback(async (provider: string) => {
-    if (!window.confirm(`Are you sure you want to delete the ${provider} API key?`)) {
-      return;
-    }
+    if (!window.confirm(`Are you sure you want to delete the ${provider} API key?`)) return;
     try {
       await api.delete(`/users/me/api-keys/${provider}`);
-      setNotification({
-        type: "success",
-        message: `API key for ${provider} deleted successfully.`,
-      });
+      setNotification({ type: "success", message: `API key for ${provider} deleted.` });
       fetchAvailableProviders();
-    } catch (error) {
-      setNotification({
-        type: "error",
-        message: `Failed to delete key for ${provider}. Please try again.`,
-      });
+    } catch {
+      setNotification({ type: "error", message: `Failed to delete key for ${provider}.` });
     }
   }, [fetchAvailableProviders]);
 
   const handleCloseNotification = useCallback(() => setNotification(null), []);
 
   return (
-    <div className="byok-form space-y-4">
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-800 byok-text-color mb-2">
-          Manage API Keys
-        </h3>
-        <p className="text-sm text-gray-600 byok-text-color">
-          Enter your API keys for the supported providers. All models from a provider will be unlocked.
-        </p>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {providers.map((provider) => {
+        const hasKey = availableProviders.includes(provider);
+        return (
+          <div key={provider} className="settings-provider-card" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
+            {hasKey && (
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent, #059669)', flexShrink: 0 }} />
+            )}
+            <span className="settings-provider-name" style={{ whiteSpace: 'nowrap', minWidth: 80 }}>{provider}</span>
+            <input
+              type="password"
+              value={hasKey ? "••••••••" : (apiKeys[provider] || "")}
+              onChange={(e) => handleKeyChange(provider, e.target.value)}
+              className="settings-input"
+              placeholder={hasKey ? "Key saved — delete to change" : "Enter your API key..."}
+              disabled={hasKey}
+              autoComplete="one-time-code"
+              style={{ fontSize: '0.8125rem', flex: 1, minWidth: 0 }}
+            />
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              {hasKey ? (
+                <button
+                  onClick={() => handleDeleteKey(provider)}
+                  className="settings-btn settings-btn-danger"
+                  title="Delete API key"
+                  style={{ padding: '6px 10px', fontSize: '0.75rem' }}
+                >
+                  <Trash size={14} />
+                  Delete
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => handleTestKey(provider)}
+                    disabled={isTesting[provider] || !apiKeys[provider]}
+                    className="settings-btn settings-btn-secondary"
+                    style={{ padding: '6px 10px', fontSize: '0.75rem' }}
+                  >
+                    {isTesting[provider] ? "Testing..." : "Test"}
+                  </button>
+                  <button
+                    onClick={() => handleSaveKey(provider)}
+                    disabled={!apiKeys[provider]}
+                    className="settings-btn settings-btn-success"
+                    style={{ padding: '6px 10px', fontSize: '0.75rem' }}
+                  >
+                    <FloppyDisk size={14} />
+                    Save
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        );
+      })}
 
-      <div className="overflow-x-auto rounded-lg byok-table-border">
-        <table className="w-100 min-w-full byok-table-bg">
-          <thead className="byok-table-header">
-            <tr>
-              <th className="py-3 px-4 byok-table-header-cell text-left text-sm font-semibold byok-table-header-text">
-                Provider
-              </th>
-              <th className="py-3 px-4 byok-table-header-cell text-left text-sm font-semibold byok-table-header-text">
-                API Key
-              </th>
-              <th className="py-3 px-4 byok-table-header-cell text-left text-sm font-semibold byok-table-header-text">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="byok-table-body">
-            {providers.map((provider) => (
-              <tr key={provider} className="byok-table-row">
-                <td className="py-3 px-4">
-                  <div className="flex items-center space-x-2">
-                    <span
-                      className={`font-medium ${availableProviders.includes(provider)
-                          ? "byok-model-available"
-                          : "byok-model-unavailable"
-                        }`}
-                    >
-                      {provider}
-                    </span>
-                    {availableProviders.includes(provider) ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium byok-badge-active">
-                        Active
-                      </span>
-                    ) : null}
-                  </div>
-                  {!availableProviders.includes(provider) ? (
-                    <span className="text-xs byok-model-required block mt-1">
-                      Key required
-                    </span>
-                  ) : null}
-                </td>
-                <td className="py-3 px-4">
-                  <input
-                    type="password"
-                    value={
-                      availableProviders.includes(provider)
-                        ? "•••••"
-                        : apiKeys[provider] || ""
-                    }
-                    onChange={(e) => handleKeyChange(provider, e.target.value)}
-                    className="w-full p-2 byok-input-field rounded-lg transition-all"
-                    placeholder={
-                      availableProviders.includes(provider) ? "Key saved" : "Enter API key..."
-                    }
-                    disabled={availableProviders.includes(provider)}
-                  />
-                </td>
-                <td className="py-3 px-4">
-                  <div className="d-inline-flex align-items-center gap-2">
-                    {availableProviders.includes(provider) ? (
-                      <>
-                        <button
-                          onClick={() => handleDeleteKey(provider)}
-                          className="btn btn-danger"
-                          title="Delete API key"
-                        >
-                          Delete
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => handleTestKey(provider)}
-                          disabled={isTesting[provider] || !apiKeys[provider]}
-                          className="btn btn-primary"
-                        >
-                          {isTesting[provider] ? "Testing..." : "Test"}
-                        </button>
-                        <button
-                          onClick={() => handleSaveKey(provider)}
-                          disabled={!apiKeys[provider]}
-                          className="btn btn-success"
-                        >
-                          Save
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {notification ? (
-        <Notification
-          type={notification.type}
-          message={notification.message}
-          onClose={handleCloseNotification}
-        />
-      ) : null}
+      {notification && (
+        <div
+          className={`settings-alert ${notification.type === 'success' ? 'settings-alert-success' : 'settings-alert-error'}`}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+        >
+          <span>{notification.message}</span>
+          <button
+            onClick={handleCloseNotification}
+            style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

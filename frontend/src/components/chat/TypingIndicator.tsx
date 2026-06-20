@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { Bot, Brain, Sparkles, Zap } from 'lucide-react';
+import { Robot, Brain, Sparkle, Lightning } from '@phosphor-icons/react';
 
 interface TypingIndicatorProps {
   modelName?: string;
@@ -23,7 +23,7 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
 
   const formatModelName = useCallback((name: string) => {
     const id = name.toLowerCase();
-    if (id.includes('qwen')) return id.includes('thinking') ? 'Qwen Thinking' : 'Qwen';
+    if (id.includes('zai-glm')) return 'ZAI GLM 4.7';
     if (id.includes('kimi')) return 'Kimi';
     if (id.includes('gpt-4o')) return 'GPT-4o';
     if (id.includes('claude')) return 'Claude';
@@ -37,13 +37,13 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
     if (name.includes('gemini') || name.includes('google')) {
       return {
         gradient: 'linear-gradient(135deg, #4285f4 0%, #34a853 100%)',
-        icon: Sparkles,
+        icon: Sparkle,
         iconColor: '#4285f4'
       };
-    } else if (name.includes('qwen') || name.includes('cerebras')) {
+    } else if (name.includes('zai-glm') || name.includes('cerebras')) {
       return {
         gradient: 'linear-gradient(135deg, #ff6b35 0%, #f7931e 100%)',
-        icon: Zap,
+        icon: Lightning,
         iconColor: '#ff6b35'
       };
     } else if (name.includes('groq')) {
@@ -57,7 +57,7 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
     // Default style
     return {
       gradient: 'linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%)',
-      icon: Bot,
+      icon: Robot,
       iconColor: '#0ea5e9'
     };
   }, [modelName]);

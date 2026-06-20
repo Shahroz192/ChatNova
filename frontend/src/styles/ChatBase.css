@@ -21,15 +21,14 @@
 }
 
 .form-select option {
-  background-color: var(--bg-primary) !important;
-  color: var(--text-primary) !important;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
 }
 
-/* Additional styling for select dropdown */
 .form-select {
-  background-color: var(--bg-primary) !important;
-  color: var(--text-primary) !important;
-  border-color: var(--border-medium) !important;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border-color: var(--border-medium);
 }
 
 .form-control::placeholder {
@@ -139,7 +138,7 @@
 }
 
 .btn-link {
-    color: var(--gray-900) !important;
+    color: var(--text-primary);
     background-color: transparent;
     border: none;
     text-decoration: none;

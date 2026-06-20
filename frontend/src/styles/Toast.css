@@ -1,6 +1,6 @@
 .toast-custom {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  transform: translateX(0);
+  transform: translateY(0);
   opacity: 1;
 }
 
@@ -14,27 +14,27 @@
 
 .toast-hidden {
   opacity: 0;
-  transform: translateX(100%);
+  transform: translateY(-12px);
 }
 
 @keyframes toast-in {
   from {
-    transform: translateX(100%);
+    transform: translateY(-12px);
     opacity: 0;
   }
   to {
-    transform: translateX(0);
+    transform: translateY(0);
     opacity: 1;
   }
 }
 
 @keyframes toast-out {
   from {
-    transform: translateX(0);
+    transform: translateY(0);
     opacity: 1;
   }
   to {
-    transform: translateX(100%);
+    transform: translateY(-12px);
     opacity: 0;
   }
 }
@@ -43,8 +43,7 @@
   background: transparent;
   border: none;
   padding: 4px;
-  border-radius: 4px;
-  color: currentColor;
+  border-radius: var(--radius-xs);
   display: flex;
   align-items: center;
   justify-content: center;

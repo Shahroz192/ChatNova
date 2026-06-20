@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ListGroup, Button, Alert, Spinner, Card } from "react-bootstrap";
-import { Trash2, Brain, RefreshCw } from "lucide-react";
+import { Trash, Brain, ArrowsClockwise } from "@phosphor-icons/react";
 import api from "../../utils/api";
 
 interface Memory {
@@ -48,82 +47,94 @@ const MemoryManagement: React.FC = () => {
 
     if (loading && memories.length === 0) {
         return (
-            <div className="text-center p-5">
-                <Spinner animation="border" variant="primary" />
-                <p className="mt-2 text-muted">Retrieving your memories...</p>
+            <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                <div
+                    style={{
+                        width: 24, height: 24,
+                        border: '2px solid var(--border-light, #e8e5df)',
+                        borderTopColor: 'var(--text-primary, #1c1917)',
+                        borderRadius: '50%',
+                        animation: 'spin 0.8s linear infinite',
+                        margin: '0 auto 12px'
+                    }}
+                />
+                <p className="settings-hint" style={{ margin: 0 }}>Retrieving your memories...</p>
             </div>
         );
     }
 
     return (
-        <div className="memory-management">
-            <div className="mb-4 d-flex justify-content-between align-items-center">
-                <div>
-                    <h3 className="text-lg font-semibold text-gray-800 mb-1 flex align-items-center gap-2">
-                        <Brain size={20} className="text-primary" />
-                        Memory Management
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-0">
-                        View and manage the facts ChatNova has learned about you.
-                    </p>
-                </div>
-                <Button 
-                    variant="link" 
-                    onClick={fetchMemories} 
+        <div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+                <button
+                    onClick={fetchMemories}
                     disabled={loading}
-                    className="p-0 text-decoration-none d-flex align-items-center gap-1"
+                    className="settings-btn settings-btn-secondary"
+                    style={{ padding: '6px 12px', fontSize: '0.75rem' }}
                 >
-                    <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+                    <ArrowsClockwise size={14} className={loading ? 'animate-spin' : ''} />
                     Refresh
-                </Button>
+                </button>
             </div>
 
-            {error && <Alert variant="danger" className="mb-4">{error}</Alert>}
+            {error && <div className="settings-alert settings-alert-error" style={{ marginBottom: 16 }}>{error}</div>}
 
             {memories.length === 0 ? (
-                <Card className="border-dashed bg-light">
-                    <Card.Body className="text-center py-5">
-                        <Brain size={48} className="text-muted mb-3 opacity-20" />
-                        <p className="text-muted mb-0">No memories stored yet.</p>
-                        <small className="text-muted">Chat with the AI to start building your personal context.</small>
-                    </Card.Body>
-                </Card>
+                <div className="settings-empty">
+                    <div className="settings-empty-icon">
+                        <Brain size={40} weight="light" />
+                    </div>
+                    <p className="settings-empty-title">No memories stored yet</p>
+                    <p className="settings-empty-desc">Chat with the AI to start building your personal context.</p>
+                </div>
             ) : (
-                <ListGroup variant="flush" className="border rounded-lg overflow-hidden">
+                <div className="settings-memory-list">
                     {memories.map((memory) => (
-                        <ListGroup.Item 
-                            key={memory.id}
-                            className="d-flex justify-content-between align-items-start py-3"
-                        >
-                            <div className="flex-grow-1 pr-3">
-                                <p className="mb-1 text-gray-800">{memory.content}</p>
-                                <small className="text-muted">
+                        <div key={memory.id} className="settings-memory-item">
+                            <Brain size={18} weight="light" style={{ color: 'var(--text-tertiary, #a8a29e)', marginTop: 2, flexShrink: 0 }} />
+                            <div className="settings-memory-content">
+                                <p className="settings-memory-text">{memory.content}</p>
+                                <p className="settings-memory-date">
                                     Learned on {new Date(memory.created_at).toLocaleDateString()}
-                                </small>
+                                </p>
                             </div>
-                            <Button 
-                                variant="outline-danger" 
-                                size="sm"
+                            <button
                                 onClick={() => handleDelete(memory.id)}
                                 disabled={deletingId === memory.id}
-                                className="border-0 p-2"
+                                className="settings-btn settings-btn-danger"
+                                style={{ padding: '6px 10px', fontSize: '0.75rem' }}
                                 title="Delete this memory"
                             >
                                 {deletingId === memory.id ? (
-                                    <Spinner animation="border" size="sm" />
+                                    <div
+                                        style={{
+                                            width: 14, height: 14,
+                                            border: '2px solid currentColor',
+                                            borderTopColor: 'transparent',
+                                            borderRadius: '50%',
+                                            animation: 'spin 0.8s linear infinite'
+                                        }}
+                                    />
                                 ) : (
-                                    <Trash2 size={16} />
+                                    <Trash size={14} />
                                 )}
-                            </Button>
-                        </ListGroup.Item>
+                            </button>
+                        </div>
                     ))}
-                </ListGroup>
+                </div>
             )}
-            
-            <div className="mt-4 alert alert-info py-2 px-3 border-0 bg-opacity-10">
-                <small className="d-block">
-                    <strong>Pro-tip:</strong> You can explicitly tell the AI to "remember" something, or it will pick up facts naturally as you talk.
-                </small>
+
+            <div style={{
+                marginTop: 16,
+                padding: '10px 14px',
+                fontSize: '0.75rem',
+                color: 'var(--text-secondary, #78716c)',
+                background: 'rgba(5, 150, 105, 0.06)',
+                border: '1px solid rgba(5, 150, 105, 0.1)',
+                borderRadius: 'var(--radius-sm)',
+                lineHeight: 1.4,
+            }}>
+                <strong>Pro-tip:</strong> You can explicitly tell the AI to "remember" something, or it will pick up facts naturally as you talk.
             </div>
         </div>
     );

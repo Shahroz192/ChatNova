@@ -92,7 +92,7 @@ const FloatingUI: React.FC<FloatingUIProps> = ({
         ref={containerRef}
         style={{
           backgroundColor: 'var(--bg-primary, #ffffff)',
-          borderRadius: '1rem',
+          borderRadius: 'var(--radius-lg)',
           width: '100%',
           maxWidth: '32rem',
           transform: isVisible ? 'scale(1)' : 'scale(0.95)',

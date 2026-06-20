@@ -76,7 +76,7 @@ export const useChatSessions = (_initialSessionIdFromUrl: string | null) => {
         await fetchSessions();
         return newSessionId;
       } catch (error) {
-        showError("Session Error", "Failed to create session.");
+        showError("Failed to create session");
         console.error("Failed to create session", error);
         throw error;
       }
@@ -94,9 +94,9 @@ export const useChatSessions = (_initialSessionIdFromUrl: string | null) => {
           clearMessages();
           navigate("/chat", { replace: true });
         }
-        showSuccess("Deleted", "Session deleted successfully");
+        showSuccess("Deleted successfully");
       } catch (error) {
-        showError("Delete Error", "Failed to delete session");
+        showError("Failed to delete session");
       }
     },
     [currentSessionId, navigate, showSuccess, showError],

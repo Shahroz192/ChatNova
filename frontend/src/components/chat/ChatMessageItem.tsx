@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { ListGroup, Button } from 'react-bootstrap';
-import { FileText } from 'lucide-react';
+import { FileText } from '@phosphor-icons/react';
 import Timestamp from './Timestamp';
 import MessageStatus from './MessageStatus';
 import MessageContextMenu from './MessageContextMenu';
@@ -12,6 +11,7 @@ import type { UIContainer } from '../../types/generative-ui';
 
 interface ChatMessageItemProps {
   msg: Message;
+  msgIndex?: number;
   streamingMessageId: number | null;
   isStreaming: boolean;
   streamingResponse: string;
@@ -26,6 +26,7 @@ interface ChatMessageItemProps {
 
 const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   msg,
+  msgIndex = 0,
   streamingMessageId,
   isStreaming,
   streamingResponse,
@@ -78,32 +79,56 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
     return { displayResponse: display, sources: srcList };
   }, [responseText]);
 
-  const uiData = useMemo(() => {
-    if (!displayResponse) return null;
+  // Extract UI container from structured output (backend) or inline JSON in the text (legacy)
+  const { uiData, displayTextWithoutUI } = useMemo(() => {
+    // Priority 1: Backend-validated structured output
+    if (msg.ui_data && msg.ui_data.type === 'container') {
+      return { uiData: msg.ui_data as UIContainer, displayTextWithoutUI: displayResponse };
+    }
+
+    // Priority 2: Legacy — extract inline ```json block from the text
+    if (!displayResponse) return { uiData: null, displayTextWithoutUI: displayResponse };
+
+    const jsonBlockMatch = displayResponse.match(/```json\n[\s\S]*?\n```/);
+    if (jsonBlockMatch) {
+      const jsonString = jsonBlockMatch[0];
+      const innerJson = jsonString.replace(/```json\n/, '').replace(/\n```/, '');
+      try {
+        const parsed = JSON.parse(innerJson);
+        if (parsed.type === 'container' && Array.isArray(parsed.children)) {
+          // Remove the JSON block from the display text so it doesn't show raw JSON
+          const textWithoutUI = displayResponse.replace(jsonBlockMatch[0], '').trim();
+          return { uiData: parsed as UIContainer, displayTextWithoutUI: textWithoutUI };
+        }
+      } catch (e) {
+        // Invalid JSON in block, fall through
+      }
+    }
+
+    // Fallback: try to find a bare JSON object in the text
     try {
-      let jsonString = displayResponse.trim();
-      const jsonBlockMatch = jsonString.match(/```json\n([\s\S]*?)\n```/);
-      if (jsonBlockMatch) {
-        jsonString = jsonBlockMatch[1];
-      } else {
-        const firstOpenBrace = jsonString.indexOf('{');
-        const lastCloseBrace = jsonString.lastIndexOf('}');
-        if (firstOpenBrace !== -1 && lastCloseBrace !== -1 && lastCloseBrace > firstOpenBrace) {
-          jsonString = jsonString.substring(firstOpenBrace, lastCloseBrace + 1);
+      const firstBrace = displayResponse.indexOf('{');
+      const lastBrace = displayResponse.lastIndexOf('}');
+      if (firstBrace !== -1 && lastBrace > firstBrace) {
+        const candidate = displayResponse.substring(firstBrace, lastBrace + 1);
+        const parsed = JSON.parse(candidate);
+        if (parsed.type === 'container' && Array.isArray(parsed.children)) {
+          const textWithoutUI = displayResponse.replace(candidate, '').trim();
+          return { uiData: parsed as UIContainer, displayTextWithoutUI: textWithoutUI };
         }
       }
-      const parsed = JSON.parse(jsonString);
-      return (parsed.type === 'container' && Array.isArray(parsed.children)) ? parsed as UIContainer : null;
     } catch (e) {
-      return null;
+      // Not valid JSON
     }
-  }, [displayResponse]);
+
+    return { uiData: null, displayTextWithoutUI: displayResponse };
+  }, [displayResponse, msg.ui_data]);
 
   const isUserActive = activeContextMenu?.id === msg.id && activeContextMenu?.type === 'user';
   const isAssistantActive = activeContextMenu?.id === msg.id && activeContextMenu?.type === 'assistant';
 
   return (
-    <ListGroup.Item className="border-0 message-item">
+    <div className="message-item" style={{ '--msg-index': msgIndex } as React.CSSProperties}>
       {(previewImage || previewDoc) ? (
         <div className="chat-preview-backdrop" onClick={() => { setPreviewImage(null); setPreviewDoc(null); }}>
           <div className="chat-preview-modal" onClick={(e) => e.stopPropagation()}>
@@ -130,11 +155,10 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
           </div>
         </div>
       ) : null}
-      <div className="d-flex justify-content-end mb-2">
-        <div className="d-flex flex-column align-items-end position-relative">
+      <div className="flex justify-end mb-2">
+        <div className="flex flex-col items-end relative">
           <div
             className="message-bubble-user"
-            style={{ width: "fit-content", maxWidth: "85%", cursor: "pointer" }}
             onClick={() => setActiveContextMenu(null)}
             onContextMenu={(e) => {
               e.preventDefault();
@@ -146,7 +170,7 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
             }}
           >
             {msg.images && msg.images.length > 0 ? (
-              <div className="message-images mb-2 d-flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 mb-2">
                 {msg.images.map((img, idx) => (
                   <img
                     key={idx}
@@ -154,29 +178,27 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                     alt="Uploaded"
                     onClick={() => setPreviewImage(img)}
                     className="message-image-clickable"
-                    style={{ maxWidth: '200px', maxHeight: '200px', borderRadius: '8px', objectFit: 'cover' }}
+                    style={{ maxWidth: '200px', maxHeight: '200px', borderRadius: 'var(--radius-xs)', objectFit: 'cover' }}
                   />
                 ))}
               </div>
             ) : null}
             {msg.documents && msg.documents.length > 0 ? (
-              <div className="message-documents mb-2 d-flex flex-column gap-1">
+              <div className="flex flex-col gap-1 mb-2">
                 {msg.documents.map((doc, idx) => (
                   <button
                     key={idx}
-                    className="message-doc-item d-flex align-items-center gap-2 p-2 bg-light bg-opacity-10 rounded text-white text-start"
-                    style={{ fontSize: '0.85rem' }}
+                    className="flex items-center gap-2 p-2 rounded text-white text-start"
+                    style={{ fontSize: '0.85rem', background: 'rgba(255,255,255,0.08)' }}
                     onClick={() => setPreviewDoc({ id: doc.id, filename: doc.filename })}
                   >
                     <FileText size={16} />
-                    <span className="text-truncate" style={{ maxWidth: '200px' }}>{doc.filename}</span>
+                    <span className="truncate" style={{ maxWidth: '200px' }}>{doc.filename}</span>
                   </button>
                 ))}
               </div>
             ) : null}
-            <div className="d-flex align-items-center">
-              <span>{msg.content}</span>
-            </div>
+            {msg.content}
           </div>
           {isUserActive ? (
             <MessageContextMenu
@@ -190,14 +212,14 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
               messageType="user"
             />
           ) : null}
-          <div className="d-flex align-items-center mt-1 me-2 gap-2">
+          <div className="flex items-center mt-1.5 mr-2 gap-2.5">
             <Timestamp dateString={msg.created_at} />
             <MessageStatus status={msg.status || "sent"} />
           </div>
         </div>
       </div>
-      <div className="d-flex justify-content-start">
-        <div className="d-flex flex-column align-items-start position-relative" style={{ maxWidth: "100%", minWidth: 0 }}>
+      <div className="flex justify-start">
+        <div className="flex flex-col items-start relative" style={{ maxWidth: "100%", minWidth: 0 }}>
           <div
             className="message-content-assistant"
             onClick={() => setActiveContextMenu(null)}
@@ -209,9 +231,9 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
               e.preventDefault();
               setActiveContextMenu({ id: msg.id, type: 'assistant' });
             }}
-            style={{ width: '100%', minWidth: 0 }}
           >
-            <div className="d-flex w-100" style={{ minWidth: 0 }}>
+            <div className="message-bubble-assistant">
+            <div className="flex w-full" style={{ minWidth: 0 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 {msg.tool_calls && msg.tool_calls.length > 0 ? (
                   <div className="tool-calls mb-3">
@@ -229,42 +251,42 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
 
                 {(msg.id === streamingMessageId && isStreaming) ? (
                   <div className="streaming-response">
-                    <MarkdownRenderer content={displayResponse + " ▋"} />
+                    <MarkdownRenderer content={displayResponse + '▋'} />
                   </div>
                 ) : (
-                  <div className="flex-grow-1 w-100">
+                  <div className="flex-1 w-full">
+                    {displayTextWithoutUI ? (
+                      <MarkdownRenderer content={displayTextWithoutUI} />
+                    ) : null}
                     {uiData ? (
                       <div className="generative-ui-container mt-2 mb-2 w-100">
                         <GenerativeUIRenderer data={uiData} />
                       </div>
-                    ) : (
-                      <MarkdownRenderer content={displayResponse} />
-                    )}
+                    ) : null}
                     {versions.length > 1 ? (
-                      <div className="d-flex align-items-center gap-2 mt-2 text-muted small">
-                        <Button
-                          variant="outline-secondary"
-                          size="sm"
+                      <div className="flex items-center gap-2 mt-2 text-gray-500 text-sm">
+                        <button
+                          className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 transition-colors"
                           disabled={activeVersionIdx === 0}
                           onClick={() => setActiveVersionIdx((idx) => Math.max(0, idx - 1))}
                         >
                           &lt;
-                        </Button>
+                        </button>
                         <span>Version {activeVersionIdx + 1} of {versions.length}</span>
-                        <Button
-                          variant="outline-secondary"
-                          size="sm"
+                        <button
+                          className="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-40 transition-colors"
                           disabled={activeVersionIdx === versions.length - 1}
                           onClick={() => setActiveVersionIdx((idx) => Math.min(versions.length - 1, idx + 1))}
                         >
                           &gt;
-                        </Button>
+                        </button>
                       </div>
                     ) : null}
                   </div>
                 )}
                 <SourceList sources={sources} />
               </div>
+            </div>
             </div>
           </div>
           {isAssistantActive ? (
@@ -279,23 +301,21 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
               messageType="assistant"
             />
           ) : null}
-          <div className="d-flex align-items-center justify-content-between mt-1 ms-2">
-            <Timestamp dateString={msg.created_at} className="me-2" />
+          <div className="flex items-center justify-between mt-1.5 ml-2">
+            <Timestamp dateString={msg.created_at} className="mr-2" />
             {(msg.id === streamingMessageId && isStreaming) ? (
-              <Button
-                variant="outline-danger"
-                size="sm"
+              <button
                 onClick={cancelStreaming}
-                className="cancel-streaming-btn"
+                className="px-2 py-0.5 text-xs border border-red-400/50 text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                 title="Cancel streaming"
               >
-                ✕
-              </Button>
+                ✕ Stop
+              </button>
             ) : null}
           </div>
         </div>
       </div>
-    </ListGroup.Item>
+    </div>
   );
 };
 

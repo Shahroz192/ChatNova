@@ -162,12 +162,7 @@ class CRUDMessage(CRUDBase[Message, MessageCreate, MessageUpdate]):
         db_obj: Message,
         obj_in: dict,
     ) -> Message:
-        if isinstance(obj_in, dict):
-            update_schema = MessageUpdate(**obj_in)
-        else:
-            update_schema = obj_in
-
-        return super().update(db, db_obj=db_obj, obj_in=update_schema)
+        return super().update(db, db_obj=db_obj, obj_in=obj_in)
 
     def remove(self, db: Session, *, id: int) -> Message:
         obj = db.get(Message, id)

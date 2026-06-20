@@ -1,9 +1,7 @@
 import React, { useState, useCallback } from "react";
-import { Plus, Server, CheckCircle, AlertCircle } from "lucide-react";
+import { Plus, HardDrives, CheckCircle, WarningCircle, X, FloppyDisk } from "@phosphor-icons/react";
 import api from "../../utils/api";
-import Notification from "../common/Notification";
 import FloatingUI from "../chat/FloatingUI";
-import "../../styles/MCPServer.css";
 
 interface MCPServerFormProps {
     onServerAdded?: () => void;
@@ -18,49 +16,45 @@ const MCPServerForm: React.FC<MCPServerFormProps> = ({ onServerAdded }) => {
 
   const validateConfig = useCallback((config: string): boolean => {
     setValidationError('');
-    
+
     if (!config.trim()) {
       setValidationError('Configuration is required');
       return false;
     }
-    
+
     try {
       const parsedConfig = JSON.parse(config);
-      
+
       if (!parsedConfig.mcpServers || typeof parsedConfig.mcpServers !== 'object') {
         setValidationError('Must contain "mcpServers" object');
         return false;
       }
-      
+
       if (Object.keys(parsedConfig.mcpServers).length === 0) {
         setValidationError('At least one server must be configured');
         return false;
       }
-      
+
       return true;
-    } catch (jsonError) {
+    } catch {
       setValidationError('Invalid JSON format');
       return false;
     }
   }, []);
 
   const handleAddServer = useCallback(async () => {
-    if (!validateConfig(mcpServersConfig)) {
-      return;
-    }
-    
+    if (!validateConfig(mcpServersConfig)) return;
+
     setIsAdding(true);
     try {
-      await api.post('/users/me/mcp-servers', {
-        mcp_servers_config: mcpServersConfig,
-      });
-      setNotification({ type: 'success', message: 'MCP servers configuration added successfully!' });
+      await api.post('/users/me/mcp-servers', { mcp_servers_config: mcpServersConfig });
       setMcpServersConfig('');
       setValidationError('');
       setShowModal(false);
+      setNotification({ type: 'success', message: 'MCP servers configuration added successfully!' });
       onServerAdded?.();
     } catch (apiError: any) {
-      const errorMessage = apiError.response?.data?.detail || 'Failed to add servers. Please try again.';
+      const errorMessage = apiError.response?.data?.detail || 'Failed to add servers.';
       setNotification({ type: 'error', message: errorMessage });
     } finally {
       setIsAdding(false);
@@ -75,119 +69,108 @@ const MCPServerForm: React.FC<MCPServerFormProps> = ({ onServerAdded }) => {
     }
   }, [validationError, validateConfig]);
 
-  const handleOpenModal = useCallback(() => {
-    setShowModal(true);
-    setMcpServersConfig('');
-  }, []);
-
-  const handleCloseModal = useCallback(() => {
-    setShowModal(false);
-    setMcpServersConfig('');
-  }, []);
-
   const handleCloseNotification = useCallback(() => setNotification(null), []);
 
   return (
-    <div className="mcp-server-form">
-      <button
-        onClick={handleOpenModal}
-        className="btn btn-primary"
-      >
-        <Plus size={18} />
+    <div>
+      <button onClick={() => setShowModal(true)} className="settings-btn settings-btn-primary">
+        <Plus size={16} weight="bold" />
         Add MCP Server
       </button>
-      
+
       <FloatingUI
         isOpen={showModal}
-        onClose={handleCloseModal}
+        onClose={() => { setShowModal(false); setMcpServersConfig(''); }}
         title="Add MCP Server Configuration"
         position="center"
       >
-        <div className="space-y-4">
-          {/* Info Banner */}
-          <div className="alert alert-info mcp-server-info">
-            <div className="flex items-start">
-              <Server size={18} className="text-primary-600 mcp-server-icon mr-2 mt-0.5 flex-shrink-0" />
-              <div className="text-sm mcp-server-info-text">
-                <p className="font-medium mb-1">Configuration Format</p>
-                <p className="text-xs">Provide a JSON configuration with an "mcpServers" object containing your server definitions.</p>
-              </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Info banner */}
+          <div style={{
+            display: 'flex',
+            gap: 12,
+            padding: '12px 16px',
+            background: 'rgba(5, 150, 105, 0.06)',
+            border: '1px solid rgba(5, 150, 105, 0.1)',
+            borderRadius: 'var(--radius-md)',
+          }}>
+            <HardDrives size={20} style={{ color: 'var(--accent, #059669)', flexShrink: 0, marginTop: 2 }} />
+            <div>
+              <p style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary, #1c1917)', margin: '0 0 4px' }}>
+                Configuration Format
+              </p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary, #78716c)', margin: 0, lineHeight: 1.4 }}>
+                Provide a JSON configuration with an "mcpServers" object containing your server definitions.
+              </p>
             </div>
           </div>
 
-          {/* Textarea with validation */}
-          <div className="space-y-2">
-            <label className="form-label">
-              Server Configuration (JSON)
-            </label>
+          <div>
+            <label className="settings-label" style={{ marginBottom: 8 }}>Server Configuration (JSON)</label>
             <textarea
               value={mcpServersConfig}
               onChange={handleConfigChange}
-              className={`form-control font-mono resize-y min-h-[180px] ${
-                validationError
-                  ? 'border-error-500 focus:ring-error-500 focus:border-error-500'
-                  : 'focus:ring-primary-500 focus:border-primary-500'
-              } mcp-server-textarea`}
+              className="settings-textarea"
+              style={{
+                minHeight: 180,
+                fontFamily: 'var(--font-family-mono, monospace)',
+                fontSize: '0.8125rem',
+                borderColor: validationError ? 'var(--error, #ef4444)' : undefined,
+              }}
               placeholder='{"mcpServers": {"sequential-thinking": {"command": "npx", "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"], "env": {}}}}'
               disabled={isAdding}
             />
-            
-            {/* Validation feedback */}
-            {validationError ? (
-              <div className="flex items-center text-error-600 mcp-server-validation-error text-sm">
-                <AlertCircle size={16} className="mr-1.5" />
+
+            {validationError && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, color: 'var(--error, #ef4444)', fontSize: '0.8125rem' }}>
+                <WarningCircle size={16} weight="bold" />
                 {validationError}
               </div>
-            ) : null}
-            
-            {!validationError && mcpServersConfig.trim() ? (
-              <div className="flex items-center text-success-600 mcp-server-validation-success text-sm">
-                <CheckCircle size={16} className="mr-1.5" />
+            )}
+
+            {!validationError && mcpServersConfig.trim() && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, color: 'var(--accent, #059669)', fontSize: '0.8125rem' }}>
+                <CheckCircle size={16} weight="bold" />
                 Valid configuration
               </div>
-            ) : null}
+            )}
           </div>
 
-          {/* Action buttons */}
-          <div className="flex justify-end space-x-3 pt-2">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
             <button
-              onClick={handleCloseModal}
+              onClick={() => { setShowModal(false); setMcpServersConfig(''); }}
               disabled={isAdding}
-              className="btn btn-secondary"
+              className="settings-btn settings-btn-secondary"
             >
+              <X size={16} />
               Cancel
             </button>
             <button
               onClick={handleAddServer}
               disabled={isAdding || !mcpServersConfig.trim() || !!validationError}
-              className="btn btn-success flex items-center"
+              className="settings-btn settings-btn-success"
             >
               {isAdding ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Saving...
-                </>
+                <>Saving...</>
               ) : (
-                <>
-                  <CheckCircle size={16} className="mr-2" />
-                  Save Configuration
-                </>
+                <><FloppyDisk size={16} /> Save Configuration</>
               )}
             </button>
           </div>
         </div>
       </FloatingUI>
-      
-      {notification ? (
-        <Notification
-          type={notification.type}
-          message={notification.message}
-          onClose={handleCloseNotification}
-        />
-      ) : null}
+
+      {notification && (
+        <div
+          className={`settings-alert ${notification.type === 'success' ? 'settings-alert-success' : 'settings-alert-error'}`}
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}
+        >
+          <span>{notification.message}</span>
+          <button onClick={handleCloseNotification} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0 }}>
+            <X size={16} />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

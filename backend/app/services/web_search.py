@@ -1,35 +1,35 @@
 """
 Web Search Service Module
-Provides access to DuckDuckGo search tool for LangChain agents.
+Provides access to Exa search API for AI-powered web search.
 """
 
-from concurrent.futures import ThreadPoolExecutor
+import logging
+import os
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from typing import Any, Dict, List
 
-from langchain_community.tools import DuckDuckGoSearchResults
-import logging
-from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
+from exa_py import Exa
 
-# Configure logging
 logger = logging.getLogger(__name__)
 
 
 class WebSearchService:
     """
-    Improved web search service using DuckDuckGo tools.
+    Web search service using the Exa AI search API.
     """
 
-    def __init__(self):
-        self.search_tool = DuckDuckGoSearchResults()
-        self.search_wrapper = DuckDuckGoSearchAPIWrapper()
-        self.image_search_wrapper = DuckDuckGoSearchAPIWrapper()
+    def __init__(self, api_key: str | None = None):
+        self.api_key = os.getenv("EXA_API_KEY", "") if api_key is None else api_key
+        self.client = Exa(api_key=self.api_key)
         self._executor = None
-        logger.info("WebSearchService initialized with DuckDuckGo tools")
+        logger.info("WebSearchService initialized with Exa")
 
     def start(self):
         """Start the thread pool executor. Called by FastAPI lifespan."""
         if self._executor is None:
-            self._executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="duckduckgo")
+            self._executor = ThreadPoolExecutor(
+                max_workers=4, thread_name_prefix="exa"
+            )
             logger.info("WebSearchService thread pool started")
 
     def shutdown(self):
@@ -43,53 +43,58 @@ class WebSearchService:
     def executor(self):
         """Lazily create executor if accessed before lifespan start (dev fallback)."""
         if self._executor is None:
-            self._executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="duckduckgo")
-            logger.warning("WebSearchService thread pool lazily initialized — prefer lifespan start()")
+            self._executor = ThreadPoolExecutor(
+                max_workers=4, thread_name_prefix="exa"
+            )
+            logger.warning(
+                "WebSearchService thread pool lazily initialized \u2014 prefer lifespan start()"
+            )
         return self._executor
 
     def get_tool(self):
-        """Get the search tool for agent use."""
-        return self.search_tool
+        """Get the Exa client for direct use."""
+        return self.client
 
-    def _normalize_result(self, item: Dict[str, Any]) -> Dict[str, str]:
-        """Normalize variable DuckDuckGo result keys to a consistent shape."""
-        title = item.get("title") or item.get("heading") or "Untitled"
-        snippet = (
-            item.get("snippet")
-            or item.get("body")
-            or item.get("description")
-            or "No snippet available."
-        )
-        link = item.get("link") or item.get("href") or item.get("url") or ""
-        date = (
-            item.get("date") or item.get("published") or item.get("published_at") or ""
-        )
-
+    def _normalize_result(self, result) -> Dict[str, str]:
+        """Normalize Exa result object to a consistent dict shape."""
+        text = (getattr(result, "text", None) or "").strip()
         return {
-            "title": str(title).strip(),
-            "snippet": str(snippet).strip(),
-            "link": str(link).strip(),
-            "date": str(date).strip(),
+            "title": (getattr(result, "title", None) or "Untitled").strip(),
+            "snippet": text,
+            "link": (getattr(result, "url", None) or "").strip(),
+            "date": (getattr(result, "published_date", None) or "").strip(),
         }
 
     def _search_single_query(
         self, query: str, max_results: int
     ) -> Dict[str, Any]:
-        """Run single text search and return results with metadata."""
+        """Run single Exa search and return results with metadata."""
+        if not self.api_key:
+            logger.warning("Exa search skipped because EXA_API_KEY is not configured")
+            return {
+                "status": "error",
+                "had_results": False,
+                "query": query,
+                "results": [],
+                "errors": ["EXA_API_KEY is not configured"],
+            }
+
         try:
-            raw_results = self.search_wrapper.results(
-                query, max_results, source="text"
+            response = self.client.search(
+                query,
+                num_results=max_results,
+                contents={"text": True},
             )
+            raw_results = response.results or []
             candidate_results = [
-                self._normalize_result(r) for r in (raw_results or [])
+                self._normalize_result(r) for r in raw_results
             ]
 
             # Filter out useless results
             candidate_results = [
                 r
                 for r in candidate_results
-                if r["title"] != "Untitled"
-                or r["snippet"] != "No snippet available."
+                if r["title"] != "Untitled" or r["snippet"]
             ]
 
             return {
@@ -101,16 +106,7 @@ class WebSearchService:
             }
         except Exception as e:
             error_msg = f"{type(e).__name__}: {e}"
-            if "No results found" in str(e):
-                logger.info(f"No results for query '{query}'")
-                return {
-                    "status": "no_results",
-                    "had_results": False,
-                    "query": query,
-                    "results": [],
-                    "errors": [],
-                }
-            logger.warning(f"Search failed for query '{query}': {error_msg}")
+            logger.error(f"Exa search failed: query='{query}' {error_msg}")
             return {
                 "status": "error",
                 "had_results": False,
@@ -157,7 +153,9 @@ class WebSearchService:
             status = "ok"
         else:
             error_text = (
-                "; ".join(payload["errors"]) if payload["errors"] else "No results returned by provider."
+                "; ".join(payload["errors"])
+                if payload["errors"]
+                else "No results returned by provider."
             )
             formatted = (
                 "### WEB SEARCH RESULTS\n"
@@ -181,9 +179,7 @@ class WebSearchService:
         """Run multiple searches in parallel and return a deduplicated merged payload."""
         cleaned_queries = [q.strip() for q in (queries or []) if q and q.strip()]
         if not cleaned_queries:
-            return self.search_with_metadata(
-                "", max_results=max_results
-            )
+            return self.search_with_metadata("", max_results=max_results)
 
         # Execute searches in parallel using thread pool
         futures = []
@@ -280,32 +276,5 @@ class WebSearchService:
     def search(self, query: str) -> str:
         """Backward-compatible search API returning formatted string context."""
         return self.search_with_metadata(query)["formatted_results"]
-
-    def search_images(self, query: str, max_results: int = 10) -> list:
-        """Run image search and return a list of normalized image objects."""
-        try:
-            # DuckDuckGoSearchAPIWrapper.results supports source="images"
-            raw_results = self.image_search_wrapper.results(
-                query, max_results, source="images"
-            )
-
-            # Normalize results to match the ImageData schema
-            normalized_results = []
-            for res in raw_results:
-                normalized_results.append(
-                    {
-                        "src": res.get("image") or res.get("thumbnail"),
-                        "thumbnail": res.get("thumbnail") or res.get("image"),
-                        "alt": res.get("title", "Search image"),
-                        "title": res.get("title"),
-                        "source": res.get("source"),
-                        "url": res.get("url"),
-                    }
-                )
-            return normalized_results
-        except Exception as e:
-            logger.error(f"Image search failed: {e}")
-            return []
-
 
 web_search_service = WebSearchService()

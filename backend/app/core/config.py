@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: Optional[str] = None
     CEREBRAS_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
+    EXA_API_KEY: Optional[str] = None
 
     # CORS Configuration
     CORS_ORIGINS: str = (

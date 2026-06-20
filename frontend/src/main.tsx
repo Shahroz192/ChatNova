@@ -2,12 +2,9 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import "bootstrap/dist/css/bootstrap.min.css";
-import "./styles/variables.css";
+
+/* Tailwind v4 entry — also includes CSS variables for legacy compatibility */
 import "./index.css";
-import "./styles/global.css";
-import "./styles/Utilities.css";
-import "./styles/DarkOverrides.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
     <React.StrictMode>

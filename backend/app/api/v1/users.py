@@ -9,6 +9,7 @@ from app.models.user import User
 from app.schemas.user import (
     UserAPIKey,
     UserAPIKeyCreate,
+    UserAPIKeyUpdate,
     UserInstructionsUpdate,
     UserMCPServer,
     UserMCPServerCreate,
@@ -76,20 +77,23 @@ def set_api_key(
         db, user_id=current_user.id, model_name=api_key_in.model_name
     )
 
+    raw_key = api_key_in.api_key
+    encrypted_key = encrypt_api_key(raw_key)
+
     if existing:
-        encrypted_key = encrypt_api_key(api_key_in.api_key)
         return user_api_key.update(
-            db, db_obj=existing, obj_in={"encrypted_key": encrypted_key}
+            db,
+            db_obj=existing,
+            obj_in=UserAPIKeyUpdate(encrypted_key=encrypted_key),
         )
 
-    encrypted_key = encrypt_api_key(api_key_in.api_key)
     return user_api_key.create(
         db,
         obj_in={
-            "user_id": current_user.id,
             "model_name": api_key_in.model_name,
             "encrypted_key": encrypted_key,
         },
+        user_id=current_user.id,
     )
 
 
@@ -116,19 +120,20 @@ def get_api_keys(
     return result
 
 
-@router.delete("/users/me/api-keys/{key_id}")
+@router.delete("/users/me/api-keys/{model_name}")
 def delete_api_key(
-    key_id: int,
+    model_name: str,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """
-    Delete a specific API key.
+    Delete a specific API key by provider/model name (e.g., "Google", "Cerebras").
     """
-    key_obj = user_api_key.get(db, id=key_id)
-    if not key_obj or key_obj.user_id != current_user.id:
+    key_obj = user_api_key.remove_by_user_and_model(
+        db, user_id=current_user.id, model_name=model_name
+    )
+    if not key_obj:
         raise HTTPException(status_code=404, detail="API key not found")
-    user_api_key.remove(db, id=key_id)
     return {"message": "API key deleted successfully"}
 
 

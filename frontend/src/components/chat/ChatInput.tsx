@@ -6,18 +6,18 @@ import React, {
   useMemo,
 } from "react";
 import {
-  Send,
-  Search,
+  PaperPlaneRight,
+  MagnifyingGlass,
   Globe,
-  Loader,
+  Spinner,
   Clock,
-  Mic,
+  Microphone,
   Square,
   Plus,
   X,
   FileText,
-  ChevronDown,
-} from "lucide-react";
+  CaretDown,
+} from "@phosphor-icons/react";
 import type { WebSearchOptions } from "../../types/search";
 import { transcribeAudio } from "../../utils/api";
 
@@ -134,8 +134,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
     // Exact mapping for the problematic IDs
     const mappings: Record<string, string> = {
-      "qwen-3-235b-a22b-instruct-2507": "Qwen",
-      "qwen-3-235b-a22b-thinking-2507": "Qwen Thinking",
+      "zai-glm-4.7": "ZAI GLM 4.7",
       "moonshotai/kimi-k2-instruct-0905": "Kimi",
     };
 
@@ -144,9 +143,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
     // Normalize and clean model names
     const modelId = name.toLowerCase();
 
-    if (modelId.includes("qwen")) {
-      return modelId.includes("thinking") ? "Qwen Thinking" : "Qwen";
-    }
+    if (modelId.includes("zai-glm")) return "ZAI GLM 4.7";
     if (modelId.includes("kimi")) return "Kimi";
     if (modelId.includes("gpt-4o")) return "GPT-4o";
     if (modelId.includes("claude")) return "Claude";
@@ -384,7 +381,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   }, []);
 
   return (
-    <div className="chat-input-wrapper">
+    <>
       {/* Attachment Preview */}
       {pendingImages.length > 0 || pendingDocuments.length > 0 ? (
         <div className="attachment-preview-container">
@@ -425,10 +422,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
           ))}
         </div>
       ) : null}
+
       {isUploadingDocs ? (
-        <div className="text-muted small mb-2">Uploading documents…</div>
+        <div className="bottomsheet-status">Uploading documents…</div>
       ) : isProcessingDocs ? (
-        <div className="text-muted small mb-2">Processing documents…</div>
+        <div className="bottomsheet-status">Processing documents…</div>
       ) : null}
 
       {recordingState !== "idle" ? (
@@ -442,7 +440,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         </div>
       ) : null}
 
-      <div className="chat-input-container-modern">
+      <div className={`chat-input-container-modern ${recordingState !== "idle" ? "has-recording" : ""}`}>
         {showCommands && filteredCommands.length > 0 && (
           <div className="search-suggestions-container">
             <div className="suggestions-group">
@@ -478,7 +476,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                     className="suggestion-row"
                     onClick={() => handleSuggestionClick(suggestion)}
                   >
-                    <Search size={14} className="icon-muted" />
+                    <MagnifyingGlass size={14} className="icon-muted" />
                     <span>{suggestion}</span>
                   </button>
                 ))}
@@ -536,7 +534,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   title="Upload files"
                   type="button"
                 >
-                  <Plus size={18} strokeWidth={2} />
+                  <Plus size={18} weight="bold" />
                 </button>
               </div>
               <input
@@ -565,9 +563,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
                       formatModelName(selectedModel)
                     )}
                   </span>
-                  <ChevronDown
+                  <CaretDown
                     size={14}
-                    strokeWidth={2.5}
+                    weight="bold"
                     className={`dropdown-chevron ${showModelDropdown ? "active" : ""}`}
                   />
                 </button>
@@ -597,7 +595,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   title="Toggle web search"
                   type="button"
                 >
-                  <Globe size={18} strokeWidth={2} />
+                  <Globe size={18} weight="bold" />
                 </button>
               </div>
             </div>
@@ -617,9 +615,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   disabled={recordingState === "processing"}
                 >
                   {recordingState === "recording" ? (
-                    <Square size={18} strokeWidth={2} />
+                    <Square size={18} weight="bold" />
                   ) : (
-                    <Mic size={18} strokeWidth={2} />
+                    <Microphone size={18} weight="bold" />
                   )}
                 </button>
               </div>
@@ -639,13 +637,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   title="Send message"
                 >
                   {loading ? (
-                    <Loader
+                    <Spinner
                       size={18}
-                      strokeWidth={2.5}
+                      weight="bold"
                       className="animate-spin"
                     />
                   ) : (
-                    <Send size={18} strokeWidth={2.5} />
+                    <PaperPlaneRight size={18} weight="bold" />
                   )}
                 </button>
               </div>
@@ -653,7 +651,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

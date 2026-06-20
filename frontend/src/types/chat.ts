@@ -1,3 +1,5 @@
+import type { UIContainer } from "./generative-ui";
+
 export interface ToolCall {
   id?: string;
   tool: string;
@@ -25,4 +27,6 @@ export interface Message {
   images?: string[];
   documents?: { id: number; filename: string; file_type: string }[];
   response_versions?: ResponseVersion[];
+  /** Validated UI container JSON from structured output. */
+  ui_data?: UIContainer | null;
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2 } from 'lucide-react';
+import { Spinner } from '@phosphor-icons/react';
 
 interface LoadingSpinnerProps {
   size?: number;
@@ -14,7 +14,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 }) => {
   return (
     <div className={`flex items-center justify-center ${className}`}>
-      <Loader2 
+      <Spinner 
         size={size} 
         className="animate-spin text-blue-500 dark:text-blue-400" 
       />

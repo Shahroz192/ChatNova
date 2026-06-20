@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { X, CheckCircle, AlertCircle, AlertTriangle, Info } from 'lucide-react';
+import { X, CheckCircle, WarningCircle, Warning, Info } from '@phosphor-icons/react';
 import '../../styles/Toast.css';
 
 export interface ToastMessage {
@@ -44,9 +44,9 @@ const Toast: React.FC<ToastProps> = React.memo(({ toast, onClose }) => {
       case 'success':
         return <CheckCircle size={20} />;
       case 'error':
-        return <AlertCircle size={20} />;
+        return <WarningCircle size={20} />;
       case 'warning':
-        return <AlertTriangle size={20} />;
+        return <Warning size={20} />;
       case 'info':
         return <Info size={20} />;
       default:
@@ -55,12 +55,12 @@ const Toast: React.FC<ToastProps> = React.memo(({ toast, onClose }) => {
   };
 
   const getToastClasses = () => {
-    const baseClasses = "toast-custom d-flex align-items-start p-3 mb-2 border shadow-sm";
+    const baseClasses = "toast-custom d-flex align-items-center gap-2 px-3 py-2";
     const typeClasses = {
-      success: 'bg-success-subtle border-success-subtle text-success-emphasis',
-      error: 'bg-danger-subtle border-danger-subtle text-danger-emphasis',
-      warning: 'bg-warning-subtle border-warning-subtle text-warning-emphasis',
-      info: 'bg-info-subtle border-info-subtle text-info-emphasis'
+      success: 'text-success-emphasis',
+      error: 'text-danger-emphasis',
+      warning: 'text-warning-emphasis',
+      info: 'text-info-emphasis'
     };
 
     const animationClasses = isLeaving
@@ -73,17 +73,12 @@ const Toast: React.FC<ToastProps> = React.memo(({ toast, onClose }) => {
   };
 
   return (
-    <div className={getToastClasses()} style={{ maxWidth: '400px', borderRadius: '8px' }}>
-      <div className="me-2 mt-1">
-        {getIcon()}
-      </div>
-      <div className="flex-grow-1">
-        <div className="fw-semibold small">{toast.title}</div>
-        {toast.message ? <div className="small opacity-75 mt-1">{toast.message}</div> : null}
-      </div>
+    <div className={getToastClasses()} style={{ background: 'var(--bg-primary, #ffffff)', border: '1px solid var(--border-light, #e8e5df)', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', maxWidth: '320px' }}>
+      {getIcon()}
+      <span className="flex-grow-1 text-sm fw-medium" style={{ color: 'var(--text-primary, #1c1917)' }}>{toast.title}{toast.message ? ` — ${toast.message}` : ''}</span>
       <button
         type="button"
-        className="btn-toast-close ms-2 mt-1 opacity-50"
+        className="btn-toast-close opacity-40"
         onClick={handleClose}
         aria-label="Close"
       >

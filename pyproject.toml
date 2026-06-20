@@ -45,6 +45,7 @@ dependencies = [
     "sentence-transformers>=5.2.2",
     "langchain-openai>=0.3.35",
     "langchain-text-splitters>=0.3.0",
+    "exa-py>=2.14.0",
 ]
 
 [project.optional-dependencies]

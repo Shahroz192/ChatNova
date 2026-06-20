@@ -13,18 +13,24 @@ ChatNova is a robust and modern AI chat application designed to provide a unifie
 
 Beyond standard text chat, ChatNova features **Multi-Modal RAG (Retrieval-Augmented Generation)** capabilities, allowing users to upload documents and images to provide session-specific context. The application also includes **Web Search** integration for real-time information retrieval and "Generative UI" for dynamic rendering of charts and image galleries directly within the conversation stream.
 
+ChatNova supports **Agent (Tool-Enabled) Chat** via MCP servers, **Audio Transcription** through Groq Whisper, **Long-term User Memories** for persistent context, and **Bring Your Own Key (BYOK)** for users to supply their own API keys.
+
 ## Key Features
 
-- **Multi-Provider AI Support**: Interact with models from Google, Cerebras, and Groq via LangChain integration.
-- **Multi-Modal RAG Support**: Upload documents (PDF, DOCX, TXT, MD) and images (Gemini models) to provide session-bound context for AI responses with automatic inline citations.
-- **Web Search Integration**: Real-time web access to supplement AI responses with up-to-date information.
-- **Model Context Protocol (MCP)**: Implements MCP adapters to standardize interactions and extend capabilities with various tools and resources.
+- **Multi-Provider AI Support**: Interact with models from Google (Gemini), Cerebras (Qwen), and Groq via LangChain integration.
+- **Agent (Tool-Enabled) Chat**: ReAct agent loop with MCP tool integration for multi-step reasoning and external tool use.
+- **Multi-Modal RAG Support**: Upload documents (PDF, DOCX, TXT, MD) and images (Gemini models) to provide session-bound context for AI responses with automatic inline citations. RAG results are re-ranked via FlashRank for higher relevance.
+- **Web Search Integration**: Real-time web access via DuckDuckGo to supplement AI responses with up-to-date information.
+- **Model Context Protocol (MCP)**: Manage and connect to MCP servers for standardized tool access and resource interaction.
 - **Generative UI**: Automatically render interactive charts (Bar, Line, Pie) and image galleries based on AI responses using Recharts and React components.
+- **Long-term User Memories**: Persistent memory system that auto-extracts and retrieves relevant memories across sessions for personalized interactions.
+- **Audio Transcription**: Transcribe voice input using Groq Whisper (whisper-large-v3).
+- **Bring Your Own Key (BYOK)**: Users can supply their own API keys for supported providers, encrypted at rest via Fernet.
+- **Model Testing**: Test model connectivity and response quality from a dedicated interface.
 - **Custom Instructions**: Users can define personalized system instructions to tailor the AI's persona and response style.
-- **Secure Authentication**: Robust user management system with JWT-based authentication and secure password hashing.
-- **Persistent Chat History**: Save and retrieve past conversations with a user-friendly history interface.
-- **Performance Profiling**: Built-in tools for monitoring memory usage and database query performance.
-- **Responsive Design**: A modern, mobile-friendly interface built with React, Bootstrap, and Lucide icons.
+- **Secure Authentication**: Robust user management system with JWT-based authentication, token blacklisting, and secure password hashing.
+- **Persistent Chat History**: Save and retrieve past conversations with search/filtering and message regeneration support.
+- **Responsive Design**: A modern, mobile-friendly interface with dark/light theme support, built with React, Bootstrap, and Lucide icons.
 
 ## Architecture
 
@@ -40,20 +46,27 @@ ChatNova follows a modern client-server architecture:
 **Frontend:**
 
 - **Framework**: React 19, TypeScript 5.9
+- **Routing**: React Router DOM v7
 - **Build Tool**: Vite 7
 - **Styling**: Bootstrap 5, React-Bootstrap
 - **Visualization**: Recharts, Chart.js
 - **Icons**: Lucide React
+- **Markdown**: react-markdown, react-syntax-highlighter, remark-gfm
+- **HTTP Client**: Axios
+- **Theming**: next-themes (dark/light mode)
+- **Testing**: Vitest, Testing Library, jsdom
 - **Package Manager**: pnpm
 
 **Backend:**
 
 - **Framework**: Python 3.12+, FastAPI 0.118+
-- **Database**: PostgreSQL 16, pgvector, SQLAlchemy 2.0, Alembic
-- **AI/ML**: LangChain (Core, Google, Cerebras, Groq), MCP Adapters
+- **Database**: PostgreSQL 16, pgvector, SQLAlchemy 2.0, Alembic, psycopg2-binary
+- **AI/ML**: LangChain (Core, Google, Cerebras, Groq), langchain-mcp-adapters, sentence-transformers, flashrank (RAG re-ranking)
+- **Audio**: Groq Whisper (whisper-large-v3) for transcription
 - **Document Processing**: PyMuPDF (fitz), python-docx
-- **Security**: OAuth2 (JWT), Passlib (Bcrypt), Bleach (Sanitization)
-- **Utilities**: SlowAPI (Rate Limiting), Pydantic V2
+- **Security**: OAuth2 (JWT), Passlib (Bcrypt), Bleach (Sanitization), python-jose, cryptography (Fernet)
+- **Web Search**: duckduckgo-search
+- **Utilities**: SlowAPI (Rate Limiting), Pydantic V2, httpx
 - **Package Manager**: uv
 
 **Infrastructure:**
@@ -86,11 +99,18 @@ cp .env.example .env
 
 Open `.env` and populate the critical variables:
 
-- `POSTGRES_PASSWORD`: Set a strong password.
+- `POSTGRES_PASSWORD`: Set a strong password (min 12 characters).
+- `FERNET_KEY`: Generate with:
+  ```bash
+  python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+  ```
+- `SECRET_KEY`: Generate with:
+  ```bash
+  python -c "import secrets; print(secrets.token_urlsafe(32))"
+  ```
 - `GOOGLE_API_KEY`: Your Google Gemini API key.
 - `CEREBRAS_API_KEY`: Your Cerebras API key.
 - `GROQ_API_KEY`: Your Groq API key.
-- `SECRET_KEY` & `FERNET_KEY`: Generate these using the commands found in `DOCKER_SETUP.md`.
 
 ### 3. Install Dependencies
 
@@ -115,17 +135,24 @@ cd ..
 
 ## Usage
 
-### Option 1: Docker Compose (Recommended)
+### Option 1: Docker Compose (Backend + Database)
 
-The easiest way to run the entire application is with Docker Compose.
+Docker Compose runs the database and backend services. The frontend must be started separately.
 
 ```bash
 docker-compose up --build
 ```
 
-- **Frontend**: <http://localhost:5173>
 - **Backend API**: <http://localhost:8000>
 - **API Docs**: <http://localhost:8000/docs>
+
+Then in a separate terminal, start the frontend:
+
+```bash
+cd frontend && pnpm dev
+```
+
+- **Frontend**: <http://localhost:5173>
 
 ### Option 2: Local Development
 
@@ -170,7 +197,7 @@ curl -X GET http://localhost:8000/ -H "accept: application/json"
 
 ### Backend Tests
 
-Run the backend test suite using `pytest` or the provided script:
+Backend tests run against an in-memory SQLite database (no PostgreSQL needed).
 
 ```bash
 # Using the convenience script (includes coverage)
@@ -179,6 +206,22 @@ Run the backend test suite using `pytest` or the provided script:
 # Or directly with uv/pytest
 cd backend
 uv run pytest
+
+# Run a specific test file
+cd backend && PYTHONPATH=. uv run pytest tests/unit/test_filename.py
+```
+
+### Frontend Tests
+
+```bash
+# Watch mode
+cd frontend && pnpm test
+
+# CI/Run once mode
+cd frontend && pnpm test -- --run
+
+# Specific file
+cd frontend && pnpm test -- src/components/chat/__tests__/ChatInput.test.tsx --run
 ```
 
 ## License

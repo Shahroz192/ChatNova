@@ -19,7 +19,7 @@ const SkeletonMessage: React.FC<SkeletonMessageProps> = ({ type, darkMode }) => 
             width: isUser ? '60%' : '80%',
             minWidth: '200px',
             height: '48px',
-            borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+            borderRadius: isUser ? 'var(--radius-xl) var(--radius-xl) 4px var(--radius-xl)' : 'var(--radius-xl) var(--radius-xl) var(--radius-xl) 4px',
           }}
         >
           <div className="skeleton-content">

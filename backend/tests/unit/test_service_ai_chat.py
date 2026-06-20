@@ -67,18 +67,6 @@ async def test_simple_chat_skips_cache_for_web_search(ai_service):
 
     with (
         patch.object(ai_service, "get_llm", return_value=MagicMock()),
-        patch.object(
-            ai_service,
-            "_build_search_queries",
-            new_callable=AsyncMock,
-            return_value=["test query", "test query latest", "test query 2026"],
-        ),
-        patch.object(
-            ai_service,
-            "_should_search_images",
-            new_callable=AsyncMock,
-            return_value=False,
-        ),
         patch(
             "app.services.ai_chat.web_search_service.search_many_with_metadata",
             return_value={
@@ -87,16 +75,14 @@ async def test_simple_chat_skips_cache_for_web_search(ai_service):
                 "formatted_results": "### WEB SEARCH RESULTS\n[1] Title: Example",
                 "results": [{"title": "Example"}],
                 "errors": [],
-                "queries": ["test query", "test query latest", "test query 2026"],
+                "queries": ["latest update"],
             },
         ),
         patch(
             "app.services.ai_chat.ChatPromptTemplate.from_messages"
         ) as mock_prompt_builder,
     ):
-        mock_prompt_builder.return_value.__or__.return_value.__or__.return_value = (
-            mock_chain
-        )
+        mock_prompt_builder.return_value.__or__.return_value = mock_chain
 
         responses = []
         async for chunk in ai_service.simple_chat(
@@ -105,28 +91,6 @@ async def test_simple_chat_skips_cache_for_web_search(ai_service):
             responses.append(chunk)
 
         assert "".join(responses) == "search response"
-
-
-@pytest.mark.asyncio
-async def test_build_search_queries_has_generic_fallback_variants(ai_service):
-    llm = MagicMock()
-
-    with patch("app.services.ai_chat.ChatPromptTemplate.from_messages") as mock_prompt:
-        mock_chain = AsyncMock()
-        mock_chain.ainvoke.side_effect = Exception("LLM failed")
-        mock_prompt.return_value.__or__.return_value.__or__.return_value = mock_chain
-
-        queries = await ai_service._build_search_queries(
-            message="compare latest model releases across providers",
-            chat_history=[],
-            llm=llm,
-            max_queries=3,
-        )
-
-    assert len(queries) <= 3
-    assert any("compare latest model releases across providers" in q for q in queries)
-    assert any(q.endswith(" latest") for q in queries)
-    assert any("2026" in q for q in queries)
 
 
 @pytest.mark.asyncio
