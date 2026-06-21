@@ -45,11 +45,11 @@ const Notification: React.FC<NotificationProps> = React.memo(({ type, message, o
       style={{ maxWidth: '400px' }}
     >
       <div className={`${bgColor} ${textColor} p-4 rounded-lg shadow-lg border flex items-start space-x-3`}>
-        <Icon size={20} className="flex-shrink-0 mt-0.5" />
+        <Icon size={20} className="shrink-0 mt-0.5" />
         <span className="flex-1 text-sm font-medium">{message}</span>
         <button 
           onClick={handleClose}
-          className="flex-shrink-0 hover:opacity-70 transition-opacity"
+          className="shrink-0 hover:opacity-70 transition-opacity"
           aria-label="Close notification"
         >
           <X size={18} />

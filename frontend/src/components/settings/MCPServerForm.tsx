@@ -90,11 +90,11 @@ const MCPServerForm: React.FC<MCPServerFormProps> = ({ onServerAdded }) => {
             display: 'flex',
             gap: 12,
             padding: '12px 16px',
-            background: 'rgba(5, 150, 105, 0.06)',
-            border: '1px solid rgba(5, 150, 105, 0.1)',
+            background: 'var(--bg-tertiary, #e8e5df)',
+            border: '1px solid var(--border-light, #e8e5df)',
             borderRadius: 'var(--radius-md)',
           }}>
-            <HardDrives size={20} style={{ color: 'var(--accent, #059669)', flexShrink: 0, marginTop: 2 }} />
+            <HardDrives size={20} style={{ color: 'var(--text-secondary, #78716c)', flexShrink: 0, marginTop: 2 }} />
             <div>
               <p style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary, #1c1917)', margin: '0 0 4px' }}>
                 Configuration Format
@@ -129,7 +129,7 @@ const MCPServerForm: React.FC<MCPServerFormProps> = ({ onServerAdded }) => {
             )}
 
             {!validationError && mcpServersConfig.trim() && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, color: 'var(--accent, #059669)', fontSize: '0.8125rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, color: 'var(--text-secondary, #78716c)', fontSize: '0.8125rem' }}>
                 <CheckCircle size={16} weight="bold" />
                 Valid configuration
               </div>

@@ -9,7 +9,9 @@ import {
   ArrowRight,
 } from "@phosphor-icons/react";
 
-import api, { getSearchHistory, getDocumentStatus } from "../../utils/api";
+import api from "../../utils/api";
+import { getSearchHistory } from "../../utils/api/search";
+import { getDocumentStatus } from "../../utils/api/chat";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useToast } from "../../contexts/ToastContext";
 import ChatInput from "./ChatInput";
@@ -22,10 +24,7 @@ import { useChatSessions } from "../../hooks/useChatSessions";
 import { useChatModels } from "../../hooks/useChatModels";
 import { useChatStreaming } from "../../hooks/useChatStreaming";
 
-import "../../styles/ChatBase.css";
-import "../../styles/ChatMessages.css";
-import "../../styles/ChatInput.css";
-import "../../styles/ChatUtils.css";
+import "../../styles/chat.css";
 
 interface ChatProps {}
 
@@ -481,7 +480,7 @@ const Chat: React.FC<ChatProps> = () => {
         const sessionId = await ensureSessionId();
 
         if (sessionId) {
-          const { uploadFile } = await import("../../utils/api");
+          const { uploadFile } = await import("../../utils/api/chat");
           const docRecord = await uploadFile(file, sessionId);
           if (docRecord && docRecord.id) {
             setPendingDocuments((prev) =>
@@ -558,57 +557,60 @@ const Chat: React.FC<ChatProps> = () => {
       />
 
       <div className={`chat-main-content ${isSidebarExpanded ? 'sidebar-expanded' : ''}`}>
-        <div className={`welcome-overlay ${messages.length > 0 ? 'hidden' : ''} ${isSidebarExpanded ? 'sidebar-expanded' : ''}`}>
-          <div className="welcome-inner">
-            <div className="welcome-cards-grid">
-              {suggestionCards.map((card, i) => {
-                const Icon = card.icon;
-                return (
-                  <button
-                    key={i}
-                    className="welcome-card"
-                    onClick={() => handleSuggestionClick(card.prompt)}
-                  >
-                    <div className="welcome-card-icon">
-                      <Icon size={22} weight="bold" />
-                    </div>
-                    <div className="welcome-card-text">
-                      <span className="welcome-card-title">{card.title}</span>
-                      <span className="welcome-card-desc">{card.desc}</span>
-                    </div>
-                    <ArrowRight size={14} className="welcome-card-arrow" weight="bold" />
-                  </button>
-                );
-              })}
+        {messages.length === 0 ? (
+          <div className="welcome-overlay">
+            <div className="welcome-inner">
+              <div className="welcome-cards-grid">
+                {suggestionCards.map((card, i) => {
+                  const Icon = card.icon;
+                  return (
+                    <button
+                      key={i}
+                      className="welcome-card"
+                      onClick={() => handleSuggestionClick(card.prompt)}
+                    >
+                      <div className="welcome-card-icon">
+                        <Icon size={22} weight="bold" />
+                      </div>
+                      <div className="welcome-card-text">
+                        <span className="welcome-card-title">{card.title}</span>
+                        <span className="welcome-card-desc">{card.desc}</span>
+                      </div>
+                      <ArrowRight size={14} className="welcome-card-arrow" weight="bold" />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
-        <div className="chat-messages-area">
-          <div className="p-4">
-            <div className="flex flex-col">
-              {messages.map((msg, index) => (
-                <ChatMessageItem
-                  key={msg.id}
-                  msg={msg}
-                  msgIndex={index}
-                  streamingMessageId={streamingMessageId}
-                  isStreaming={isStreaming}
-                  streamingResponse={
-                    msg.id === streamingMessageId ? streamingResponse : ""
-                  }
-                  activeContextMenu={activeContextMenu}
-                  setActiveContextMenu={setActiveContextMenu}
-                  handleCopyMessage={handleCopyMessage}
-                  handleRegenerateResponse={regenerateResponse}
-                  handleEditMessage={handleEditMessage}
-                  handleDeleteMessage={handleDeleteMessage}
-                  cancelStreaming={cancelStreaming}
-                />
-              ))}
+        ) : (
+          <div className="chat-messages-area">
+            <div className="p-4">
+              <div className="flex flex-col">
+                {messages.map((msg, index) => (
+                  <ChatMessageItem
+                    key={msg.id}
+                    msg={msg}
+                    msgIndex={index}
+                    streamingMessageId={streamingMessageId}
+                    isStreaming={isStreaming}
+                    streamingResponse={
+                      msg.id === streamingMessageId ? streamingResponse : ""
+                    }
+                    activeContextMenu={activeContextMenu}
+                    setActiveContextMenu={setActiveContextMenu}
+                    handleCopyMessage={handleCopyMessage}
+                    handleRegenerateResponse={regenerateResponse}
+                    handleEditMessage={handleEditMessage}
+                    handleDeleteMessage={handleDeleteMessage}
+                    cancelStreaming={cancelStreaming}
+                  />
+                ))}
+              </div>
+              <div ref={messagesEndRef} />
             </div>
-            <div ref={messagesEndRef} />
           </div>
-        </div>
+        )}
         <div className={`chat-input-area ${isSidebarExpanded ? 'sidebar-expanded' : ''}`}>
           <ChatInput
             input={input}

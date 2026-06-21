@@ -11,7 +11,6 @@ def ai_service():
 @pytest.mark.asyncio
 async def test_get_relevant_chunks_with_reranking(ai_service):
     db = MagicMock()
-    llm = MagicMock()
     mock_chunks = []
     for i in range(10):
         chunk = MagicMock(spec=DocumentChunk)
@@ -24,5 +23,5 @@ async def test_get_relevant_chunks_with_reranking(ai_service):
 
     with patch("app.services.rag_service.rag_service.get_relevant_chunks", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = {"text": "context", "sources": []}
-        result = await rag_service.get_relevant_chunks("query", 1, 1, db, llm=llm)
+        result = await rag_service.get_relevant_chunks("query", 1, 1, db)
         assert result["text"] == "context"

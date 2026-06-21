@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Key, HardDrives, Sparkle, Brain, User } from '@phosphor-icons/react';
+import { X, Key, HardDrives, Sparkle, User } from '@phosphor-icons/react';
 import BYOKForm from './BYOKForm';
 import MCPServerForm from './MCPServerForm';
 import MCPServerList from './MCPServerList';
@@ -13,7 +13,7 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
-type TabId = 'keys' | 'personalization' | 'memory' | 'servers' | 'account';
+type TabId = 'keys' | 'personalization' | 'servers' | 'account';
 
 interface NavItem {
   id: TabId;
@@ -24,7 +24,6 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { id: 'keys', label: 'API Keys', icon: Key },
   { id: 'personalization', label: 'Personalization', icon: Sparkle },
-  { id: 'memory', label: 'Memory', icon: Brain },
   { id: 'servers', label: 'MCP Servers', icon: HardDrives },
   { id: 'account', label: 'Account', icon: User },
 ];
@@ -147,16 +146,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                   Custom Instructions
                 </h3>
                 <PersonalizationForm />
-              </div>
-            )}
-
-            {activeTab === 'memory' && (
-              <div>
-                <h3 className="settings-card-title" style={{ marginBottom: 16 }}>
-                  <Brain size={18} weight="bold" />
-                  Long-term Memory
-                </h3>
-                <MemoryManagement />
+                <div style={{ marginTop: 32 }}>
+                  <h3 className="settings-card-title" style={{ marginBottom: 16 }}>
+                    Long-term Memory
+                  </h3>
+                  <MemoryManagement />
+                </div>
               </div>
             )}
 

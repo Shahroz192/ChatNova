@@ -175,7 +175,7 @@ const MCPServerList: React.FC = () => {
               )}
 
               {!validationError && editConfig.trim() && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, color: 'var(--accent, #059669)', fontSize: '0.8125rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, color: 'var(--text-secondary, #78716c)', fontSize: '0.8125rem' }}>
                   <CheckCircle size={16} weight="bold" />
                   Valid configuration
                 </div>
@@ -226,8 +226,8 @@ const MCPServerList: React.FC = () => {
                           alignItems: 'center',
                           gap: 4,
                           padding: '4px 10px',
-                          background: 'rgba(5, 150, 105, 0.08)',
-                          color: 'var(--accent, #059669)',
+                          background: 'var(--bg-tertiary, #e8e5df)',
+                          color: 'var(--text-secondary, #78716c)',
                           borderRadius: 'var(--radius-xs)',
                           fontSize: '0.75rem',
                           fontWeight: 500,

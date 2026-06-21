@@ -25,7 +25,6 @@ from app.database import SessionLocal
 from app.services.llm_service import llm_service
 from app.services.memory_service import memory_service
 from app.services.rag_service import rag_service
-from app.services.ui_generator import ui_generator_service
 from app.services.web_search import web_search_service
 
 load_dotenv()
@@ -314,6 +313,7 @@ class AIChatService:
         images: Optional[List[str]] = None,
         document_ids: Optional[List[int]] = None,
     ) -> AsyncGenerator[str, None]:
+        t0 = asyncio.get_running_loop().time()
         sanitized_message = sanitize_user_input(message)
         llm = llm_service.get_llm(model_name, user_id, db, streaming=True)
         if not llm:
@@ -330,13 +330,16 @@ class AIChatService:
             if db_user and db_user.custom_instructions:
                 custom_instructions = f"### Custom Instructions\n{db_user.custom_instructions}\n"
 
+        t1 = asyncio.get_running_loop().time()
         relevant_memories = await memory_service.get_relevant_memories(sanitized_message, user_id, db, llm)
+        t2 = asyncio.get_running_loop().time()
         doc_data = {"text": "", "sources": []}
         if session_id and db and user_id:
             doc_data = await rag_service.get_relevant_chunks(
-                sanitized_message, session_id, user_id, db, llm=llm,
-                chat_history=chat_history, document_ids=document_ids
+                sanitized_message, session_id, user_id, db,
+                document_ids=document_ids
             )
+        t3 = asyncio.get_running_loop().time()
         document_context = doc_data["text"]
         sources = doc_data["sources"]
         search_results, ui_container = None, None
@@ -344,14 +347,21 @@ class AIChatService:
 
         current_date = datetime.now().strftime("%A, %B %d, %Y")
         search_status, had_search_results = "Not used", False
+        t4 = asyncio.get_running_loop().time()
         if search_web:
             try:
-                sq = await web_search_service.generate_search_queries(sanitized_message, chat_history, llm)
-                sp = await asyncio.wait_for(web_search_service.search(sq, max_results=5), timeout=15.0)
+                sp = await asyncio.wait_for(web_search_service.search(sanitized_message, max_results=5), timeout=15.0)
                 search_results, search_status, had_search_results = sp["formatted_results"], sp["status"], sp["had_results"]
             except Exception as e:
                 logging.error(f"Search failed: {e}")
                 search_web = False
+        t5 = asyncio.get_running_loop().time()
+        logging.info(
+            f"[TIMING] simple_chat({user_id}): init={t1-t0:.3f}s, "
+            f"memories={t2-t1:.3f}s, rag={t3-t2:.3f}s, "
+            f"search={t5-t4:.3f}s (search_web={search_web}), "
+            f"pre_llm_total={t5-t0:.3f}s"
+        )
 
         # Build the system prompt parts
         system_prompt_content = (
@@ -404,6 +414,7 @@ class AIChatService:
             chain = prompt | bound_llm
             inputs.pop("input_text")
 
+        t6 = asyncio.get_running_loop().time()
         full_msg = None
         async for chunk in chain.astream(inputs):
             if isinstance(chunk, str):
@@ -416,6 +427,7 @@ class AIChatService:
                     full_response += text
                     yield self._moderate_chunk(text, full_response)
 
+        t7 = asyncio.get_running_loop().time()
         if ui_container is None and full_msg:
             for tc in getattr(full_msg, "tool_calls", []) or []:
                 if tc.get("name") == "generate_ui":
@@ -428,18 +440,16 @@ class AIChatService:
             full_response += src_text
             yield src_text
 
-        if ui_container is None:
-            try:
-                s_llm = llm_service.get_llm(model_name, user_id, db, streaming=False)
-                ui_container = await asyncio.wait_for(
-                    ui_generator_service.generate_ui(s_llm, sanitized_message, full_response, search_results, document_context or None),
-                    timeout=10.0
-                )
-            except (json.JSONDecodeError, KeyError, Exception):
-                pass
-
         if ui_container:
             yield f"__GEN_UI__{json.dumps(ui_container)}__END_UI__"
+
+        t9 = asyncio.get_running_loop().time()
+        logging.info(
+            f"[TIMING] simple_chat({user_id}): llm_stream={t7-t6:.3f}s, "
+            f"ui_post_proc={t9-t7:.3f}s, total={t9-t0:.3f}s, "
+            f"response_len={len(full_response)}, has_ui={ui_container is not None}, "
+            f"search_web={search_web}, model={model_name}"
+        )
 
     def transcribe_audio(self, audio_file, filename="audio.wav", user_id=None, db=None) -> str:
         api_key = llm_service.get_provider_key("Groq", user_id, db)

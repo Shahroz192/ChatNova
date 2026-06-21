@@ -35,7 +35,7 @@ const PIE_COLORS = [
   { bg: '#F59E0B', border: '#D97706' }, // Amber
   { bg: '#EF4444', border: '#DC2626' }, // Red
   { bg: '#8B5CF6', border: '#7C3AED' }, // Purple
-  { bg: '#10B981', border: '#059669' }, // Emerald
+  { bg: '#78716c', border: '#57534e' }, // Gray
   { bg: '#EC4899', border: '#DB2777' }, // Pink
   { bg: '#06B6D4', border: '#0891B2' }, // Cyan
   { bg: '#F97316', border: '#EA580C' }, // Orange

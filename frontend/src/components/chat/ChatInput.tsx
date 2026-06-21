@@ -19,7 +19,7 @@ import {
   CaretDown,
 } from "@phosphor-icons/react";
 import type { WebSearchOptions } from "../../types/search";
-import { transcribeAudio } from "../../utils/api";
+import { transcribeAudio } from "../../utils/api/chat";
 
 interface ChatInputProps {
   input: string;
@@ -554,7 +554,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
                   type="button"
                   title="Select model"
                 >
-                  <span className="model-name-text text-truncate">
+                  <span className="model-name-text truncate">
                     {loading ? (
                       <span className="thinking-text-indicator">
                         Thinking...

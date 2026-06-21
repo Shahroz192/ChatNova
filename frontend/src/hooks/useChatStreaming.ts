@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { streamChat } from "../utils/api";
+import { streamChat } from "../utils/api/chat";
 import type { Message } from "../types/chat";
 import type { WebSearchOptions } from "../types/search";
 import { useToast } from "../contexts/ToastContext";

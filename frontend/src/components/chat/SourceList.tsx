@@ -15,15 +15,15 @@ const SourceList: React.FC<SourceListProps> = ({ sources }) => {
 
   return (
     <div className="sources-container mt-3 pt-2 border-top">
-      <div className="sources-label d-flex align-items-center mb-2">
-        <FileText size={14} className="me-2 text-muted" />
-        <span className="small fw-bold text-muted text-uppercase" style={{ letterSpacing: '0.05em', fontSize: '10px' }}>Sources</span>
+      <div className="sources-label flex items-center mb-2">
+        <FileText size={14} className="mr-2 text-gray-500" />
+        <span className="text-xs font-bold text-gray-500 uppercase" style={{ letterSpacing: '0.05em' }}>Sources</span>
       </div>
-      <div className="d-flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2">
         {sources.map((source) => (
-          <div key={source.id} className="source-item d-flex align-items-center px-2 py-1 bg-light border rounded-pill" style={{ fontSize: '11px' }}>
-            <span className="me-1 fw-bold text-primary">[{source.id}]</span>
-            <span className="text-secondary text-truncate" style={{ maxWidth: '150px' }}>{source.filename}</span>
+          <div key={source.id} className="source-item flex items-center px-2 py-1 bg-gray-100 border rounded-full" style={{ fontSize: '11px' }}>
+            <span className="mr-1 font-bold text-gray-900 dark:text-gray-100">[{source.id}]</span>
+            <span className="text-gray-500 dark:text-gray-400 truncate" style={{ maxWidth: '150px' }}>{source.filename}</span>
           </div>
         ))}
       </div>

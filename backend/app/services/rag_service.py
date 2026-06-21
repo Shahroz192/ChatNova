@@ -1,42 +1,14 @@
 import logging
 import re
 import sqlalchemy as sa
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.output_parsers import StrOutputParser
 
 from app.models.document import SessionDocument, DocumentChunk
 from app.services.rerank_service import rerank_service
 
 
 class RAGService:
-    async def optimize_query(
-        self, message: str, chat_history: List[Any], llm: Any
-    ) -> str:
-        """Optimize the user's message into a better query for document retrieval."""
-        opt_prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "You are a retrieval expert. Convert the user's request into a query that is optimized for finding relevant information in technical or informative documents. "
-                    "Focus on the core keywords and entities. If there is relevant conversation history, use it to disambiguate the query. "
-                    "Output ONLY the optimized query string, no quotes or explanation.",
-                ),
-                MessagesPlaceholder(variable_name="chat_history"),
-                ("human", "{input}"),
-            ]
-        )
-        chain = opt_prompt | llm | StrOutputParser()
-        try:
-            optimized_query = await chain.ainvoke(
-                {"input": message, "chat_history": chat_history}
-            )
-            return optimized_query.strip().strip('"')
-        except Exception as e:
-            logging.error(f"Error optimizing RAG query: {e}")
-            return message
-
     async def get_relevant_chunks(
         self,
         query: str,
@@ -44,31 +16,20 @@ class RAGService:
         user_id: int,
         db: Session,
         limit: int = 5,
-        llm: Optional[Any] = None,
-        chat_history: Optional[List[Any]] = None,
         document_ids: Optional[List[int]] = None,
     ) -> Dict[str, Any]:
-        """Retrieve and rerank relevant document chunks for the current query and session."""
+        """Retrieve and rerank relevant document chunks using the raw query."""
         try:
             from app.models.document import has_vector
 
-            # 1. Optimize Query for RAG
-            optimized_query = query
-            if llm:
-                optimized_query = await self.optimize_query(
-                    query, chat_history or [], llm
-                )
-                logging.info(f"🔍 Optimized RAG Query: {optimized_query}")
-
-            # 2. Fetch Candidates (fetch more than the final limit for reranking)
             candidate_limit = limit * 3
 
             # Extract key terms for keyword matching
             search_terms = [
-                t for t in re.findall(r"\w+", optimized_query) if len(t) > 3
+                t for t in re.findall(r"\w+", query) if len(t) > 3
             ]
             if not search_terms:
-                search_terms = [optimized_query[:50]]
+                search_terms = [query[:50]]
             query_filter = sa.or_(
                 *[DocumentChunk.content.ilike(f"%{term}%") for term in search_terms]
             )
@@ -81,9 +42,7 @@ class RAGService:
 
                 try:
                     embedding_service = EmbeddingService(user_id, db)
-                    query_embedding = await embedding_service.embed_query(
-                        optimized_query
-                    )
+                    query_embedding = await embedding_service.embed_query(query)
 
                     # Vector search
                     vector_chunks = (
@@ -151,7 +110,6 @@ class RAGService:
                 )
 
             if not candidates:
-                # Greedy Fallback
                 candidates = (
                     db.query(DocumentChunk)
                     .join(SessionDocument)
@@ -168,15 +126,15 @@ class RAGService:
             if not candidates:
                 return {"text": "", "sources": []}
 
-            # 3. Rerank Candidates. Pull a wider set, then keep coverage across files
+            # Rerank candidates
             reranked_candidates = rerank_service.rerank(
-                optimized_query, candidates, top_n=max(limit * 2, len(document_ids or []))
+                query, candidates, top_n=max(limit * 2, len(document_ids or []))
             )
 
             chunks = []
             covered_docs = set()
 
-            # First pass: prefer at least one chunk from each document when possible.
+            # First pass: prefer at least one chunk from each document
             for chunk in reranked_candidates:
                 if chunk.document_id in covered_docs:
                     continue
@@ -185,7 +143,7 @@ class RAGService:
                 if len(chunks) >= limit:
                     break
 
-            # Second pass: fill any remaining slots by relevance.
+            # Second pass: fill remaining slots by relevance
             if len(chunks) < limit:
                 selected_chunk_ids = {chunk.id for chunk in chunks}
                 for chunk in reranked_candidates:

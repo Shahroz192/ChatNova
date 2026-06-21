@@ -12,15 +12,15 @@ const MessageStatus: React.FC<MessageStatusProps> = ({ status, className = '' })
   const getStatusIcon = () => {
     switch (status) {
       case 'sending':
-        return <Clock size={12} className="text-warning" />;
+        return <Clock size={12} className="text-yellow-500" />;
       case 'sent':
-        return <Check size={12} className="text-muted" />;
+        return <Check size={12} className="text-gray-500" />;
       case 'delivered':
-        return <Checks size={12} className="text-success" />;
+        return <Checks size={12} className="text-green-500" />;
       case 'failed':
-        return <X size={12} className="text-danger" />;
+        return <X size={12} className="text-red-500" />;
       default:
-        return <Check size={12} className="text-muted" />;
+        return <Check size={12} className="text-gray-500" />;
     }
   };
 
@@ -41,7 +41,7 @@ const MessageStatus: React.FC<MessageStatusProps> = ({ status, className = '' })
 
   return (
     <div
-      className={`d-flex align-items-center message-status ${className}`}
+      className={`flex items-center message-status ${className}`}
       title={getStatusText()}
     >
       {getStatusIcon()}

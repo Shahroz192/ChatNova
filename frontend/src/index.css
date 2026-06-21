@@ -37,17 +37,17 @@
   --color-gray-900: #1c1917;
   --color-gray-950: #0c0a09;
 
-  /* Deep Emerald accent — single distinctive accent */
-  --color-emerald: #059669;
-  --color-emerald-50: #ecfdf5;
-  --color-emerald-100: #d1fae5;
-  --color-emerald-200: #a7f3d0;
-  --color-emerald-300: #6ee7b7;
-  --color-emerald-400: #34d399;
-  --color-emerald-500: #059669;
-  --color-emerald-600: #047857;
-  --color-emerald-700: #065f46;
-  --color-emerald-800: #064e3b;
+  /* Neutral accent palette */
+  --color-emerald: #78716c;
+  --color-emerald-50: #fafaf9;
+  --color-emerald-100: #f5f4f0;
+  --color-emerald-200: #e8e5df;
+  --color-emerald-300: #d4d0c8;
+  --color-emerald-400: #a8a29e;
+  --color-emerald-500: #78716c;
+  --color-emerald-600: #57534e;
+  --color-emerald-700: #44403c;
+  --color-emerald-800: #292524;
 
   /* Surface colors — reference CSS vars for automatic dark mode */
   --color-surface: var(--bg-primary, #f5f4f0);
@@ -114,9 +114,9 @@ body {
   --primary-hover: #292524;
   --primary-light: #44403c;
   --secondary: #78716c;
-  --accent: #059669;
-  --accent-glow: rgba(5, 150, 105, 0.15);
-  --success: #10b981;
+  --accent: #1c1917;
+  --accent-glow: transparent;
+  --success: #57534e;
   --warning: #f59e0b;
   --error: #ef4444;
   --info: #0ea5e9;
@@ -205,8 +205,8 @@ body {
   --primary-hover: #f5f4f0;
   --primary-light: #d4d0c8;
   --secondary: #a8a29e;
-  --accent: #34d399;
-  --accent-glow: rgba(52, 211, 153, 0.2);
+  --accent: #e8e5df;
+  --accent-glow: transparent;
   --bg-primary: #121212;
   --bg-secondary: #1a1a1a;
   --bg-tertiary: #252525;

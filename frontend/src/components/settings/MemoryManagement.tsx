@@ -129,8 +129,8 @@ const MemoryManagement: React.FC = () => {
                 padding: '10px 14px',
                 fontSize: '0.75rem',
                 color: 'var(--text-secondary, #78716c)',
-                background: 'rgba(5, 150, 105, 0.06)',
-                border: '1px solid rgba(5, 150, 105, 0.1)',
+                background: 'var(--bg-tertiary, #e8e5df)',
+                border: '1px solid var(--border-light, #e8e5df)',
                 borderRadius: 'var(--radius-sm)',
                 lineHeight: 1.4,
             }}>
