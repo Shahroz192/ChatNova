@@ -1,4 +1,5 @@
-from unittest.mock import MagicMock
+import pytest
+from unittest.mock import AsyncMock
 
 from app.services.web_search import WebSearchService
 
@@ -6,12 +7,12 @@ from app.services.web_search import WebSearchService
 class FakeExaResult:
     """Simulates an Exa result object."""
 
-    def __init__(self, title, url, published_date, text=None):
+    def __init__(self, title, url, published_date, text=None, image=None):
         self.title = title
         self.url = url
         self.published_date = published_date
         self.text = text
-        self.image = None
+        self.image = image
 
 
 class FakeExaResponse:
@@ -21,10 +22,11 @@ class FakeExaResponse:
         self.results = results
 
 
-def test_search_with_metadata_formats_results():
+@pytest.mark.asyncio
+async def test_search_formats_results():
     service = WebSearchService(api_key="test-key")
-    service.client = MagicMock()
-    service.client.search.return_value = FakeExaResponse(
+    service._client = AsyncMock()
+    service._client.search.return_value = FakeExaResponse(
         results=[
             FakeExaResult(
                 title="Event happened",
@@ -35,7 +37,7 @@ def test_search_with_metadata_formats_results():
         ]
     )
 
-    result = service.search_with_metadata("did event happen")
+    result = await service.search("did event happen")
 
     assert result["had_results"] is True
     assert result["status"] == "ok"
@@ -44,35 +46,37 @@ def test_search_with_metadata_formats_results():
     assert "https://example.com/event" in result["formatted_results"]
 
 
-def test_search_with_metadata_returns_no_results_status_on_errors():
+@pytest.mark.asyncio
+async def test_search_returns_no_results_status_on_errors():
     service = WebSearchService(api_key="test-key")
-    service.client = MagicMock()
-    service.client.search.side_effect = RuntimeError("provider down")
+    service._client = AsyncMock()
+    service._client.search.side_effect = RuntimeError("provider down")
 
-    result = service.search_with_metadata("failing query")
+    result = await service.search("failing query")
 
     assert result["had_results"] is False
     assert result["status"] == "no_results"
-    assert "No reliable search results were retrieved" in result["formatted_results"]
-    assert service.client.search.call_count == 1
+    assert service._client.search.call_count == 1
 
 
-def test_search_with_metadata_skips_provider_without_api_key():
+@pytest.mark.asyncio
+async def test_search_skips_provider_without_api_key():
     service = WebSearchService(api_key="")
-    service.client = MagicMock()
+    service._client = AsyncMock()
 
-    result = service.search_with_metadata("latest news")
+    result = await service.search("latest news")
 
     assert result["had_results"] is False
-    assert result["status"] == "no_results"
-    assert "EXA_API_KEY is not configured" in result["formatted_results"]
-    service.client.search.assert_not_called()
+    assert result["status"] == "error"
+    assert "EXA_API_KEY not configured" in str(result.get("formatted_results", ""))
+    service._client.search.assert_not_called()
 
 
-def test_search_with_metadata_deduplicates_across_sources_and_variants():
+@pytest.mark.asyncio
+async def test_search_returns_single_result_for_single_query():
     service = WebSearchService(api_key="test-key")
-    service.client = MagicMock()
-    service.client.search.return_value = FakeExaResponse(
+    service._client = AsyncMock()
+    service._client.search.return_value = FakeExaResponse(
         results=[
             FakeExaResult(
                 title="Samsung tri-fold launched",
@@ -83,16 +87,17 @@ def test_search_with_metadata_deduplicates_across_sources_and_variants():
         ]
     )
 
-    result = service.search_with_metadata("samsung tri-fold phone launch")
+    result = await service.search("samsung tri-fold phone launch")
 
     assert result["had_results"] is True
     assert len(result["results"]) == 1
 
 
-def test_search_many_with_metadata_merges_and_deduplicates():
+@pytest.mark.asyncio
+async def test_search_many_with_metadata_merges_and_deduplicates():
     service = WebSearchService(api_key="test-key")
-    service.client = MagicMock()
-    service.client.search.return_value = FakeExaResponse(
+    service._client = AsyncMock()
+    service._client.search.return_value = FakeExaResponse(
         results=[
             FakeExaResult(
                 title="Kimi 2.5 released",
@@ -103,11 +108,73 @@ def test_search_many_with_metadata_merges_and_deduplicates():
         ]
     )
 
-    result = service.search_many_with_metadata(
+    result = await service.search_many_with_metadata(
         ["latest kimi release", "moonshot kimi 2.5"]
     )
 
     assert result["status"] == "ok"
     assert result["had_results"] is True
     assert len(result["results"]) == 1
-    assert "WEB SEARCH RESULTS (MERGED)" in result["formatted_results"]
+    assert "WEB SEARCH RESULTS" in result["formatted_results"]
+
+
+@pytest.mark.asyncio
+async def test_search_with_empty_api_key():
+    service = WebSearchService(api_key="")
+    service._client = AsyncMock()
+
+    result = await service.search("test query")
+
+    assert result["had_results"] is False
+    assert result["status"] == "error"
+    assert "EXA_API_KEY not configured" in str(result.get("formatted_results", ""))
+
+
+@pytest.mark.asyncio
+async def test_search_with_empty_query():
+    service = WebSearchService(api_key="test-key")
+    service._client = AsyncMock()
+
+    result = await service.search("")
+
+    assert result["had_results"] is False
+    assert result["status"] == "no_results"
+    assert "No valid query" in str(result.get("formatted_results", ""))
+
+
+@pytest.mark.asyncio
+async def test_search_uses_highlights_and_extras():
+    service = WebSearchService(api_key="test-key")
+    service._client = AsyncMock()
+    service._client.search.return_value = FakeExaResponse(results=[])
+
+    await service.search("test query", max_results=5)
+
+    service._client.search.assert_called_once_with(
+        "test query",
+        num_results=5,
+        contents={"highlights": {"query": "test query", "max_characters": 500}, "extras": {"image_links": 2}},
+    )
+
+
+@pytest.mark.asyncio
+async def test_search_with_metadata_aliases_search():
+    service = WebSearchService(api_key="test-key")
+    service._client = AsyncMock()
+    service._client.search.return_value = FakeExaResponse(results=[])
+
+    result = await service.search_with_metadata("test query")
+
+    assert "formatted_results" in result
+    assert "results" in result
+
+
+@pytest.mark.asyncio
+async def test_search_returns_query_in_response():
+    service = WebSearchService(api_key="test-key")
+    service._client = AsyncMock()
+    service._client.search.return_value = FakeExaResponse(results=[])
+
+    result = await service.search("my search query")
+
+    assert result["query"] == "my search query"

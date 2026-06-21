@@ -18,7 +18,8 @@ vi.mock('axios', () => ({
   },
 }));
 
-import { getSearchHistory, addToSearchHistory, streamChat } from '../api';
+import { getSearchHistory, addToSearchHistory } from '../api/search';
+import { streamChat } from '../api/chat';
 
 describe('api utility', () => {
   beforeEach(() => {

@@ -46,7 +46,7 @@ export const ThemeToggle: React.FC<ThemeToggleProps> = React.memo(({ className =
   return (
     <button
       onClick={cycleTheme}
-      className={`btn btn-link p-2 rounded-circle d-flex align-items-center justify-content-center ${className}`}
+      className={`p-2 rounded-full flex items-center justify-center ${className}`}
       style={{ color: 'inherit', textDecoration: 'none' }}
       title={tooltip}
       aria-label={`Current theme: ${theme}. Click to change.`}

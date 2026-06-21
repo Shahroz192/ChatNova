@@ -11,7 +11,7 @@ const Timestamp: React.FC<TimestampProps> = ({ dateString, className = '' }) => 
 
   return (
     <small
-      className={`text-muted timestamp ${className}`}
+      className={`text-gray-500 timestamp ${className}`}
       onMouseEnter={() => setShowFullTime(true)}
       onMouseLeave={() => setShowFullTime(false)}
       style={{ cursor: 'default', fontSize: '0.75rem' }}

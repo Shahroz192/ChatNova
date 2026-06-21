@@ -27,7 +27,7 @@ async def test_simple_chat_includes_custom_instructions():
         mock_astream_mock = MagicMock(side_effect=mock_astream)
         mock_llm.astream = mock_astream_mock
 
-        with patch.object(service, "get_llm", return_value=mock_llm):
+        with patch("app.services.ai_chat.llm_service.get_llm", return_value=mock_llm):
             with patch(
                 "app.services.ai_chat.ChatPromptTemplate.from_messages"
             ) as mock_from_messages:
@@ -71,7 +71,7 @@ async def test_simple_chat_no_instructions_behavior():
         mock_astream_mock = MagicMock(side_effect=mock_astream)
         mock_llm.astream = mock_astream_mock
 
-        with patch.object(service, "get_llm", return_value=mock_llm):
+        with patch("app.services.ai_chat.llm_service.get_llm", return_value=mock_llm):
             with patch(
                 "app.services.ai_chat.ChatPromptTemplate.from_messages"
             ) as mock_from_messages:

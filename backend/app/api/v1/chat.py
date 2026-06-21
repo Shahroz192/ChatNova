@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -18,6 +19,7 @@ from app.schemas.session import (
     ChatSessionUpdate,
 )
 from app.services.ai_chat import ai_service
+from app.services.llm_service import llm_service
 from app.services.document_task_service import process_document_task
 from app.services.session_service import session_service
 from app.utils.pagination import compute_pagination_meta
@@ -430,6 +432,7 @@ async def chat_stream(
 
             ui_data = None
             content_chunks = 0
+            _t_stream_start = asyncio.get_running_loop().time()
             async for chunk in ai_service.simple_chat(
                 message_in.content,
                 message_in.model,
@@ -455,7 +458,8 @@ async def chat_stream(
                     json.dumps({"type": "content", "content": chunk})
                 )
 
-            logger.info(f"[STREAM] simple_chat completed: total_chunks={content_chunks}, response_len={len(full_response)} for message {msg.id}")
+            _t_stream_end = asyncio.get_running_loop().time()
+            logger.info(f"[STREAM] simple_chat completed: total_chunks={content_chunks}, response_len={len(full_response)}, stream_duration={_t_stream_end-_t_stream_start:.3f}s for message {msg.id}")
 
             if msg:
                 update_data: Dict[str, Any] = {"response": full_response}
@@ -465,12 +469,14 @@ async def chat_stream(
                 logger.info(f"[STREAM] Message {msg.id} updated in DB")
 
             # Yield memory events
+            _t_mem_start = asyncio.get_running_loop().time()
             logger.info(f"[STREAM] Extracting memories for message {msg.id}...")
             async for mem_event in _extract_memories_events(
                 message_in.content, current_user.id, message_in.model, stream_db
             ):
                 yield mem_event
-            logger.info(f"[STREAM] Memories done, yielding [DONE] for message {msg.id}")
+            _t_mem_end = asyncio.get_running_loop().time()
+            logger.info(f"[STREAM] Memories done ({_t_mem_end-_t_mem_start:.3f}s), yielding [DONE] for message {msg.id}")
 
             yield "data: [DONE]\n\n"
             logger.info(f"[STREAM] [DONE] yielded for message {msg.id}")
@@ -726,7 +732,7 @@ async def test_ai_models(
     Test all available AI models with a single input and return their responses.
     Helpful for comparing model outputs and performance.
     """
-    available_models = ai_service.get_available_models(current_user.id, db)
+    available_models = llm_service.get_available_models(current_user.id, db)
     results = {}
 
     for model in available_models:
@@ -773,7 +779,7 @@ async def test_provider_key(
     if not model_name:
         raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
 
-    llm = ai_service.get_llm_by_provider(provider, api_key)
+    llm = llm_service.get_llm_by_provider(provider, api_key)
     if not llm:
         raise HTTPException(
             status_code=400, detail=f"Failed to initialize {provider} client"
@@ -800,8 +806,8 @@ def get_available_models(
     Get list of available AI models.
     """
     return {
-        "models": ai_service.get_available_models(current_user.id, db),
-        "total": len(ai_service.get_available_models(current_user.id, db)),
+        "models": llm_service.get_available_models(current_user.id, db),
+        "total": len(llm_service.get_available_models(current_user.id, db)),
     }
 
 

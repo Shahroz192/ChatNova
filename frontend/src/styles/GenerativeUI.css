@@ -180,10 +180,10 @@
   border-left: 3px solid rgba(59, 130, 246, 0.6);
 }
 .gen-ui-alert-success {
-  background: rgba(16, 185, 129, 0.08);
-  border-color: rgba(16, 185, 129, 0.2);
-  color: var(--success);
-  border-left: 3px solid rgba(16, 185, 129, 0.6);
+  background: var(--bg-tertiary, #e8e5df);
+  border-color: var(--border-medium, #d4d0c8);
+  color: var(--text-primary, #1c1917);
+  border-left: 3px solid var(--border-dark, #a8a29e);
 }
 .gen-ui-alert-warning {
   background: rgba(245, 158, 11, 0.08);

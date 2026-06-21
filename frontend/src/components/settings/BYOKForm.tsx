@@ -78,7 +78,7 @@ const BYOKForm: React.FC = () => {
         return (
           <div key={provider} className="settings-provider-card" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px' }}>
             {hasKey && (
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent, #059669)', flexShrink: 0 }} />
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', flexShrink: 0 }} />
             )}
             <span className="settings-provider-name" style={{ whiteSpace: 'nowrap', minWidth: 80 }}>{provider}</span>
             <input

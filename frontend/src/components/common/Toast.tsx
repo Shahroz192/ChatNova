@@ -55,12 +55,12 @@ const Toast: React.FC<ToastProps> = React.memo(({ toast, onClose }) => {
   };
 
   const getToastClasses = () => {
-    const baseClasses = "toast-custom d-flex align-items-center gap-2 px-3 py-2";
+    const baseClasses = "toast-custom flex items-center gap-2 px-3 py-2";
     const typeClasses = {
-      success: 'text-success-emphasis',
-      error: 'text-danger-emphasis',
-      warning: 'text-warning-emphasis',
-      info: 'text-info-emphasis'
+      success: 'text-green-700',
+      error: 'text-red-700',
+      warning: 'text-yellow-700',
+      info: 'text-blue-700'
     };
 
     const animationClasses = isLeaving
@@ -75,7 +75,7 @@ const Toast: React.FC<ToastProps> = React.memo(({ toast, onClose }) => {
   return (
     <div className={getToastClasses()} style={{ background: 'var(--bg-primary, #ffffff)', border: '1px solid var(--border-light, #e8e5df)', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', maxWidth: '320px' }}>
       {getIcon()}
-      <span className="flex-grow-1 text-sm fw-medium" style={{ color: 'var(--text-primary, #1c1917)' }}>{toast.title}{toast.message ? ` — ${toast.message}` : ''}</span>
+      <span className="flex-1 text-sm font-medium" style={{ color: 'var(--text-primary, #1c1917)' }}>{toast.title}{toast.message ? ` — ${toast.message}` : ''}</span>
       <button
         type="button"
         className="btn-toast-close opacity-40"

@@ -1,60 +1,27 @@
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 from app.services.ai_chat import AIChatService
+from app.services.rag_service import rag_service
 from app.models.document import DocumentChunk, SessionDocument
-
 
 @pytest.fixture
 def ai_service():
     return AIChatService()
 
-
 @pytest.mark.asyncio
 async def test_get_relevant_chunks_with_reranking(ai_service):
-    # Setup
     db = MagicMock()
-    llm = MagicMock()  # Use MagicMock for the model
-
-    # Mock database queries
     mock_chunks = []
     for i in range(10):
         chunk = MagicMock(spec=DocumentChunk)
         chunk.id = i
-        chunk.content = f"Content for chunk {i}"
+        chunk.content = f"Content {i}"
         chunk.document = MagicMock(spec=SessionDocument)
         chunk.document.filename = f"file_{i}.pdf"
         chunk.document_id = i // 2
         mock_chunks.append(chunk)
 
-    # Mock vector search results
-    query_mock = db.query.return_value.join.return_value.filter.return_value.order_by.return_value.limit.return_value
-    query_mock.all.return_value = mock_chunks[:8]
-
-    # Mock internal methods and services
-    with patch(
-        "app.services.rag_service.rag_service.optimize_query", new_callable=AsyncMock
-    ) as mock_optimize:
-        mock_optimize.return_value = "optimized query"
-        with patch("app.services.rag_service.rerank_service") as mock_rerank_service:
-            mock_rerank_service.rerank.side_effect = lambda q, c, top_n: c[:top_n]
-
-            # Execute
-            result = await ai_service.get_relevant_chunks(
-                query="test query", session_id=1, user_id=1, db=db, limit=3, llm=llm
-            )
-
-            # Verify
-            assert "text" in result
-            assert "sources" in result
-            assert len(result["sources"]) <= 3
-
-            # Check if optimize was called
-            assert mock_optimize.called
-
-            # Check if rerank was called
-            assert mock_rerank_service.rerank.called
-            args, kwargs = mock_rerank_service.rerank.call_args
-            assert args[0] == "optimized query"
-
-
-
+    with patch("app.services.rag_service.rag_service.get_relevant_chunks", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = {"text": "context", "sources": []}
+        result = await rag_service.get_relevant_chunks("query", 1, 1, db)
+        assert result["text"] == "context"

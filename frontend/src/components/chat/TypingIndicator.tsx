@@ -196,8 +196,8 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({
 
   return (
     <div className="enhanced-typing-indicator">
-      <div className="d-flex justify-content-start mb-3">
-        <div className="d-flex align-items-start">
+      <div className="flex justify-start mb-3">
+        <div className="flex items-start">
           {/* Enhanced AI Avatar */}
           <div className="enhanced-ai-avatar">
             <div

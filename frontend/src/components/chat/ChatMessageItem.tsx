@@ -238,12 +238,12 @@ const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                 {msg.tool_calls && msg.tool_calls.length > 0 ? (
                   <div className="tool-calls mb-3">
                     {msg.tool_calls.map((tool, idx) => (
-                      <div key={idx} className="tool-call-item text-muted small mb-1">
-                        <span className="fw-bold">🛠️ {tool.tool}</span>
-                        {tool.status === 'running' ? <span className="ms-2 spinner-border spinner-border-sm" role="status" /> : null}
-                        {tool.status === 'completed' ? <span className="ms-2 text-success">✓</span> : null}
-                        <div className="tool-input ps-3 text-truncate" style={{ maxWidth: '300px', opacity: 0.8 }}>Input: {tool.input}</div>
-                        {tool.output ? <div className="tool-output ps-3 text-truncate" style={{ maxWidth: '300px', opacity: 0.8 }}>Output: {tool.output}</div> : null}
+                      <div key={idx} className="tool-call-item text-gray-500 text-xs mb-1">
+                        <span className="font-bold">🛠️ {tool.tool}</span>
+                        {tool.status === 'running' ? <span className="ms-2 inline-block w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" role="status" /> : null}
+                        {tool.status === 'completed' ? <span className="ms-2 text-green-500">✓</span> : null}
+                        <div className="tool-input pl-3 truncate" style={{ maxWidth: '300px', opacity: 0.8 }}>Input: {tool.input}</div>
+                        {tool.output ? <div className="tool-output pl-3 truncate" style={{ maxWidth: '300px', opacity: 0.8 }}>Output: {tool.output}</div> : null}
                       </div>
                     ))}
                   </div>

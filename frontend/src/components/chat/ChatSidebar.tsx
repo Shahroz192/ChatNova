@@ -245,7 +245,7 @@ const ChatSidebar: React.FC<ChatSidebarProps> = ({
           {/* Footer — User info + menu */}
           <div className="sidebar-expanded-footer">
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              <div className="w-7 h-7 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-xs font-semibold text-gray-700 dark:text-gray-200 flex-shrink-0">
+              <div className="w-7 h-7 rounded-full bg-gray-300 dark:bg-gray-600 flex items-center justify-center text-xs font-semibold text-gray-700 dark:text-gray-200 shrink-0">
                 {userEmail ? userEmail[0].toUpperCase() : '?'}
               </div>
               <span className="text-sm text-gray-600 dark:text-gray-400 truncate">
